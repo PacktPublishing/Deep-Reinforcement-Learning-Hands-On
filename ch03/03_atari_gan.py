@@ -30,8 +30,6 @@ LEARNING_RATE = 0.0001
 REPORT_EVERY_ITER = 100
 SAVE_IMAGE_EVERY_ITER = 1000
 
-RUN_PREFIX = "runs"
-
 
 class InputWrapper(gym.ObservationWrapper):
     """
@@ -120,7 +118,8 @@ def iterate_batches(envs, batch_size=BATCH_SIZE):
     while True:
         e = next(env_gen)
         obs, reward, is_done, _ = e.step(e.action_space.sample())
-        batch.append(obs)
+        if np.mean(obs) > 0.01:
+            batch.append(obs)
         if len(batch) == batch_size:
             yield Variable(torch.from_numpy(np.array(batch, dtype=np.float32)))
             batch.clear()
@@ -135,13 +134,9 @@ if __name__ == "__main__":
 
     envs = [InputWrapper(gym.make(name)) for name in ('Breakout-v0', 'AirRaid-v0', 'Pong-v0')]
     input_shape = envs[0].observation_space.shape
-    log.info("Observations: %s", input_shape)
 
     net_discr = Discriminator(input_shape=input_shape)
     net_gener = Generator(output_shape=input_shape)
-    log.info("Discriminator: %s", net_discr)
-    log.info("Generator: %s", net_gener)
-
     if args.cuda:
         net_discr.cuda()
         net_gener.cuda()
@@ -161,43 +156,42 @@ if __name__ == "__main__":
         true_labels_v = true_labels_v.cuda()
         fake_labels_v = fake_labels_v.cuda()
 
-    for batch in iterate_batches(envs):
-        dis_optimizer.zero_grad()
-
+    for batch_v in iterate_batches(envs):
         # generate extra fake samples, input is 4D: batch, filters, x, y
         gen_input_v = Variable(torch.FloatTensor(BATCH_SIZE, LATENT_VECTOR_SIZE, 1, 1).normal_(0, 1))
         if args.cuda:
-            batch = batch.cuda()
+            batch_v = batch_v.cuda()
             gen_input_v = gen_input_v.cuda()
         gen_output_v = net_gener(gen_input_v)
 
         # train discriminator
-        dis_output_true_v = net_discr(batch)
+        dis_output_true_v = net_discr(batch_v)
         dis_output_fake_v = net_discr(gen_output_v.detach())
         dis_loss = objective(dis_output_true_v, true_labels_v) + objective(dis_output_fake_v, fake_labels_v)
         dis_loss.backward()
-        # nn.utils.clip_grad_norm(net_discr.parameters(), max_norm=1.0)
         dis_optimizer.step()
+        dis_optimizer.zero_grad()
         dis_losses.append(dis_loss.data.cpu().numpy()[0])
 
         # train generator
-        gen_optimizer.zero_grad()
         dis_output_v = net_discr(gen_output_v)
-        gen_loss = objective(dis_output_v, true_labels_v)
-        gen_loss.backward()
-        # nn.utils.clip_grad_norm(net_gener.parameters(), max_norm=1.0)
+        gen_loss_v = objective(dis_output_v, true_labels_v)
+        gen_loss_v.backward()
         gen_optimizer.step()
-        gen_losses.append(gen_loss.data.cpu().numpy()[0])
+        gen_optimizer.zero_grad()
+        dis_optimizer.zero_grad()
+        gen_losses.append(gen_loss_v.data.cpu().numpy()[0])
 
         iter_no += 1
         if iter_no % REPORT_EVERY_ITER == 0:
             log.info("Iter %d: gen_loss=%.3e, dis_loss=%.3e", iter_no, np.mean(gen_losses), np.mean(dis_losses))
-            writer.add_scalar(RUN_PREFIX + "/gen_loss", np.mean(gen_losses), iter_no)
-            writer.add_scalar(RUN_PREFIX + "/dis_loss", np.mean(dis_losses), iter_no)
+            writer.add_scalar("gen_loss", np.mean(gen_losses), iter_no)
+            writer.add_scalar("dis_loss", np.mean(dis_losses), iter_no)
             gen_losses = []
             dis_losses = []
         if iter_no % SAVE_IMAGE_EVERY_ITER == 0:
-            vutils.save_image(gen_output_v.data, "out-%03d.png" % iter_no, nrow=8, normalize=False)
+            writer.add_image("fake", vutils.make_grid(gen_output_v.data[:64]), iter_no)
+            writer.add_image("real", vutils.make_grid(batch_v.data[:64]), iter_no)
 
     pass
 
