@@ -165,21 +165,20 @@ if __name__ == "__main__":
         gen_output_v = net_gener(gen_input_v)
 
         # train discriminator
+        dis_optimizer.zero_grad()
         dis_output_true_v = net_discr(batch_v)
         dis_output_fake_v = net_discr(gen_output_v.detach())
         dis_loss = objective(dis_output_true_v, true_labels_v) + objective(dis_output_fake_v, fake_labels_v)
         dis_loss.backward()
         dis_optimizer.step()
-        dis_optimizer.zero_grad()
         dis_losses.append(dis_loss.data.cpu().numpy()[0])
 
         # train generator
+        gen_optimizer.zero_grad()
         dis_output_v = net_discr(gen_output_v)
         gen_loss_v = objective(dis_output_v, true_labels_v)
         gen_loss_v.backward()
         gen_optimizer.step()
-        gen_optimizer.zero_grad()
-        dis_optimizer.zero_grad()
         gen_losses.append(gen_loss_v.data.cpu().numpy()[0])
 
         iter_no += 1
