@@ -12,7 +12,7 @@ from torch.autograd import Variable
 
 HIDDEN_SIZE = 128
 BATCH_SIZE = 16
-PERCENTILLE = 50
+PERCENTILLE = 70
 
 
 class Net(nn.Module):
@@ -94,7 +94,7 @@ if __name__ == "__main__":
         writer.add_scalar("loss", loss_v.data[0], iter_no)
         writer.add_scalar("reward_bound", reward_bound, iter_no)
         writer.add_scalar("reward_mean", reward_mean, iter_no)
-        if reward_bound > 199:
+        if reward_mean > 199:
             print("Solved!")
             break
     writer.close()
