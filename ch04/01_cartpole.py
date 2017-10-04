@@ -40,19 +40,20 @@ def iterate_batches(env, net, batch_size):
     sm = nn.Softmax()
     while True:
         obs_v = Variable(torch.FloatTensor([obs]))
-        act_probs = sm(net(obs_v)).data.cpu().numpy()[0]
+        act_probs_v = sm(net(obs_v))
+        act_probs = act_probs_v.data.numpy()[0]
         action = np.random.choice(len(act_probs), p=act_probs)
         next_obs, reward, is_done, _ = env.step(action)
         episode_reward += reward
         episode_steps.append(EpisodeStep(observation=obs, action=action))
         if is_done:
             batch.append(Episode(reward=episode_reward, steps=episode_steps))
-            if len(batch) == batch_size:
-                yield batch
-                batch = []
             episode_reward = 0.0
             episode_steps = []
             next_obs = env.reset()
+            if len(batch) == batch_size:
+                yield batch
+                batch = []
         obs = next_obs
 
 
