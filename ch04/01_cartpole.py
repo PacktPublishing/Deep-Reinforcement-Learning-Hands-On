@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import gym
-import collections
+from collections import namedtuple
 import numpy as np
 from tensorboardX import SummaryWriter
 
@@ -12,7 +12,7 @@ from torch.autograd import Variable
 
 HIDDEN_SIZE = 128
 BATCH_SIZE = 16
-PERCENTILLE = 70
+PERCENTILE = 70
 
 
 class Net(nn.Module):
@@ -28,14 +28,14 @@ class Net(nn.Module):
         return self.net(x)
 
 
-BatchExample = collections.namedtuple('BatchExample', field_names=['reward', 'episode'])
-EpisodeStep  = collections.namedtuple('EpisodeStep', field_names=['observation', 'action'])
+Episode = namedtuple('Episode', field_names=['reward', 'steps'])
+EpisodeStep = namedtuple('EpisodeStep', field_names=['observation', 'action'])
 
 
 def iterate_batches(env, net, batch_size):
     batch = []
     episode_reward = 0.0
-    episode_samples = []
+    episode_steps = []
     obs = env.reset()
     sm = nn.Softmax()
     while True:
@@ -44,21 +44,21 @@ def iterate_batches(env, net, batch_size):
         action = np.random.choice(len(act_probs), p=act_probs)
         next_obs, reward, is_done, _ = env.step(action)
         episode_reward += reward
-        episode_samples.append(EpisodeStep(observation=obs, action=action))
+        episode_steps.append(EpisodeStep(observation=obs, action=action))
         if is_done:
-            batch.append(BatchExample(reward=episode_reward, episode=episode_samples))
+            batch.append(Episode(reward=episode_reward, steps=episode_steps))
             if len(batch) == batch_size:
                 yield batch
                 batch = []
             episode_reward = 0.0
-            episode_samples = []
+            episode_steps = []
             next_obs = env.reset()
         obs = next_obs
 
 
-def filter_batch(batch, percentille):
+def filter_batch(batch, percentile):
     rewards = list(map(lambda s: s.reward, batch))
-    reward_bound = np.percentile(rewards, percentille)
+    reward_bound = np.percentile(rewards, percentile)
     reward_mean = float(np.mean(rewards))
 
     train_obs = []
@@ -66,8 +66,8 @@ def filter_batch(batch, percentille):
     for example in batch:
         if example.reward < reward_bound:
             continue
-        train_obs.extend(map(lambda step: step.observation, example.episode))
-        train_act.extend(map(lambda step: step.action, example.episode))
+        train_obs.extend(map(lambda step: step.observation, example.steps))
+        train_act.extend(map(lambda step: step.action, example.steps))
 
     return Variable(torch.FloatTensor(train_obs)), Variable(torch.LongTensor(train_act)), reward_bound, reward_mean
 
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     writer = SummaryWriter()
 
     for iter_no, batch in enumerate(iterate_batches(env, net, BATCH_SIZE)):
-        train_obs, train_acts, reward_bound, reward_mean = filter_batch(batch, PERCENTILLE)
+        train_obs, train_acts, reward_bound, reward_mean = filter_batch(batch, PERCENTILE)
         optimizer.zero_grad()
         action_scores = net(train_obs)
         loss_v = objective(action_scores, train_acts)
