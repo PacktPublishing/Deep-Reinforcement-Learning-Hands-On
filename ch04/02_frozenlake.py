@@ -13,7 +13,8 @@ from torch.autograd import Variable
 
 HIDDEN_SIZE = 512
 BATCH_SIZE = 100
-PERCENTILE = 50
+PERCENTILE = 98
+GAMMA = 0.99
 
 
 class DiscreteOneHotWrapper(gym.ObservationWrapper):
@@ -71,10 +72,9 @@ def iterate_batches(env, net, batch_size):
 
 
 def filter_batch(batch, percentile):
-    rewards = list(map(lambda s: s.reward / len(s.steps), batch))
+    rewards = list(map(lambda s: s.reward * (GAMMA ** len(s.steps)), batch))
+    reward_bound = np.percentile(rewards, percentile)
     rewards_total = list(map(lambda s: s.reward, batch))
-#    reward_bound = np.percentile(rewards, percentile)
-    reward_bound = (np.max(rewards) - np.min(rewards)) * percentile / 100.0
     reward_mean = float(np.mean(rewards_total))
 
     train_obs = []
@@ -98,7 +98,7 @@ if __name__ == "__main__":
 
     net = Net(obs_size, HIDDEN_SIZE, n_actions)
     objective = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(params=net.parameters(), lr=0.01)
+    optimizer = optim.Adam(params=net.parameters(), lr=0.001)
     writer = SummaryWriter()
 
     for iter_no, batch in enumerate(iterate_batches(env, net, BATCH_SIZE)):
@@ -115,5 +115,7 @@ if __name__ == "__main__":
         writer.add_scalar("reward_mean", reward_m, iter_no)
         if reward_m > 0.8:
             print("Solved!")
+            break
+        if iter_no > 5000:
             break
     writer.close()
