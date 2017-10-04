@@ -70,7 +70,9 @@ def filter_batch(batch, percentile):
         train_obs.extend(map(lambda step: step.observation, example.steps))
         train_act.extend(map(lambda step: step.action, example.steps))
 
-    return Variable(torch.FloatTensor(train_obs)), Variable(torch.LongTensor(train_act)), reward_bound, reward_mean
+    train_obs_v = Variable(torch.FloatTensor(train_obs))
+    train_act_v = Variable(torch.LongTensor(train_act))
+    return train_obs_v, train_act_v, reward_bound, reward_mean
 
 
 if __name__ == "__main__":
@@ -85,18 +87,18 @@ if __name__ == "__main__":
     writer = SummaryWriter()
 
     for iter_no, batch in enumerate(iterate_batches(env, net, BATCH_SIZE)):
-        train_obs, train_acts, reward_bound, reward_mean = filter_batch(batch, PERCENTILE)
+        obs_v, acts_v, reward_b, reward_m = filter_batch(batch, PERCENTILE)
         optimizer.zero_grad()
-        action_scores = net(train_obs)
-        loss_v = objective(action_scores, train_acts)
+        action_scores_v = net(obs_v)
+        loss_v = objective(action_scores_v, acts_v)
         loss_v.backward()
         optimizer.step()
         print("%d: loss=%.3f, reward_mean=%.1f, reward_bound=%.1f" % (
-            iter_no, loss_v.data[0], reward_mean, reward_bound))
+            iter_no, loss_v.data[0], reward_m, reward_b))
         writer.add_scalar("loss", loss_v.data[0], iter_no)
-        writer.add_scalar("reward_bound", reward_bound, iter_no)
-        writer.add_scalar("reward_mean", reward_mean, iter_no)
-        if reward_mean > 199:
+        writer.add_scalar("reward_bound", reward_b, iter_no)
+        writer.add_scalar("reward_mean", reward_m, iter_no)
+        if reward_m > 199:
             print("Solved!")
             break
     writer.close()
