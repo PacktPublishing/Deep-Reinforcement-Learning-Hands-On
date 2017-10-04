@@ -11,7 +11,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 
-HIDDEN_SIZE = 128
+HIDDEN_SIZE = 512
 BATCH_SIZE = 100
 PERCENTILE = 50
 
@@ -71,9 +71,11 @@ def iterate_batches(env, net, batch_size):
 
 
 def filter_batch(batch, percentile):
-    rewards = list(map(lambda s: s.reward, batch))
-    reward_bound = np.percentile(rewards, percentile)
-    reward_mean = float(np.mean(rewards))
+    rewards = list(map(lambda s: s.reward / len(s.steps), batch))
+    rewards_total = list(map(lambda s: s.reward, batch))
+#    reward_bound = np.percentile(rewards, percentile)
+    reward_bound = (np.max(rewards) - np.min(rewards)) * percentile / 100.0
+    reward_mean = float(np.mean(rewards_total))
 
     train_obs = []
     train_act = []
