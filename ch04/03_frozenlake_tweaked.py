@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import random
 import gym
 import gym.spaces
 from collections import namedtuple
@@ -11,9 +12,9 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 
-HIDDEN_SIZE = 512
+HIDDEN_SIZE = 128
 BATCH_SIZE = 100
-PERCENTILE = 98
+PERCENTILE = 50
 GAMMA = 0.99
 
 
@@ -72,25 +73,25 @@ def iterate_batches(env, net, batch_size):
 
 
 def filter_batch(batch, percentile):
-    rewards = list(map(lambda s: s.reward * (GAMMA ** len(s.steps)), batch))
-    reward_bound = np.percentile(rewards, percentile)
-    rewards_total = list(map(lambda s: s.reward, batch))
-    reward_mean = float(np.mean(rewards_total))
+    disc_rewards = list(map(lambda s: s.reward * (GAMMA ** len(s.steps)), batch))
+    reward_bound = np.percentile(disc_rewards, percentile)
 
     train_obs = []
     train_act = []
-    for example in batch:
-        if example.reward < reward_bound:
-            continue
-        train_obs.extend(map(lambda step: step.observation, example.steps))
-        train_act.extend(map(lambda step: step.action, example.steps))
+    elite_batch = []
+    for example, discounted_reward in zip(batch, disc_rewards):
+        if discounted_reward > reward_bound:
+            train_obs.extend(map(lambda step: step.observation, example.steps))
+            train_act.extend(map(lambda step: step.action, example.steps))
+            elite_batch.append(example)
 
     train_obs_v = Variable(torch.FloatTensor(train_obs))
     train_act_v = Variable(torch.LongTensor(train_act))
-    return train_obs_v, train_act_v, reward_bound, reward_mean
+    return elite_batch, train_obs_v, train_act_v, reward_bound
 
 
 if __name__ == "__main__":
+    random.seed(12345)
     env = DiscreteOneHotWrapper(gym.make("FrozenLake-v0"))
     # env = gym.wrappers.Monitor(env, directory="mon", force=True)
     obs_size = env.observation_space.shape[0]
@@ -98,22 +99,28 @@ if __name__ == "__main__":
 
     net = Net(obs_size, HIDDEN_SIZE, n_actions)
     objective = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(params=net.parameters(), lr=0.01)
+    optimizer = optim.Adam(params=net.parameters(), lr=0.001)
     writer = SummaryWriter(comment="-frozenlake-tweaked")
 
+    full_batch = []
     for iter_no, batch in enumerate(iterate_batches(env, net, BATCH_SIZE)):
-        obs_v, acts_v, reward_b, reward_m = filter_batch(batch, PERCENTILE)
+        reward_mean = float(np.mean(list(map(lambda s: s.reward, batch))))
+        full_batch, obs_v, acts_v, reward_bound = filter_batch(full_batch + batch, PERCENTILE)
+        if not full_batch:
+            continue
+        full_batch = full_batch[-500:]
+
         optimizer.zero_grad()
         action_scores_v = net(obs_v)
         loss_v = objective(action_scores_v, acts_v)
         loss_v.backward()
         optimizer.step()
         print("%d: loss=%.3f, reward_mean=%.3f, reward_bound=%.3f" % (
-            iter_no, loss_v.data[0], reward_m, reward_b))
+            iter_no, loss_v.data[0], reward_mean, reward_bound))
         writer.add_scalar("loss", loss_v.data[0], iter_no)
-        writer.add_scalar("reward_bound", reward_b, iter_no)
-        writer.add_scalar("reward_mean", reward_m, iter_no)
-        if reward_m > 0.8:
+        writer.add_scalar("reward_mean", reward_mean, iter_no)
+        writer.add_scalar("reward_bound", reward_bound, iter_no)
+        if reward_mean > 0.8:
             print("Solved!")
             break
         if iter_no > 5000:
