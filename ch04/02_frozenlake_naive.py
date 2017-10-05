@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-import gym
-import gym.spaces
+import gym, gym.spaces
 from collections import namedtuple
 import numpy as np
 from tensorboardX import SummaryWriter
@@ -11,10 +10,9 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 
-HIDDEN_SIZE = 512
-BATCH_SIZE = 100
-PERCENTILE = 98
-GAMMA = 0.99
+HIDDEN_SIZE = 128
+BATCH_SIZE = 16
+PERCENTILE = 70
 
 
 class DiscreteOneHotWrapper(gym.ObservationWrapper):
@@ -72,10 +70,9 @@ def iterate_batches(env, net, batch_size):
 
 
 def filter_batch(batch, percentile):
-    rewards = list(map(lambda s: s.reward * (GAMMA ** len(s.steps)), batch))
+    rewards = list(map(lambda s: s.reward, batch))
     reward_bound = np.percentile(rewards, percentile)
-    rewards_total = list(map(lambda s: s.reward, batch))
-    reward_mean = float(np.mean(rewards_total))
+    reward_mean = float(np.mean(rewards))
 
     train_obs = []
     train_act = []
@@ -98,8 +95,8 @@ if __name__ == "__main__":
 
     net = Net(obs_size, HIDDEN_SIZE, n_actions)
     objective = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(params=net.parameters(), lr=0.001)
-    writer = SummaryWriter()
+    optimizer = optim.Adam(params=net.parameters(), lr=0.01)
+    writer = SummaryWriter(comment="-frozenlake-naive")
 
     for iter_no, batch in enumerate(iterate_batches(env, net, BATCH_SIZE)):
         obs_v, acts_v, reward_b, reward_m = filter_batch(batch, PERCENTILE)
@@ -108,14 +105,12 @@ if __name__ == "__main__":
         loss_v = objective(action_scores_v, acts_v)
         loss_v.backward()
         optimizer.step()
-        print("%d: loss=%.3f, reward_mean=%.3f, reward_bound=%.3f" % (
+        print("%d: loss=%.3f, reward_mean=%.1f, reward_bound=%.1f" % (
             iter_no, loss_v.data[0], reward_m, reward_b))
         writer.add_scalar("loss", loss_v.data[0], iter_no)
         writer.add_scalar("reward_bound", reward_b, iter_no)
         writer.add_scalar("reward_mean", reward_m, iter_no)
         if reward_m > 0.8:
             print("Solved!")
-            break
-        if iter_no > 5000:
             break
     writer.close()
