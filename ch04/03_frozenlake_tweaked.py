@@ -14,8 +14,8 @@ from torch.autograd import Variable
 
 HIDDEN_SIZE = 128
 BATCH_SIZE = 100
-PERCENTILE = 50
-GAMMA = 0.99
+PERCENTILE = 30
+GAMMA = 0.9
 
 
 class DiscreteOneHotWrapper(gym.ObservationWrapper):
@@ -115,14 +115,14 @@ if __name__ == "__main__":
         loss_v = objective(action_scores_v, acts_v)
         loss_v.backward()
         optimizer.step()
-        print("%d: loss=%.3f, reward_mean=%.3f, reward_bound=%.3f" % (
-            iter_no, loss_v.data[0], reward_mean, reward_bound))
+        print("%d: loss=%.3f, reward_mean=%.3f, reward_bound=%.3f, batch=%d" % (
+            iter_no, loss_v.data[0], reward_mean, reward_bound, len(full_batch)))
         writer.add_scalar("loss", loss_v.data[0], iter_no)
         writer.add_scalar("reward_mean", reward_mean, iter_no)
         writer.add_scalar("reward_bound", reward_bound, iter_no)
         if reward_mean > 0.8:
             print("Solved!")
             break
-        if iter_no > 5000:
+        if iter_no > 10000:
             break
     writer.close()
