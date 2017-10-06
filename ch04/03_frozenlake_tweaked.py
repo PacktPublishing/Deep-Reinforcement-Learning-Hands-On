@@ -123,6 +123,4 @@ if __name__ == "__main__":
         if reward_mean > 0.8:
             print("Solved!")
             break
-        if iter_no > 10000:
-            break
     writer.close()
