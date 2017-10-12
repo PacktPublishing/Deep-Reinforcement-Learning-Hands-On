@@ -6,10 +6,6 @@ from tensorboardX import SummaryWriter
 GAMMA = 0.9
 TEST_EPISODES = 100
 
-RewardKey = collections.namedtuple('RewardKey', field_names=['src_state', 'action', 'tgt_state'])
-TransitKey = collections.namedtuple('TransitKey', field_names=['src_state', 'action'])
-ValueKey = collections.namedtuple("ValueKey", field_names=['state', 'action'])
-
 
 class Agent:
     def __init__(self, env):
@@ -22,14 +18,14 @@ class Agent:
         for _ in range(count):
             action = self.env.action_space.sample()
             new_state, reward, is_done, _ = self.env.step(action)
-            self.rewards[RewardKey(self.state, action, new_state)] = reward
-            self.transits[TransitKey(self.state, action)][new_state] += 1
+            self.rewards[(self.state, action, new_state)] = reward
+            self.transits[(self.state, action)][new_state] += 1
             self.state = self.env.reset() if is_done else new_state
 
     def select_action(self, state, values):
         best_action, best_value = None, None
         for action in range(self.env.action_space.n):
-            value = values[ValueKey(state, action)]
+            value = values[(state, action)]
             if best_value is None or best_value < value:
                 best_value = value
                 best_action = action
@@ -54,13 +50,13 @@ def value_iteration(values, agent):
     for state in range(agent.env.observation_space.n):
         for action in range(agent.env.action_space.n):
             action_value = 0.0
-            target_counts = agent.transits[TransitKey(state, action)]
+            target_counts = agent.transits[(state, action)]
             total = sum(target_counts.values())
             for tgt_state, count in target_counts.items():
-                reward = agent.rewards[RewardKey(state, action, tgt_state)]
+                reward = agent.rewards[(state, action, tgt_state)]
                 best_action = agent.select_action(tgt_state, values)
-                action_value += (count / total) * (reward + GAMMA * values[ValueKey(tgt_state, best_action)])
-            values[ValueKey(state, action)] = action_value
+                action_value += (count / total) * (reward + GAMMA * values[(tgt_state, best_action)])
+            values[(state, action)] = action_value
 
 
 if __name__ == "__main__":
