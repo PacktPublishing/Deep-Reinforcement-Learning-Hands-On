@@ -8,6 +8,7 @@ TEST_EPISODES = 100
 
 RewardKey = collections.namedtuple('RewardKey', field_names=['src_state', 'action', 'tgt_state'])
 TransitKey = collections.namedtuple('TransitKey', field_names=['src_state', 'action'])
+ValueKey = collections.namedtuple("ValueKey", field_names=['state', 'action'])
 
 
 class Agent:
@@ -28,14 +29,9 @@ class Agent:
     def select_action(self, state, values):
         best_action, best_value = None, None
         for action in range(self.env.action_space.n):
-            target_counts = self.transits[TransitKey(state, action)]
-            total = sum(target_counts.values())
-            action_value = 0.0
-            for tgt_state, count in target_counts.items():
-                reward = self.rewards[RewardKey(state, action, tgt_state)]
-                action_value += (count / total) * (reward + GAMMA * values[tgt_state])
-            if best_value is None or best_value < action_value:
-                best_value = action_value
+            value = values[ValueKey(state, action)]
+            if best_value is None or best_value < value:
+                best_value = value
                 best_action = action
         if best_action is not None:
             return best_action
@@ -56,22 +52,21 @@ class Agent:
 def value_iteration(values, agent):
     assert isinstance(agent, Agent)
     for state in range(agent.env.observation_space.n):
-        state_values = []
         for action in range(agent.env.action_space.n):
             action_value = 0.0
             target_counts = agent.transits[TransitKey(state, action)]
             total = sum(target_counts.values())
             for tgt_state, count in target_counts.items():
                 reward = agent.rewards[RewardKey(state, action, tgt_state)]
-                action_value += (count / total) * (reward + GAMMA * values[tgt_state])
-            state_values.append(action_value)
-        values[state] = max(state_values)
+                best_action = agent.select_action(tgt_state, values)
+                action_value += (count / total) * (reward + GAMMA * values[ValueKey(tgt_state, best_action)])
+            values[ValueKey(state, action)] = action_value
 
 
 if __name__ == "__main__":
     env = gym.make("FrozenLake-v0")
     agent = Agent(env)
-    writer = SummaryWriter(comment="v-learning")
+    writer = SummaryWriter(comment="q-learning")
     values = collections.defaultdict(float)
 
     iter_no = 0
