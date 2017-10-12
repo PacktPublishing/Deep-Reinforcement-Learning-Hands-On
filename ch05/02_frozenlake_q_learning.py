@@ -62,7 +62,7 @@ def value_iteration(values, agent):
 if __name__ == "__main__":
     env = gym.make("FrozenLake-v0")
     agent = Agent(env)
-    writer = SummaryWriter(comment="q-learning")
+    writer = SummaryWriter(comment="-q-learning")
     values = collections.defaultdict(float)
 
     iter_no = 0
