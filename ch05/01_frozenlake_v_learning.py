@@ -3,13 +3,14 @@ import gym
 import collections
 from tensorboardX import SummaryWriter
 
+ENV_NAME = "FrozenLake-v0"
 GAMMA = 0.9
 TEST_EPISODES = 100
 
 
 class Agent:
-    def __init__(self, env):
-        self.env = env
+    def __init__(self):
+        self.env = gym.make("FrozenLake-v0")
         self.state = self.env.reset()
         self.rewards = collections.defaultdict(float)
         self.transits = collections.defaultdict(collections.Counter)
@@ -38,15 +39,18 @@ class Agent:
             return best_action
         return self.env.action_space.sample()
 
-    def play_episode(self, values):
+    def play_episode(self, env, values):
         total_reward = 0.0
-        state = self.env.reset()
+        state = env.reset()
         while True:
             action = self.select_action(state, values)
-            state, reward, is_done, _ = self.env.step(action)
+            new_state, reward, is_done, _ = env.step(action)
+            self.rewards[(state, action, new_state)] = reward
+            self.transits[(state, action)][new_state] += 1
             total_reward += reward
             if is_done:
                 break
+            state = new_state
         return total_reward
 
 
@@ -66,8 +70,8 @@ def value_iteration(values, agent):
 
 
 if __name__ == "__main__":
-    env = gym.make("FrozenLake-v0")
-    agent = Agent(env)
+    test_env = gym.make("FrozenLake-v0")
+    agent = Agent()
     writer = SummaryWriter(comment="-v-learning")
     values = collections.defaultdict(float)
 
@@ -80,7 +84,7 @@ if __name__ == "__main__":
 
         reward = 0.0
         for _ in range(TEST_EPISODES):
-            reward += agent.play_episode(values)
+            reward += agent.play_episode(test_env, values)
         reward /= TEST_EPISODES
         writer.add_scalar("reward", reward, iter_no)
         if reward > best_reward:

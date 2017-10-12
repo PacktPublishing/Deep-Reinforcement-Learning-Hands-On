@@ -38,10 +38,13 @@ class Agent:
         state = self.env.reset()
         while True:
             action = self.select_action(state, values)
-            state, reward, is_done, _ = self.env.step(action)
+            new_state, reward, is_done, _ = self.env.step(action)
+            self.rewards[(state, action, new_state)] = reward
+            self.transits[(state, action)][new_state] += 1
             total_reward += reward
             if is_done:
                 break
+            state = new_state
         return total_reward
 
 
