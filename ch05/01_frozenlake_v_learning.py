@@ -40,9 +40,7 @@ class Agent:
             if best_value is None or best_value < action_value:
                 best_value = action_value
                 best_action = action
-        if best_action is not None:
-            return best_action
-        return self.env.action_space.sample()
+        return best_action
 
     def play_episode(self, env):
         total_reward = 0.0
@@ -60,10 +58,8 @@ class Agent:
 
     def value_iteration(self):
         for state in range(self.env.observation_space.n):
-            state_values = []
-            for action in range(self.env.action_space.n):
-                action_value = agent.calc_action_value(state, action)
-                state_values.append(action_value)
+            state_values = [self.calc_action_value(state, action)
+                            for action in range(self.env.action_space.n)]
             self.values[state] = max(state_values)
 
 

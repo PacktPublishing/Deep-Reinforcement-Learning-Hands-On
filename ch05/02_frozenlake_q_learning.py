@@ -31,9 +31,7 @@ class Agent:
             if best_value is None or best_value < action_value:
                 best_value = action_value
                 best_action = action
-        if best_action is not None:
-            return best_action
-        return self.env.action_space.sample()
+        return best_action
 
     def play_episode(self, env):
         total_reward = 0.0
