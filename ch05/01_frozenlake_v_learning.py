@@ -10,7 +10,7 @@ TEST_EPISODES = 20
 
 class Agent:
     def __init__(self):
-        self.env = gym.make("FrozenLake-v0")
+        self.env = gym.make(ENV_NAME)
         self.state = self.env.reset()
         self.rewards = collections.defaultdict(float)
         self.transits = collections.defaultdict(collections.Counter)
@@ -64,7 +64,7 @@ class Agent:
 
 
 if __name__ == "__main__":
-    test_env = gym.make("FrozenLake-v0")
+    test_env = gym.make(ENV_NAME)
     agent = Agent()
     writer = SummaryWriter(comment="-v-learning")
 
