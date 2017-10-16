@@ -2,6 +2,7 @@
 import gym
 import gym.spaces
 import numpy as np
+import collections
 from scipy.misc import imresize
 
 import torch
@@ -41,6 +42,20 @@ class BufferWrapper(gym.ObservationWrapper):
         return self.buffer
 
 
+class EpsilonGreedyWrapper(gym.ActionWrapper):
+    def __init__(self, env, epsilon=1.0):
+        super(EpsilonGreedyWrapper, self).__init__(env)
+        self.epsilon = epsilon
+
+    def _action(self, action):
+        if np.random.random() < self.epsilon:
+            return self.env.action_space.sample()
+        return action
+
+    def set_epsilon(self, epsilon):
+        self.epsilon = epsilon
+
+
 class DQN(nn.Module):
     def __init__(self, input_shape, n_actions):
         super(DQN, self).__init__()
@@ -68,8 +83,26 @@ class DQN(nn.Module):
         return self.fc(conv_out)
 
 
+Experience = collections.namedtuple('Experience', field_names=['state', 'action', 'reward', 'done', 'new_state'])
+
+
+class ExperienceBuffer:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.buffer = collections.deque()
+
+    def append(self, experience):
+        self.buffer.append(experience)
+        while len(self.buffer) > self.capacity:
+            self.buffer.popleft()
+
+    def sample(self, batch_size):
+        return np.random.choice(self.buffer, batch_size, replace=False)
+
+
 if __name__ == "__main__":
     env = BufferWrapper(ImageWrapper(gym.make("Pong-v4")), n_steps=4)
+    env = EpsilonGreedyWrapper(env, epsilon=1.0)
     net = DQN(env.observation_space.shape, env.action_space.n)
     print(net)
     out = net(Variable(torch.FloatTensor([env.reset()])))
