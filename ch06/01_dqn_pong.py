@@ -11,6 +11,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
 
+from tensorboardX import SummaryWriter
+
 GAMMA = 0.99
 
 
@@ -91,26 +93,40 @@ class ExperienceBuffer:
         return [self.buffer[idx] for idx in indices]
 
 
-def play_n_steps(steps, env, net, exp_buffer, state, epsilon=0.0, cuda=False):
-    if state is None:
-        state = env.reset().copy()
-    for _ in range(steps):
-        state_v = Variable(torch.FloatTensor([state]))
-        if cuda:
-            state_v = state_v.cuda()
-        q_vals_v = net(state_v)
-        _, act_v = torch.max(q_vals_v, dim=1)
-        action = act_v.data.cpu().numpy()[0]
-        if np.random.random() < epsilon:
-            action = env.action_space.sample()
-        new_state, reward, is_done, _ = env.step(action)
-        new_state = new_state.copy()
-        exp_buffer.append(Experience(state, action, reward, is_done, new_state))
-        state = new_state
-        if is_done:
-            state = env.reset().copy()
-            print("Episode done, reward %f" % reward)
-    return state
+class Agent:
+    def __init__(self, env, exp_buffer):
+        self.env = env
+        self.exp_buffer = exp_buffer
+        self._reset()
+
+    def _reset(self):
+        self.state = env.reset().copy()
+        self.total_reward = 0.0
+
+    def play_n_steps(self, steps, net, epsilon=0.0, cuda=False):
+        rewards = []
+        for _ in range(steps):
+            # decide on action
+            state_v = Variable(torch.FloatTensor([self.state]))
+            if cuda:
+                state_v = state_v.cuda()
+            q_vals_v = net(state_v)
+            _, act_v = torch.max(q_vals_v, dim=1)
+            action = act_v.data.cpu().numpy()[0]
+            # apply epsilon greedy
+            if np.random.random() < epsilon:
+                action = env.action_space.sample()
+            # do step in the environment
+            new_state, reward, is_done, _ = env.step(action)
+            self.total_reward += reward
+            new_state = new_state.copy()
+
+            self.exp_buffer.append(Experience(self.state, action, reward, is_done, new_state))
+            self.state = new_state
+            if is_done:
+                rewards.append(self.total_reward)
+                self._reset()
+        return rewards
 
 
 def calc_loss(batch, net, cuda=False):
@@ -148,20 +164,22 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda mode")
     args = parser.parse_args()
 
+    writer = SummaryWriter(comment='-pong')
     env = BufferWrapper(ImageWrapper(gym.make("Pong-v4")), n_steps=4)
     net = DQN(env.observation_space.shape, env.action_space.n)
     print(net)
 
     exp_buffer = ExperienceBuffer(capacity=1000)
-    state = None
+    agent = Agent(env, exp_buffer)
     epsilon = 1.0
 
     optimizer = optim.RMSprop(net.parameters(), lr=0.001)
     if args.cuda:
         net.cuda()
 
+    iter_idx = 0
     while True:
-        state = play_n_steps(100, env, net, exp_buffer, state, epsilon=epsilon, cuda=args.cuda)
+        rewards = agent.play_n_steps(100, net, epsilon=epsilon, cuda=args.cuda)
         losses = []
         for _ in range(4):
             batch = exp_buffer.sample(64)
@@ -171,6 +189,8 @@ if __name__ == "__main__":
             losses.append(loss_v.data.cpu().numpy())
         epsilon *= 0.99
         epsilon = max(epsilon, 0.1)
-        print("Loss %.6f, epsilon=%f" % (np.mean(losses), epsilon))
-
-    pass
+        writer.add_scalar("epsilon", epsilon, iter_idx)
+        writer.add_scalar("loss", np.mean(losses), iter_idx)
+        if rewards:
+            writer.add_scalar("reward", np.mean(rewards))
+        iter_idx += 1
