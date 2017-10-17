@@ -148,8 +148,6 @@ def calc_loss(batch, net, cuda=False):
         R = exp.reward
         if not exp.done:
             R += GAMMA * np.max(new_q[idx])
-        else:
-            print("Done sampled")
         y[idx][exp.action] = R
 
     y_v = Variable(torch.FloatTensor(y))
@@ -192,5 +190,6 @@ if __name__ == "__main__":
         writer.add_scalar("epsilon", epsilon, iter_idx)
         writer.add_scalar("loss", np.mean(losses), iter_idx)
         if rewards:
+            print("%d: rewards: %s" % (iter_idx, rewards))
             writer.add_scalar("reward", np.mean(rewards))
         iter_idx += 1
