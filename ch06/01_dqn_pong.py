@@ -2,6 +2,7 @@
 import argparse
 import gym
 import gym.spaces
+import copy
 import numpy as np
 import collections
 from scipy.misc import imresize
@@ -15,6 +16,11 @@ from tensorboardX import SummaryWriter
 
 GAMMA = 0.99
 BATCH_SIZE = 32
+REPLAY_SIZE = 20000
+LEARNING_RATE = 0.00025
+SYNC_TARGET_FRAMES = 10000
+REPLAY_START_SIZE = 5000
+
 SUMMARY_EVERY_FRAME = 100
 
 
@@ -134,6 +140,15 @@ class Agent:
         return done_reward
 
 
+class TargetNet:
+    def __init__(self, model):
+        self.model = model
+        self.target_model = copy.deepcopy(model)
+
+    def sync(self):
+        self.target_model.load_state_dict(self.model.state_dict())
+
+
 def calc_loss(batch, net, cuda=False):
     x = [exp.state for exp in batch]
     x_v = Variable(torch.FloatTensor(x))
@@ -169,19 +184,25 @@ if __name__ == "__main__":
     writer = SummaryWriter(comment='-pong')
     env = BufferWrapper(ImageWrapper(gym.make("Pong-v4")), n_steps=4)
     net = DQN(env.observation_space.shape, env.action_space.n)
+    tgt_net = TargetNet(net)
     print(net)
 
-    exp_buffer = ExperienceBuffer(capacity=1000000)
+    exp_buffer = ExperienceBuffer(capacity=REPLAY_SIZE)
     agent = Agent(env, exp_buffer)
     epsilon = 1.0
 
-    optimizer = optim.RMSprop(net.parameters(), lr=0.001)
+    optimizer = optim.RMSprop(net.parameters(), lr=LEARNING_RATE, momentum=0.95)
     if args.cuda:
         net.cuda()
 
+    print("Populate buffer with %d steps" % REPLAY_START_SIZE)
+    for _ in range(REPLAY_START_SIZE):
+        agent.play_step(None, epsilon=1.0)
+    print("Start learning")
+
     frame_idx = 0
     while True:
-        reward = agent.play_step(net, epsilon=epsilon, cuda=args.cuda)
+        reward = agent.play_step(tgt_net.target_model, epsilon=epsilon)
         if reward is not None:
             print("%d: reward %f" % (frame_idx, reward))
             writer.add_scalar("reward", reward, frame_idx)
@@ -197,4 +218,7 @@ if __name__ == "__main__":
             writer.add_scalar("epsilon", epsilon, frame_idx)
             print("%d: epsilon %f" % (frame_idx, epsilon))
             #writer.add_scalar("loss", np.mean(losses), iter_idx)
+
+        if frame_idx % SYNC_TARGET_FRAMES == 0:
+            tgt_net.sync()
         frame_idx += 1
