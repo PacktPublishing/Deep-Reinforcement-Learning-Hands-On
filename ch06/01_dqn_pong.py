@@ -26,6 +26,7 @@ SUMMARY_EVERY_FRAME = 100
 
 class ImageWrapper(gym.ObservationWrapper):
     X_OFS = 20
+
     def __init__(self, env):
         super(ImageWrapper, self).__init__(env)
         self.observation_space = gym.spaces.Box(0, 1, self._observation(env.observation_space.low).shape)
@@ -114,15 +115,13 @@ class Agent:
         self.state = env.reset().copy()
         self.total_reward = 0.0
 
-    def play_step(self, net, epsilon=0.0, cuda=False):
+    def play_step(self, net, epsilon=0.0):
         done_reward = None
 
         if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
             state_v = Variable(torch.FloatTensor([self.state]))
-            if cuda:
-                state_v = state_v.cuda()
             q_vals_v = net(state_v)
             _, act_v = torch.max(q_vals_v, dim=1)
             action = act_v.data.cpu().numpy()[0]
