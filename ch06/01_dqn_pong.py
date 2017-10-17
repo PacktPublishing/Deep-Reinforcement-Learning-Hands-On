@@ -191,5 +191,5 @@ if __name__ == "__main__":
         writer.add_scalar("loss", np.mean(losses), iter_idx)
         if rewards:
             print("%d: rewards: %s" % (iter_idx, rewards))
-            writer.add_scalar("reward", np.mean(rewards))
+            writer.add_scalar("reward", np.mean(rewards), iter_idx)
         iter_idx += 1
