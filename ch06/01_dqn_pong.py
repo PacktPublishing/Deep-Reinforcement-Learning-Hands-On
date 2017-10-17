@@ -14,6 +14,8 @@ from torch.autograd import Variable
 from tensorboardX import SummaryWriter
 
 GAMMA = 0.99
+BATCH_SIZE = 32
+SUMMARY_EVERY_FRAME = 100
 
 
 class ImageWrapper(gym.ObservationWrapper):
@@ -83,6 +85,9 @@ class ExperienceBuffer:
         self.capacity = capacity
         self.buffer = collections.deque()
 
+    def __len__(self):
+        return len(self.buffer)
+
     def append(self, experience):
         self.buffer.append(experience)
         while len(self.buffer) > self.capacity:
@@ -103,30 +108,30 @@ class Agent:
         self.state = env.reset().copy()
         self.total_reward = 0.0
 
-    def play_n_steps(self, steps, net, epsilon=0.0, cuda=False):
-        rewards = []
-        for _ in range(steps):
-            # decide on action
+    def play_step(self, net, epsilon=0.0, cuda=False):
+        done_reward = None
+
+        if np.random.random() < epsilon:
+            action = env.action_space.sample()
+        else:
             state_v = Variable(torch.FloatTensor([self.state]))
             if cuda:
                 state_v = state_v.cuda()
             q_vals_v = net(state_v)
             _, act_v = torch.max(q_vals_v, dim=1)
             action = act_v.data.cpu().numpy()[0]
-            # apply epsilon greedy
-            if np.random.random() < epsilon:
-                action = env.action_space.sample()
-            # do step in the environment
-            new_state, reward, is_done, _ = env.step(action)
-            self.total_reward += reward
-            new_state = new_state.copy()
 
-            self.exp_buffer.append(Experience(self.state, action, reward, is_done, new_state))
-            self.state = new_state
-            if is_done:
-                rewards.append(self.total_reward)
-                self._reset()
-        return rewards
+        # do step in the environment
+        new_state, reward, is_done, _ = env.step(action)
+        self.total_reward += reward
+        new_state = new_state.copy()
+
+        self.exp_buffer.append(Experience(self.state, action, reward, is_done, new_state))
+        self.state = new_state
+        if is_done:
+            done_reward = self.total_reward
+            self._reset()
+        return done_reward
 
 
 def calc_loss(batch, net, cuda=False):
@@ -156,7 +161,6 @@ def calc_loss(batch, net, cuda=False):
     return nn.MSELoss()(q_v, y_v)
 
 
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda mode")
@@ -167,7 +171,7 @@ if __name__ == "__main__":
     net = DQN(env.observation_space.shape, env.action_space.n)
     print(net)
 
-    exp_buffer = ExperienceBuffer(capacity=1000)
+    exp_buffer = ExperienceBuffer(capacity=1000000)
     agent = Agent(env, exp_buffer)
     epsilon = 1.0
 
@@ -175,21 +179,22 @@ if __name__ == "__main__":
     if args.cuda:
         net.cuda()
 
-    iter_idx = 0
+    frame_idx = 0
     while True:
-        rewards = agent.play_n_steps(100, net, epsilon=epsilon, cuda=args.cuda)
-        losses = []
-        for _ in range(4):
-            batch = exp_buffer.sample(64)
+        reward = agent.play_step(net, epsilon=epsilon, cuda=args.cuda)
+        if reward is not None:
+            print("%d: reward %f" % (frame_idx, reward))
+            writer.add_scalar("reward", reward, frame_idx)
+
+        if len(exp_buffer) >= BATCH_SIZE:
+            batch = exp_buffer.sample(BATCH_SIZE)
             optimizer.zero_grad()
             loss_v = calc_loss(batch, net, cuda=args.cuda)
             loss_v.backward()
-            losses.append(loss_v.data.cpu().numpy())
-        epsilon *= 0.99
-        epsilon = max(epsilon, 0.1)
-        writer.add_scalar("epsilon", epsilon, iter_idx)
-        writer.add_scalar("loss", np.mean(losses), iter_idx)
-        if rewards:
-            print("%d: rewards: %s" % (iter_idx, rewards))
-            writer.add_scalar("reward", np.mean(rewards), iter_idx)
-        iter_idx += 1
+
+        epsilon = max(0.1, 1.0 - frame_idx / 10**6)
+        if frame_idx % SUMMARY_EVERY_FRAME == 0:
+            writer.add_scalar("epsilon", epsilon, frame_idx)
+            print("%d: epsilon %f" % (frame_idx, epsilon))
+            #writer.add_scalar("loss", np.mean(losses), iter_idx)
+        frame_idx += 1
