@@ -153,31 +153,29 @@ class TargetNet:
         self.target_model.load_state_dict(self.model.state_dict())
 
 
-def calc_loss(batch, net, cuda=False):
+def calc_loss(batch, net, target_net, cuda=False):
+    loss_v = Variable(torch.FloatTensor([0.0]))
+    if cuda:
+        loss_v = loss_v.cuda()
+
     x = [obs_to_np(exp.state) for exp in batch]
     x_v = Variable(torch.FloatTensor(x))
     if cuda:
         x_v = x_v.cuda()
     q_v = net(x_v)
-    y = q_v.data.cpu().numpy().copy()
 
     new_x = [obs_to_np(exp.new_state) for exp in batch]
     new_x_v = Variable(torch.FloatTensor(new_x))
-    if cuda:
-        new_x_v = new_x_v.cuda()
-    new_q_v = net(new_x_v)
+    new_q_v = target_net(new_x_v)
     new_q = new_q_v.data.cpu().numpy()
 
     for idx, exp in enumerate(batch):
         R = exp.reward
         if not exp.done:
             R += GAMMA * np.max(new_q[idx])
-        y[idx][exp.action] = R
+        loss_v += (q_v[idx][exp.action] - R) ** 2
 
-    y_v = Variable(torch.FloatTensor(y))
-    if cuda:
-        y_v = y_v.cuda()
-    return nn.MSELoss()(q_v, y_v)
+    return loss_v / len(batch)
 
 
 def play_episode(env, net):
@@ -205,7 +203,6 @@ if __name__ == "__main__":
 
     writer = SummaryWriter(comment='-pong')
     env = BufferWrapper(ImageWrapper(gym.make("Pong-v4")), n_steps=4)
-    o = env.reset()
 
     test_env = BufferWrapper(ImageWrapper( gym.make("Pong-v4")), n_steps=4)
     test_env = gym.wrappers.Monitor(test_env, "records", force=True)
@@ -236,7 +233,7 @@ if __name__ == "__main__":
 
         batch = exp_buffer.sample(BATCH_SIZE)
         optimizer.zero_grad()
-        loss_v = calc_loss(batch, net, cuda=args.cuda)
+        loss_v = calc_loss(batch, net, tgt_net.target_model, cuda=args.cuda)
         loss_v.backward()
         optimizer.step()
 
