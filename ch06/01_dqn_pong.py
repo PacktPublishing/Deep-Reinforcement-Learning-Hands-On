@@ -180,6 +180,24 @@ def calc_loss(batch, net, cuda=False):
     return nn.MSELoss()(q_v, y_v)
 
 
+def play_episode(env, net):
+    state = env.reset()
+    total_reward = 0.0
+
+    while True:
+        state_v = Variable(torch.FloatTensor([state]))
+        q_vals_v = net(state_v)
+        _, act_v = torch.max(q_vals_v, dim=1)
+        action = act_v.data.numpy()[0]
+        new_state, reward, is_done, _ = env.step(action)
+        total_reward += reward
+        if is_done:
+            break
+        state = new_state
+    return total_reward
+
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda mode")
@@ -187,6 +205,7 @@ if __name__ == "__main__":
 
     writer = SummaryWriter(comment='-pong')
     env = BufferWrapper(ImageWrapper(gym.make("Pong-v4")), n_steps=4)
+    test_env = BufferWrapper(ImageWrapper(gym.make("Pong-v4")), n_steps=4)
     net = DQN(env.observation_space.shape, env.action_space.n)
     tgt_net = TargetNet(net)
     print(net)
@@ -220,9 +239,13 @@ if __name__ == "__main__":
         epsilon = max(0.1, 1.0 - frame_idx / 10**5)
         if frame_idx % SUMMARY_EVERY_FRAME == 0:
             writer.add_scalar("epsilon", epsilon, frame_idx)
-            writer.add_scalar("loss", loss_v.data.cpu().numpy()[0], frame_idx)
-            print("%d: epsilon %f" % (frame_idx, epsilon))
+            loss = loss_v.data.cpu().numpy()[0]
+            writer.add_scalar("loss", loss, frame_idx)
+            print("%d: epsilon %f, loss %f" % (frame_idx, epsilon, loss))
 
         if frame_idx % SYNC_TARGET_FRAMES == 0:
             tgt_net.sync()
+            reward = play_episode(test_env, tgt_net.target_model)
+            writer.add_scalar("reward_test", reward, frame_idx)
+            print("%d: synced, test episode reward=%f" % (frame_idx, reward))
         frame_idx += 1
