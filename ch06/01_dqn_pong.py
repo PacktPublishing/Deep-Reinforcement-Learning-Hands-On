@@ -18,8 +18,8 @@ GAMMA = 0.99
 BATCH_SIZE = 32
 REPLAY_SIZE = 20000
 LEARNING_RATE = 0.00025
-SYNC_TARGET_FRAMES = 10000
-REPLAY_START_SIZE = 5000
+SYNC_TARGET_FRAMES = 1000
+REPLAY_START_SIZE = 1000
 
 SUMMARY_EVERY_FRAME = 100
 
@@ -211,18 +211,17 @@ if __name__ == "__main__":
             print("%d: reward %f" % (frame_idx, reward))
             writer.add_scalar("reward", reward, frame_idx)
 
-        if len(exp_buffer) >= BATCH_SIZE:
-            batch = exp_buffer.sample(BATCH_SIZE)
-            optimizer.zero_grad()
-            loss_v = calc_loss(batch, net, cuda=args.cuda)
-            loss_v.backward()
-            optimizer.step()
+        batch = exp_buffer.sample(BATCH_SIZE)
+        optimizer.zero_grad()
+        loss_v = calc_loss(batch, net, cuda=args.cuda)
+        loss_v.backward()
+        optimizer.step()
 
         epsilon = max(0.1, 1.0 - frame_idx / 10**6)
         if frame_idx % SUMMARY_EVERY_FRAME == 0:
             writer.add_scalar("epsilon", epsilon, frame_idx)
+            writer.add_scalar("loss", loss_v.data.cpu().numpy()[0], frame_idx)
             print("%d: epsilon %f" % (frame_idx, epsilon))
-            #writer.add_scalar("loss", np.mean(losses), iter_idx)
 
         if frame_idx % SYNC_TARGET_FRAMES == 0:
             tgt_net.sync()
