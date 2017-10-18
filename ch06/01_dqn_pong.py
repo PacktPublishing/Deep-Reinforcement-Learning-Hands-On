@@ -217,7 +217,7 @@ if __name__ == "__main__":
         loss_v.backward()
         optimizer.step()
 
-        epsilon = max(0.1, 1.0 - frame_idx / 10**6)
+        epsilon = max(0.1, 1.0 - frame_idx / 10**5)
         if frame_idx % SUMMARY_EVERY_FRAME == 0:
             writer.add_scalar("epsilon", epsilon, frame_idx)
             writer.add_scalar("loss", loss_v.data.cpu().numpy()[0], frame_idx)
