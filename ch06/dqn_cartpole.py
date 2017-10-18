@@ -89,6 +89,20 @@ class DQN(nn.Module):
         return self.fc(conv_out)
 
 
+class SimpleDQN(nn.Module):
+    def __init__(self, input_shape, n_action):
+        super(SimpleDQN, self).__init__()
+
+        self.net = nn.Sequential(
+            nn.Linear(input_shape[0]*input_shape[1], 256),
+            nn.ReLU(),
+            nn.Linear(256, n_action)
+        )
+
+    def forward(self, x):
+        return self.net(x.view(x.size()[0], -1))
+
+
 Experience = collections.namedtuple('Experience', field_names=['state', 'action', 'reward', 'done', 'new_state'])
 
 
@@ -185,9 +199,11 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda mode")
     args = parser.parse_args()
 
-    writer = SummaryWriter(comment='-pong')
-    env = BufferWrapper(ImageWrapper(gym.make("Pong-v4")), n_steps=4)
-    net = DQN(env.observation_space.shape, env.action_space.n)
+    writer = SummaryWriter(comment='-cart')
+
+    env = BufferWrapper(gym.make("CartPole-v0"), n_steps=4)
+#    net = DQN(env.observation_space.shape, env.action_space.n)
+    net = SimpleDQN(env.observation_space.shape, env.action_space.n)
     tgt_net = TargetNet(net)
     print(net)
 
@@ -216,9 +232,8 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             loss_v = calc_loss(batch, net, cuda=args.cuda)
             loss_v.backward()
-            optimizer.step()
 
-        epsilon = max(0.1, 1.0 - frame_idx / 10**6)
+        epsilon = max(0.1, 1.0 - frame_idx / 10**5)
         if frame_idx % SUMMARY_EVERY_FRAME == 0:
             writer.add_scalar("epsilon", epsilon, frame_idx)
             print("%d: epsilon %f" % (frame_idx, epsilon))
