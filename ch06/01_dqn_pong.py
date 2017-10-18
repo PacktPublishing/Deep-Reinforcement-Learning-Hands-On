@@ -205,7 +205,10 @@ if __name__ == "__main__":
 
     writer = SummaryWriter(comment='-pong')
     env = BufferWrapper(ImageWrapper(gym.make("Pong-v4")), n_steps=4)
+
     test_env = BufferWrapper(ImageWrapper(gym.make("Pong-v4")), n_steps=4)
+    test_env = gym.wrappers.Monitor(test_env, "records", force=True)
+
     net = DQN(env.observation_space.shape, env.action_space.n)
     tgt_net = TargetNet(net)
     print(net)
