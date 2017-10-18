@@ -122,13 +122,15 @@ class Agent:
         self.state = env.reset().copy()
         self.total_reward = 0.0
 
-    def play_step(self, net, epsilon=0.0):
+    def play_step(self, net, epsilon=0.0, cuda=False):
         done_reward = None
 
         if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
             state_v = Variable(torch.FloatTensor([obs_to_np(self.state)]))
+            if cuda:
+                state_v = state_v.cuda()
             q_vals_v = net(state_v)
             _, act_v = torch.max(q_vals_v, dim=1)
             action = act_v.data.cpu().numpy()[0]
@@ -232,7 +234,7 @@ if __name__ == "__main__":
 
     frame_idx = 0
     while True:
-        reward = agent.play_step(tgt_net.target_model, epsilon=epsilon)
+        reward = agent.play_step(tgt_net.target_model, epsilon=epsilon, cuda=args.cuda)
         if reward is not None:
             print("%d: reward %f" % (frame_idx, reward))
             writer.add_scalar("reward", reward, frame_idx)
