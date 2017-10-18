@@ -119,7 +119,7 @@ class Agent:
         self._reset()
 
     def _reset(self):
-        self.state = env.reset().copy()
+        self.state = env.reset()
         self.total_reward = 0.0
 
     def play_step(self, net, epsilon=0.0, cuda=False):
@@ -138,7 +138,7 @@ class Agent:
         # do step in the environment
         new_state, reward, is_done, _ = env.step(action)
         self.total_reward += reward
-        new_state = new_state.copy()
+        new_state = new_state
 
         self.exp_buffer.append(Experience(self.state, action, reward, is_done, new_state))
         self.state = new_state
