@@ -16,10 +16,10 @@ from tensorboardX import SummaryWriter
 
 GAMMA = 0.99
 BATCH_SIZE = 32
-REPLAY_SIZE = 1000000
-LEARNING_RATE = 0.00025
-SYNC_TARGET_FRAMES = 10000
-REPLAY_START_SIZE = 50000
+REPLAY_SIZE = 10000
+LEARNING_RATE = 1e-4
+SYNC_TARGET_FRAMES = 1000
+REPLAY_START_SIZE = 10000
 
 SUMMARY_EVERY_FRAME = 100
 
@@ -210,9 +210,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     writer = SummaryWriter(comment='-pong')
-    env = BufferWrapper(ImageWrapper(gym.make("Pong-v4")), n_steps=4)
+    env = BufferWrapper(ImageWrapper(gym.make("PongNoFrameskip-v4")), n_steps=4)
 
-    test_env = BufferWrapper(ImageWrapper( gym.make("Pong-v4")), n_steps=4)
+    test_env = BufferWrapper(ImageWrapper( gym.make("PongNoFrameskip-v4")), n_steps=4)
 #    test_env = gym.wrappers.Monitor(test_env, "records", force=True)
 
     net = DQN(env.observation_space.shape, env.action_space.n)
@@ -245,7 +245,7 @@ if __name__ == "__main__":
         loss_v.backward()
         optimizer.step()
 
-        epsilon = max(0.1, 1.0 - frame_idx / 10**5)
+        epsilon = max(0.02, 1.0 - frame_idx / 10**5)
         if frame_idx % SUMMARY_EVERY_FRAME == 0:
             writer.add_scalar("epsilon", epsilon, frame_idx)
             loss = loss_v.data.cpu().numpy()[0]
