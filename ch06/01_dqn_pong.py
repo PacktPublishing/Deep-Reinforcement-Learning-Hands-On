@@ -5,7 +5,7 @@ import gym.spaces
 import copy
 import numpy as np
 import collections
-from scipy.misc import imresize
+from PIL import Image
 
 import torch
 import torch.nn as nn
@@ -25,41 +25,41 @@ SUMMARY_EVERY_FRAME = 100
 
 
 class ImageWrapper(gym.ObservationWrapper):
-    X_OFS = 20
+    TARGET_SIZE = 84
 
     def __init__(self, env):
         super(ImageWrapper, self).__init__(env)
-        self.observation_space = gym.spaces.Box(0, 1, self._observation(env.observation_space.low).shape)
+        probe = np.zeros_like(env.observation_space.low, np.uint8)
+        self.observation_space = gym.spaces.Box(0, 255, self._observation(probe).shape)
 
     def _observation(self, obs):
-        obs = imresize(obs, (110, 84))
-        obs = obs.mean(axis=-1, keepdims=True)
-
-        obs = obs[self.X_OFS:self.X_OFS+84, :, :]
-        obs = np.moveaxis(obs, 2, 0)
-        return obs.astype(np.float32) / 255.0
+        img = Image.fromarray(obs)
+        img = img.convert("YCbCr")
+        img = img.resize((self.TARGET_SIZE, self.TARGET_SIZE))
+        data = np.asarray(img.getdata(0), np.uint8).reshape(img.size)
+        return np.expand_dims(data, 0)
 
 
 class BufferWrapper(gym.ObservationWrapper):
-    def __init__(self, env, n_steps):
+    def __init__(self, env, n_steps, dtype=np.uint8):
         super(BufferWrapper, self).__init__(env)
+        self.dtype = dtype
         old_space = env.observation_space
-        if len(old_space.shape) == 1:
-            l = np.expand_dims(old_space.low, axis=0)
-            h = np.expand_dims(old_space.high, axis=0)
-        else:
-            l = old_space.low
-            h = old_space.high
-        self.observation_space = gym.spaces.Box(l.repeat(n_steps, axis=0), h.repeat(n_steps, axis=0))
+        self.observation_space = gym.spaces.Box(old_space.low.repeat(n_steps, axis=0),
+                                                old_space.high.repeat(n_steps, axis=0))
 
     def _reset(self):
-        self.buffer = np.zeros_like(self.observation_space.low)
+        self.buffer = np.zeros_like(self.observation_space.low, dtype=self.dtype)
         return self._observation(self.env.reset())
 
     def _observation(self, observation):
         self.buffer[:-1] = self.buffer[1:]
         self.buffer[-1] = observation
         return self.buffer
+
+
+def obs_to_np(obs):
+    return obs.astype(np.float) / 255
 
 
 class DQN(nn.Module):
@@ -126,7 +126,7 @@ class Agent:
         if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
-            state_v = Variable(torch.FloatTensor([self.state]))
+            state_v = Variable(torch.FloatTensor([obs_to_np(self.state)]))
             q_vals_v = net(state_v)
             _, act_v = torch.max(q_vals_v, dim=1)
             action = act_v.data.cpu().numpy()[0]
@@ -154,14 +154,14 @@ class TargetNet:
 
 
 def calc_loss(batch, net, cuda=False):
-    x = [exp.state for exp in batch]
+    x = [obs_to_np(exp.state) for exp in batch]
     x_v = Variable(torch.FloatTensor(x))
     if cuda:
         x_v = x_v.cuda()
     q_v = net(x_v)
     y = q_v.data.cpu().numpy().copy()
 
-    new_x = [exp.new_state for exp in batch]
+    new_x = [obs_to_np(exp.new_state) for exp in batch]
     new_x_v = Variable(torch.FloatTensor(new_x))
     if cuda:
         new_x_v = new_x_v.cuda()
@@ -185,7 +185,7 @@ def play_episode(env, net):
     total_reward = 0.0
 
     while True:
-        state_v = Variable(torch.FloatTensor([state]))
+        state_v = Variable(torch.FloatTensor([obs_to_np(state)]))
         q_vals_v = net(state_v)
         _, act_v = torch.max(q_vals_v, dim=1)
         action = act_v.data.numpy()[0]
@@ -205,8 +205,9 @@ if __name__ == "__main__":
 
     writer = SummaryWriter(comment='-pong')
     env = BufferWrapper(ImageWrapper(gym.make("Pong-v4")), n_steps=4)
+    o = env.reset()
 
-    test_env = BufferWrapper(ImageWrapper(gym.make("Pong-v4")), n_steps=4)
+    test_env = BufferWrapper(ImageWrapper( gym.make("Pong-v4")), n_steps=4)
     test_env = gym.wrappers.Monitor(test_env, "records", force=True)
 
     net = DQN(env.observation_space.shape, env.action_space.n)
