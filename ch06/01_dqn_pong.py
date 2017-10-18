@@ -145,9 +145,11 @@ class Agent:
 
 
 class TargetNet:
-    def __init__(self, model):
+    def __init__(self, model, cuda=False):
         self.model = model
         self.target_model = copy.deepcopy(model)
+        if cuda:
+            self.target_model.cuda()
 
     def sync(self):
         self.target_model.load_state_dict(self.model.state_dict())
@@ -155,17 +157,17 @@ class TargetNet:
 
 def calc_loss(batch, net, target_net, cuda=False):
     loss_v = Variable(torch.FloatTensor([0.0]))
-    if cuda:
-        loss_v = loss_v.cuda()
 
     x = [obs_to_np(exp.state) for exp in batch]
     x_v = Variable(torch.FloatTensor(x))
-    if cuda:
-        x_v = x_v.cuda()
-    q_v = net(x_v)
-
     new_x = [obs_to_np(exp.new_state) for exp in batch]
     new_x_v = Variable(torch.FloatTensor(new_x))
+    if cuda:
+        loss_v = loss_v.cuda()
+        x_v = x_v.cuda()
+        new_x_v = new_x_v.cuda()
+
+    q_v = net(x_v)
     new_q_v = target_net(new_x_v)
     new_q = new_q_v.data.cpu().numpy()
 
@@ -178,15 +180,17 @@ def calc_loss(batch, net, target_net, cuda=False):
     return loss_v / len(batch)
 
 
-def play_episode(env, net):
+def play_episode(env, net, cuda=False):
     state = env.reset()
     total_reward = 0.0
 
     while True:
         state_v = Variable(torch.FloatTensor([obs_to_np(state)]))
+        if cuda:
+            state_v = state_v.cuda()
         q_vals_v = net(state_v)
         _, act_v = torch.max(q_vals_v, dim=1)
-        action = act_v.data.numpy()[0]
+        action = act_v.data.cpu().numpy()[0]
         new_state, reward, is_done, _ = env.step(action)
         total_reward += reward
         if is_done:
@@ -205,10 +209,10 @@ if __name__ == "__main__":
     env = BufferWrapper(ImageWrapper(gym.make("Pong-v4")), n_steps=4)
 
     test_env = BufferWrapper(ImageWrapper( gym.make("Pong-v4")), n_steps=4)
-    test_env = gym.wrappers.Monitor(test_env, "records", force=True)
+#    test_env = gym.wrappers.Monitor(test_env, "records", force=True)
 
     net = DQN(env.observation_space.shape, env.action_space.n)
-    tgt_net = TargetNet(net)
+    tgt_net = TargetNet(net, cuda=args.cuda)
     print(net)
 
     exp_buffer = ExperienceBuffer(capacity=REPLAY_SIZE)
@@ -246,7 +250,7 @@ if __name__ == "__main__":
 
         if frame_idx % SYNC_TARGET_FRAMES == 0:
             tgt_net.sync()
-            reward = play_episode(test_env, tgt_net.target_model)
+            reward = play_episode(test_env, tgt_net.target_model, cuda=args.cuda)
             writer.add_scalar("reward_test", reward, frame_idx)
             print("%d: synced, test episode reward=%f" % (frame_idx, reward))
         frame_idx += 1
