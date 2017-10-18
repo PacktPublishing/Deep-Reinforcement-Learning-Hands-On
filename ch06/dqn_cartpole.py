@@ -219,7 +219,7 @@ if __name__ == "__main__":
     writer = SummaryWriter(comment='-cart')
 
     env = BufferWrapper(gym.make("CartPole-v0"), n_steps=4)
-    test_env = BufferWrapper(ImageWrapper(gym.make("Pong-v4")), n_steps=4)
+    test_env = BufferWrapper(gym.make("CartPole-v0"), n_steps=4)
 
 #    net = DQN(env.observation_space.shape, env.action_space.n)
     net = SimpleDQN(env.observation_space.shape, env.action_space.n)
@@ -250,6 +250,7 @@ if __name__ == "__main__":
         optimizer.zero_grad()
         loss_v = calc_loss(batch, net, cuda=args.cuda)
         loss_v.backward()
+        optimizer.step()
 
         epsilon = max(0.1, 1.0 - frame_idx / 10**5)
         if frame_idx % SUMMARY_EVERY_FRAME == 0:
