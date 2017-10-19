@@ -11,6 +11,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
 
+from PIL import Image
+
 import cv2
 from collections import deque
 from gym import spaces
@@ -24,6 +26,41 @@ SYNC_TARGET_FRAMES = 1000
 REPLAY_START_SIZE = 10000
 
 SUMMARY_EVERY_FRAME = 100
+
+
+class ImageWrapper(gym.ObservationWrapper):
+    TARGET_SIZE = 84
+
+    def __init__(self, env):
+        super(ImageWrapper, self).__init__(env)
+        probe = np.zeros_like(env.observation_space.low, np.uint8)
+        self.observation_space = gym.spaces.Box(0, 255, self._observation(probe).shape)
+
+    def _observation(self, obs):
+        img = Image.fromarray(obs)
+        img = img.convert("YCbCr")
+        img = img.resize((self.TARGET_SIZE, self.TARGET_SIZE))
+        data = np.asarray(img.getdata(0), np.uint8).reshape(img.size)
+        return np.expand_dims(data, 0)
+
+
+class BufferWrapper(gym.ObservationWrapper):
+    def __init__(self, env, n_steps, dtype=np.uint8):
+        super(BufferWrapper, self).__init__(env)
+        self.dtype = dtype
+        old_space = env.observation_space
+        self.observation_space = gym.spaces.Box(old_space.low.repeat(n_steps, axis=0),
+                                                old_space.high.repeat(n_steps, axis=0))
+
+    def _reset(self):
+        self.buffer = np.zeros_like(self.observation_space.low, dtype=self.dtype)
+        return self._observation(self.env.reset())
+
+    def _observation(self, observation):
+        self.buffer[:-1] = self.buffer[1:]
+        self.buffer[-1] = observation
+        return self.buffer
+
 
 
 class ImageToPyTorch(gym.ObservationWrapper):
@@ -304,10 +341,10 @@ class Buffer:
                np.array(obses_tp1, dtype=np.float32)
 
 
-
 if __name__ == "__main__":
     env = gym.make("PongNoFrameskip-v4")
-    env = ImageToPyTorch(ScaledFloatFrame(wrap_dqn(env)))
+#    env = ImageToPyTorch(ScaledFloatFrame(wrap_dqn(env)))
+    env = ScaledFloatFrame(BufferWrapper(ImageWrapper(env)))
 
     net = DQN(env.observation_space.shape, env.action_space.n)
     tgt_net = DQN(env.observation_space.shape, env.action_space.n)
