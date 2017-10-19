@@ -297,7 +297,11 @@ class Buffer:
             rewards.append(reward)
             obses_tp1.append(np.array(obs_tp1, copy=False))
             dones.append(done)
-        return np.array(obses_t), np.array(actions), np.array(rewards), np.array(dones), np.array(obses_tp1)
+        return np.array(obses_t, dtype=np.float32), \
+               np.array(actions), \
+               np.array(rewards, dtype=np.float32), \
+               np.array(dones), \
+               np.array(obses_tp1, dtype=np.float32)
 
 
 
@@ -326,7 +330,7 @@ if __name__ == "__main__":
         if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
-            q_vals_t = net(Variable(torch.FloatTensor([state])).cuda())[0]
+            q_vals_t = net(Variable(torch.FloatTensor([state]), volatile=True).cuda())[0]
             q_vals = q_vals_t.data.cpu().numpy()
             action = np.argmax(q_vals)
 
@@ -351,19 +355,20 @@ if __name__ == "__main__":
         # train
         optimizer.zero_grad()
         obses_t, actions, rewards, dones, obses_tp1 = buffer.sample_batch(BATCH_SIZE)
-        loss_t = Variable(torch.FloatTensor([0.0])).cuda()
-        q_vals_t = net(Variable(torch.FloatTensor(obses_t)).cuda())
-        q_vals_tp1 = tgt_net(Variable(torch.FloatTensor(obses_tp1)).cuda()).data
 
-        # max Q(s', a')
-        max_q_tp1, _ = q_vals_tp1.max(dim=1)
-        max_q_tp1 *= GAMMA
-        not_done_mask = torch.FloatTensor(np.invert(dones).astype(np.float)).cuda()
-        max_q_tp1 = torch.mul(max_q_tp1, not_done_mask)
-        q_target = max_q_tp1 + torch.FloatTensor(rewards).cuda()
-        idx = Variable(torch.LongTensor(actions).cuda().unsqueeze(-1))
-        q_vals_acts = q_vals_t.gather(1, idx).squeeze(-1)
-        loss_t = nn.MSELoss()(q_vals_acts, Variable(q_target))
+        obses_t_v = Variable(torch.from_numpy(obses_t)).cuda()
+        obses_tp1_v = Variable(torch.from_numpy(obses_tp1), volatile=True).cuda()
+        actions_v = Variable(torch.from_numpy(actions)).cuda()
+        rewards_v = Variable(torch.from_numpy(rewards)).cuda()
+        done_mask = torch.ByteTensor(dones.astype(np.uint8)).cuda()
+
+        state_action_values = net(obses_t_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
+        next_state_values = tgt_net(obses_tp1_v).max(1)[0]
+        next_state_values[done_mask] = 0.0
+        next_state_values.volatile = False
+
+        expected_state_action_values = next_state_values * GAMMA + rewards_v
+        loss_t = nn.MSELoss()(state_action_values, expected_state_action_values)
 
         # for idx in range(BATCH_SIZE):
         #     R = rewards[idx]
