@@ -395,9 +395,9 @@ def calc_loss(batch, net, target_net, cuda=False):
     new_x = [obs_to_np(exp.new_state) for exp in batch]
     new_x_v = Variable(torch.FloatTensor(new_x))
     if cuda:
-        loss_v = loss_v.cuda()
-        x_v = x_v.cuda()
-        new_x_v = new_x_v.cuda()
+        loss_v = loss_v.cuda(async=True)
+        x_v = x_v.cuda(async=True)
+        new_x_v = new_x_v.cuda(async=True)
 
     q_v = net(x_v)
     new_q_v = target_net(new_x_v)
@@ -484,6 +484,7 @@ if __name__ == "__main__":
         optimizer.step()
 
         epsilon = max(0.02, 1.0 - frame_idx / 10**5)
+        frame_idx += 1
         if frame_idx % SUMMARY_EVERY_FRAME == 0:
             writer.add_scalar("epsilon", epsilon, frame_idx)
             loss = loss_v.data.cpu().numpy()[0]
@@ -500,4 +501,3 @@ if __name__ == "__main__":
             reward = play_episode(test_env, tgt_net.target_model, cuda=args.cuda)
             writer.add_scalar("reward_test", reward, frame_idx)
             print("%d: synced, test episode reward=%f" % (frame_idx, reward))
-        frame_idx += 1
