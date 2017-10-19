@@ -355,6 +355,7 @@ if __name__ == "__main__":
         q_vals_t = net(Variable(torch.FloatTensor(obses_t)).cuda())
         q_vals_tp1 = tgt_net(Variable(torch.FloatTensor(obses_tp1)).cuda())
         q_vals_tp1 = q_vals_tp1.data.cpu().numpy()
+
         for idx in range(BATCH_SIZE):
             R = rewards[idx]
             if not dones[idx]:
