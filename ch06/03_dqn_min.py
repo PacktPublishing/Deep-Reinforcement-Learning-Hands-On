@@ -319,7 +319,7 @@ if __name__ == "__main__":
     buffer = Buffer(REPLAY_SIZE)
     epsilon = 1.0
 
-    optimizer = optim.RMSprop(net.parameters(), lr=LEARNING_RATE)
+    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
     total_rewards = [0.0]
     state = env.reset()
     frame_idx = 0
