@@ -3,6 +3,7 @@ import argparse
 import gym
 import gym.spaces
 import copy
+import time
 import numpy as np
 import collections
 
@@ -467,6 +468,8 @@ if __name__ == "__main__":
     print("Start learning")
 
     frame_idx = 0
+    start_ts = time.time()
+
     while True:
         reward = agent.play_step(tgt_net.target_model, epsilon=epsilon, cuda=args.cuda)
         if reward is not None:
@@ -485,9 +488,12 @@ if __name__ == "__main__":
             writer.add_scalar("epsilon", epsilon, frame_idx)
             loss = loss_v.data.cpu().numpy()[0]
             writer.add_scalar("loss", loss, frame_idx)
-            print("%d: epsilon %f, loss %f, mean rw100 %.1f, total done %d" % (
-                frame_idx, epsilon, loss, np.mean(episode_rewards[-100:]), len(episode_rewards)))
+            speed = SUMMARY_EVERY_FRAME / (time.time() - start_ts)
+            start_ts = time.time()
+            print("%d: epsilon %f, loss %f, mean rw100 %.1f, total done %d, speed %.2f f/s" % (
+                frame_idx, epsilon, loss, np.mean(episode_rewards[-100:]), len(episode_rewards), speed))
             writer.add_scalar("reward_100", np.mean(episode_rewards[-100:]), frame_idx)
+            writer.add_scalar("speed", speed, frame_idx)
 
         if frame_idx % SYNC_TARGET_FRAMES == 0:
             tgt_net.sync()
