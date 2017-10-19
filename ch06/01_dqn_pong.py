@@ -136,7 +136,7 @@ class Agent:
             action = act_v.data.cpu().numpy()[0]
 
         # do step in the environment
-        new_state, reward, is_done, _ = env.step(action)
+        new_state, reward, is_done, _ = self.env.step(action)
         self.total_reward += reward
         new_state = new_state
 
