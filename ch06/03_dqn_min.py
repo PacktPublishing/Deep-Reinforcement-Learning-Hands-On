@@ -353,15 +353,24 @@ if __name__ == "__main__":
         obses_t, actions, rewards, dones, obses_tp1 = buffer.sample_batch(BATCH_SIZE)
         loss_t = Variable(torch.FloatTensor([0.0])).cuda()
         q_vals_t = net(Variable(torch.FloatTensor(obses_t)).cuda())
-        q_vals_tp1 = tgt_net(Variable(torch.FloatTensor(obses_tp1)).cuda())
-        q_vals_tp1 = q_vals_tp1.data.cpu().numpy()
+        q_vals_tp1 = tgt_net(Variable(torch.FloatTensor(obses_tp1)).cuda()).data
 
-        for idx in range(BATCH_SIZE):
-            R = rewards[idx]
-            if not dones[idx]:
-                R += GAMMA * np.max(q_vals_tp1[idx])
-            loss_t += (q_vals_t[idx][actions[idx]] - R) ** 2
-        loss_t /= BATCH_SIZE
+        # max Q(s', a')
+        max_q_tp1, _ = q_vals_tp1.max(dim=1)
+        max_q_tp1 *= GAMMA
+        not_done_mask = torch.FloatTensor(np.invert(dones).astype(np.float)).cuda()
+        max_q_tp1 = torch.mul(max_q_tp1, not_done_mask)
+        q_target = max_q_tp1 + torch.FloatTensor(rewards).cuda()
+        idx = Variable(torch.LongTensor(actions).cuda().unsqueeze(-1))
+        q_vals_acts = q_vals_t.gather(1, idx).squeeze(-1)
+        loss_t = nn.MSELoss()(q_vals_acts, Variable(q_target))
+
+        # for idx in range(BATCH_SIZE):
+        #     R = rewards[idx]
+        #     if not dones[idx]:
+        #         R += GAMMA * np.max(q_vals_tp1[idx])
+        #     loss_t += (q_vals_t[idx][actions[idx]] - R) ** 2
+        # loss_t /= BATCH_SIZE
         loss_t.backward()
         optimizer.step()
 
