@@ -1,20 +1,15 @@
 #!/usr/bin/env python3
-import argparse
 import gym
 import gym.spaces
 import random
-import copy
 import time
 import numpy as np
 import collections
-from PIL import Image
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
-
-from tensorboardX import SummaryWriter
 
 import cv2
 from collections import deque
@@ -323,6 +318,8 @@ if __name__ == "__main__":
     total_rewards = [0.0]
     state = env.reset()
     frame_idx = 0
+    ts_frame = 0
+    ts = time.time()
 
     while True:
         frame_idx += 1
@@ -340,8 +337,12 @@ if __name__ == "__main__":
         if done:
             state = env.reset()
             total_rewards.append(0.0)
-            print("%d: done %d games, mean reward %.3f, eps %.2f" % (
-                frame_idx, len(total_rewards), np.mean(total_rewards[-100:]), epsilon
+            speed = (frame_idx - ts_frame) / (time.time() - ts)
+            ts_frame = frame_idx
+            ts = time.time()
+            print("%d: done %d games, mean reward %.3f, eps %.2f, speed %.2f f/s" % (
+                frame_idx, len(total_rewards), np.mean(total_rewards[-100:]), epsilon,
+                speed
             ))
 
         if len(buffer) < REPLAY_START_SIZE:
