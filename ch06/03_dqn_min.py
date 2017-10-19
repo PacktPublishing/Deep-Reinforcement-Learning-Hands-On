@@ -344,7 +344,7 @@ class Buffer:
 if __name__ == "__main__":
     env = gym.make("PongNoFrameskip-v4")
 #    env = ImageToPyTorch(ScaledFloatFrame(wrap_dqn(env)))
-    env = ScaledFloatFrame(BufferWrapper(ImageWrapper(env)))
+    env = ScaledFloatFrame(BufferWrapper(ImageWrapper(env), n_steps=4))
 
     net = DQN(env.observation_space.shape, env.action_space.n)
     tgt_net = DQN(env.observation_space.shape, env.action_space.n)
