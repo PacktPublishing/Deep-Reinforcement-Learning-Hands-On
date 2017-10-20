@@ -277,8 +277,8 @@ def wrap_dqn(env):
     env = EpisodicLifeEnv(env)
     env = NoopResetEnv(env, noop_max=30)
     env = MaxAndSkipEnv(env, skip=4)
-    # if 'FIRE' in env.unwrapped.get_action_meanings():
-    #     env = FireResetEnv(env)
+    if 'FIRE' in env.unwrapped.get_action_meanings():
+        env = FireResetEnv(env)
     env = ProcessFrame84(env)
     env = FrameStack(env, 4)
     env = ClippedRewardsWrapper(env)
@@ -344,7 +344,13 @@ class Buffer:
 
 if __name__ == "__main__":
     env = gym.make("PongNoFrameskip-v4")
-    env = ImageToPyTorch(ScaledFloatFrame(wrap_dqn(env)))
+#    env = ImageToPyTorch(ScaledFloatFrame(wrap_dqn(env)))
+    env = MaxAndSkipEnv(env)
+    env = FireResetEnv(env)
+    env = ProcessFrame84(env)
+    env = FrameStack(env, 4)
+    env = ScaledFloatFrame(ImageToPyTorch(env))
+
 #    env = ScaledFloatFrame(ImageToPyTorch(FrameStack(ProcessFrame84(MaxAndSkipEnv(env)), 4)))
 
     net = DQN(env.observation_space.shape, env.action_space.n)
