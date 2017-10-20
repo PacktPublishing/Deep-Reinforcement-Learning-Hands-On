@@ -63,7 +63,7 @@ class Agent:
 if __name__ == "__main__":
     test_env = gym.make(ENV_NAME)
     agent = Agent()
-    writer = SummaryWriter(comment="-q-learning")
+    writer = SummaryWriter(comment="-q-iteration")
 
     iter_no = 0
     best_reward = 0.0
