@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import sys
 import gym
 import gym.spaces
 import random
@@ -344,7 +345,7 @@ class Buffer:
 if __name__ == "__main__":
     env = gym.make("PongNoFrameskip-v4")
 #    env = ImageToPyTorch(ScaledFloatFrame(wrap_dqn(env)))
-    env = ScaledFloatFrame(BufferWrapper(ImageWrapper(env), n_steps=4))
+    env = ImageToPyTorch(ScaledFloatFrame(FrameStack(ProcessFrame84(env), 4)))
 
     net = DQN(env.observation_space.shape, env.action_space.n)
     tgt_net = DQN(env.observation_space.shape, env.action_space.n)
@@ -385,6 +386,7 @@ if __name__ == "__main__":
                 frame_idx, len(total_rewards), np.mean(total_rewards[-100:]), epsilon,
                 speed
             ))
+            sys.stdout.flush()
 
         if len(buffer) < REPLAY_START_SIZE:
             continue
