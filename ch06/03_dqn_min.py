@@ -348,8 +348,10 @@ if __name__ == "__main__":
     env = MaxAndSkipEnv(env)
     env = FireResetEnv(env)
     env = ProcessFrame84(env)
-    env = FrameStack(env, 4)
-    env = ScaledFloatFrame(ImageToPyTorch(env))
+#    env = FrameStack(env, 4)
+    env = ImageToPyTorch(env)
+    env = BufferWrapper(env, 4)
+    env = ScaledFloatFrame(env)
 
 #    env = ScaledFloatFrame(ImageToPyTorch(FrameStack(ProcessFrame84(MaxAndSkipEnv(env)), 4)))
 
