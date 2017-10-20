@@ -25,11 +25,17 @@ class Agent:
     def best_value_and_action(self, state):
         best_value, best_action = None, None
         for action in range(self.env.action_space.n):
-            action_value = self.values[(state, action)]
+            action_value = self.values.get((state, action), 0.0)
             if best_value is None or best_value < action_value:
                 best_value = action_value
                 best_action = action
         return best_value, best_action
+
+    def value_update(self, s, a, r, next_s):
+        best_v, _ = self.best_value_and_action(next_s)
+        new_val = r + GAMMA * best_v
+        old_val = self.values.get((s, a), 0.0)
+        self.values[(s, a)] = old_val * (1-ALPHA) + new_val * ALPHA
 
     def play_episode(self, env):
         total_reward = 0.0
@@ -42,12 +48,6 @@ class Agent:
                 break
             state = new_state
         return total_reward
-
-    def value_update(self, s, a, r, next_s):
-        old_val = self.values.get((s, a), 0.0)
-        best_v, _ = self.best_value_and_action(next_s)
-        new_val = r + GAMMA * best_v
-        self.values[(s, a)] = old_val * (1-ALPHA) + new_val * ALPHA
 
 
 if __name__ == "__main__":
