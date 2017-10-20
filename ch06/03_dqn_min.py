@@ -275,10 +275,10 @@ def wrap_dqn(env):
     """Apply a common set of wrappers for Atari games."""
     assert 'NoFrameskip' in env.spec.id
     env = EpisodicLifeEnv(env)
-#    env = NoopResetEnv(env, noop_max=30)
+    env = NoopResetEnv(env, noop_max=30)
     env = MaxAndSkipEnv(env, skip=4)
-    if 'FIRE' in env.unwrapped.get_action_meanings():
-        env = FireResetEnv(env)
+    # if 'FIRE' in env.unwrapped.get_action_meanings():
+    #     env = FireResetEnv(env)
     env = ProcessFrame84(env)
     env = FrameStack(env, 4)
     env = ClippedRewardsWrapper(env)
