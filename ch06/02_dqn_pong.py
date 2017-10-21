@@ -264,7 +264,7 @@ class Agent:
         self._reset()
 
     def _reset(self):
-        self.state = env.reset().copy()
+        self.state = env.reset()
         self.total_reward = 0.0
 
     def play_step(self, net, epsilon=0.0, cuda=False):
@@ -285,8 +285,8 @@ class Agent:
         self.total_reward += reward
         new_state = new_state
 
-        self.exp_buffer.append(Experience(self.state, action, reward, is_done, new_state.copy()))
-        self.state = new_state.copy()
+        self.exp_buffer.append(Experience(self.state, action, reward, is_done, new_state))
+        self.state = new_state
         if is_done:
             done_reward = self.total_reward
             self._reset()
@@ -348,7 +348,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda mode")
     args = parser.parse_args()
 
-    writer = SummaryWriter(comment='-pong-fast')
+    writer = SummaryWriter(comment='-pong-frames')
     env = make_env()
 
     net = DQN(env.observation_space.shape, env.action_space.n)
