@@ -132,11 +132,6 @@ def make_env():
     return env
 
 
-def obs_to_np(obs):
-#    return obs.astype(np.float32) / 255
-    return obs
-
-
 class DQN(nn.Module):
     def __init__(self, input_shape, n_actions):
         super(DQN, self).__init__()
@@ -203,7 +198,7 @@ class Agent:
         if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
-            state_v = Variable(torch.from_numpy(np.array([obs_to_np(self.state)], copy=False)))
+            state_v = Variable(torch.from_numpy(np.array([self.state], copy=False)))
             if cuda:
                 state_v = state_v.cuda()
             q_vals_v = net(state_v)
@@ -225,8 +220,6 @@ class Agent:
 
 def calc_loss(batch, net, target_net, cuda=False):
     states, actions, rewards, dones, next_states = zip(*batch)
-    states = list(map(obs_to_np, states))
-    next_states = list(map(obs_to_np, next_states))
     states_v = Variable(torch.from_numpy(np.array(states, copy=False)))
     next_states_v = Variable(torch.from_numpy(np.array(next_states, copy=False)), volatile=True)
     actions_v = Variable(torch.LongTensor(actions))
@@ -255,7 +248,7 @@ def play_episode(env, net, cuda=False):
     total_reward = 0.0
 
     while True:
-        state_v = Variable(torch.from_numpy(np.array([obs_to_np(state)], copy=False)))
+        state_v = Variable(torch.from_numpy(np.array([state], copy=False)))
         if cuda:
             state_v = state_v.cuda()
         q_vals_v = net(state_v)
@@ -307,7 +300,7 @@ if __name__ == "__main__":
             last_frame = frame_idx
             mean_100 = np.mean(episode_rewards[-100:])
             print("%d: reward %.1f, mean rewards %.2f, episodes %d, speed %.2f frames/sec, epsilon %.2f" % (
-                frame_idx, reward, len(episode_rewards), mean_100, speed, epsilon))
+                frame_idx, reward, mean_100, len(episode_rewards), speed, epsilon))
             writer.add_scalar("reward", reward, frame_idx)
             writer.add_scalar("speed", speed, frame_idx)
             writer.add_scalar("epsilon", epsilon, frame_idx)
