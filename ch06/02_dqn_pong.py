@@ -218,7 +218,7 @@ class Agent:
         return done_reward
 
 
-def calc_loss(batch, net, target_net, cuda=False):
+def calc_loss_fast(batch, net, target_net, cuda=False):
     states, actions, rewards, dones, next_states = zip(*batch)
     states_v = Variable(torch.from_numpy(np.array(states, copy=False)))
     next_states_v = Variable(torch.from_numpy(np.array(next_states, copy=False)), volatile=True)
@@ -241,6 +241,32 @@ def calc_loss(batch, net, target_net, cuda=False):
     bellman_q_v = rewards_v + next_state_values_v * GAMMA
     loss_v = nn.MSELoss()(state_action_values_v, bellman_q_v)
     return loss_v
+
+
+def calc_loss(batch, net, target_net, cuda=False):
+    loss_v = Variable(torch.FloatTensor([0.0]))
+
+    x = [exp.state for exp in batch]
+    x_v = Variable(torch.from_numpy(np.array(x, copy=False)))
+    new_x = [exp.new_state for exp in batch]
+    new_x_v = Variable(torch.from_numpy(np.array(new_x, copy=False)))
+    if cuda:
+        loss_v = loss_v.cuda(async=True)
+        x_v = x_v.cuda(async=True)
+        new_x_v = new_x_v.cuda(async=True)
+
+    q_v = net(x_v)
+    new_q_v = target_net(new_x_v)
+    new_q = new_q_v.data.cpu().numpy()
+
+    for idx, exp in enumerate(batch):
+        R = exp.reward
+        if not exp.done:
+            R += GAMMA * np.max(new_q[idx])
+        loss_v += (q_v[idx][exp.action] - R) ** 2
+
+    return loss_v / len(batch)
+
 
 
 def play_episode(env, net, cuda=False):
