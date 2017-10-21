@@ -218,7 +218,7 @@ class Agent:
         return done_reward
 
 
-def calc_loss_fast(batch, net, target_net, cuda=False):
+def calc_loss(batch, net, target_net, cuda=False):
     states, actions, rewards, dones, next_states = zip(*batch)
     states_v = Variable(torch.from_numpy(np.array(states, copy=False)))
     next_states_v = Variable(torch.from_numpy(np.array(next_states, copy=False)), volatile=True)
@@ -243,7 +243,7 @@ def calc_loss_fast(batch, net, target_net, cuda=False):
     return loss_v
 
 
-def calc_loss(batch, net, target_net, cuda=False):
+def calc_loss_naive(batch, net, target_net, cuda=False):
     loss_v = Variable(torch.FloatTensor([0.0]))
 
     x = [exp.state for exp in batch]
