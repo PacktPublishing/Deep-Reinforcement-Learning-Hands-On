@@ -2,13 +2,10 @@
 import argparse
 import gym
 import gym.spaces
-import copy
+import random
 import time
 import numpy as np
 import collections
-import cv2
-
-from PIL import Image
 
 import torch
 import torch.nn as nn
@@ -17,7 +14,9 @@ from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
+import cv2
 from collections import deque
+from gym import spaces
 
 ENV_NAME = "PongNoFrameskip-v4"
 GAMMA = 0.99
@@ -26,29 +25,6 @@ REPLAY_SIZE = 10000
 LEARNING_RATE = 1e-4
 SYNC_TARGET_FRAMES = 1000
 REPLAY_START_SIZE = 10000
-
-EPSILON_DECAY_LAST_FRAME = 10**5
-EPSILON_START = 1.0
-EPSILON_FINAL = 0.02
-
-SUMMARY_EVERY_FRAME = 100
-
-
-
-class ImageWrapper(gym.ObservationWrapper):
-    TARGET_SIZE = 84
-
-    def __init__(self, env):
-        super(ImageWrapper, self).__init__(env)
-        probe = np.zeros_like(env.observation_space.low, np.uint8)
-        self.observation_space = gym.spaces.Box(0, 255, self._observation(probe).shape)
-
-    def _observation(self, obs):
-        img = Image.fromarray(obs)
-        img = img.convert("YCbCr")
-        img = img.resize((self.TARGET_SIZE, self.TARGET_SIZE))
-        data = np.asarray(img.getdata(0), np.uint8).reshape(img.size)
-        return np.expand_dims(data, 0)
 
 
 class BufferWrapper(gym.ObservationWrapper):
@@ -69,42 +45,14 @@ class BufferWrapper(gym.ObservationWrapper):
         return self.buffer
 
 
-
 class ImageToPyTorch(gym.ObservationWrapper):
     def __init__(self, env):
         super(ImageToPyTorch, self).__init__(env)
         old_shape = self.observation_space.shape
-        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(old_shape[-1], old_shape[0], old_shape[1]))
+        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(old_shape[-1], old_shape[0], old_shape[1]))
 
     def _observation(self, observation):
         return np.moveaxis(observation, 2, 0)
-
-
-# Wrappers from OpenAI baselines
-class NoopResetEnv(gym.Wrapper):
-    def __init__(self, env=None, noop_max=30):
-        """Sample initial states by taking random number of no-ops on reset.
-        No-op is assumed to be action 0.
-        """
-        super(NoopResetEnv, self).__init__(env)
-        self.noop_max = noop_max
-        self.override_num_noops = None
-        assert env.unwrapped.get_action_meanings()[0] == 'NOOP'
-
-    def _reset(self):
-        """ Do no-op action for a number of steps in [1, noop_max]."""
-        self.env.reset()
-        if self.override_num_noops is not None:
-            noops = self.override_num_noops
-        else:
-            noops = np.random.randint(1, self.noop_max + 1)
-        assert noops > 0
-        obs = None
-        for _ in range(noops):
-            obs, _, done, _ = self.env.step(0)
-            if done:
-                obs = self.env.reset()
-        return obs
 
 
 class FireResetEnv(gym.Wrapper):
@@ -122,46 +70,6 @@ class FireResetEnv(gym.Wrapper):
         obs, _, done, _ = self.env.step(2)
         if done:
             self.env.reset()
-        return obs
-
-
-class EpisodicLifeEnv(gym.Wrapper):
-    def __init__(self, env=None):
-        """Make end-of-life == end-of-episode, but only reset on true game over.
-        Done by DeepMind for the DQN and co. since it helps value estimation.
-        """
-        super(EpisodicLifeEnv, self).__init__(env)
-        self.lives = 0
-        self.was_real_done = True
-        self.was_real_reset = False
-
-    def _step(self, action):
-        obs, reward, done, info = self.env.step(action)
-        self.was_real_done = done
-        # check current lives, make loss of life terminal,
-        # then update lives to handle bonus lives
-        lives = self.env.unwrapped.ale.lives()
-        if lives < self.lives and lives > 0:
-            # for Qbert somtimes we stay in lives == 0 condtion for a few frames
-            # so its important to keep lives > 0, so that we only reset once
-            # the environment advertises done.
-            done = True
-        self.lives = lives
-        return obs, reward, done, info
-
-    def _reset(self):
-        """Reset only when lives are exhausted.
-        This way all states are still reachable even though lives are episodic,
-        and the learner need not know about any of this behind-the-scenes.
-        """
-        if self.was_real_done:
-            obs = self.env.reset()
-            self.was_real_reset = True
-        else:
-            # no-op step to advance from terminal/lost life state
-            obs, _, _, _ = self.env.step(0)
-            self.was_real_reset = False
-        self.lives = self.env.unwrapped.ale.lives()
         return obs
 
 
@@ -198,7 +106,7 @@ class MaxAndSkipEnv(gym.Wrapper):
 class ProcessFrame84(gym.ObservationWrapper):
     def __init__(self, env=None):
         super(ProcessFrame84, self).__init__(env)
-        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(84, 84, 1))
+        self.observation_space = spaces.Box(low=0, high=255, shape=(84, 84, 1))
 
     def _observation(self, obs):
         return ProcessFrame84.process(obs)
@@ -218,76 +126,11 @@ class ProcessFrame84(gym.ObservationWrapper):
         return x_t.astype(np.uint8)
 
 
-class ClippedRewardsWrapper(gym.RewardWrapper):
-    def _reward(self, reward):
-        """Change all the positive rewards to 1, negative to -1 and keep zero."""
-        return np.sign(reward)
-
-
-class LazyFrames(object):
-    def __init__(self, frames):
-        """This object ensures that common frames between the observations are only stored once.
-        It exists purely to optimize memory usage which can be huge for DQN's 1M frames replay
-        buffers.
-        This object should only be converted to numpy array before being passed to the model.
-        You'd not belive how complex the previous solution was."""
-        self._frames = frames
-
-    def __array__(self, dtype=None):
-        out = np.concatenate(self._frames, axis=2)
-        if dtype is not None:
-            out = out.astype(dtype)
-        return out
-
-
-class FrameStack(gym.Wrapper):
-    def __init__(self, env, k):
-        """Stack k last frames.
-        Returns lazy array, which is much more memory efficient.
-        See Also
-        --------
-        baselines.common.atari_wrappers.LazyFrames
-        """
-        gym.Wrapper.__init__(self, env)
-        self.k = k
-        self.frames = deque([], maxlen=k)
-        shp = env.observation_space.shape
-        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(shp[0], shp[1], shp[2] * k))
-
-    def _reset(self):
-        ob = self.env.reset()
-        for _ in range(self.k):
-            self.frames.append(ob)
-        return self._get_ob()
-
-    def _step(self, action):
-        ob, reward, done, info = self.env.step(action)
-        self.frames.append(ob)
-        return self._get_ob(), reward, done, info
-
-    def _get_ob(self):
-        assert len(self.frames) == self.k
-        return LazyFrames(list(self.frames))
-
-
 class ScaledFloatFrame(gym.ObservationWrapper):
     def _observation(self, obs):
         # careful! This undoes the memory optimization, use
         # with smaller replay buffers only.
-        return np.array(obs).astype(np.float32) / 255.0
-
-
-def make_env():
-    env = gym.make("PongNoFrameskip-v4")
-    #    env = ImageToPyTorch(ScaledFloatFrame(wrap_dqn(env)))
-    env = MaxAndSkipEnv(env)
-    env = FireResetEnv(env)
-    env = ProcessFrame84(env)
-    #    env = FrameStack(env, 4)
-    env = ImageToPyTorch(env)
-    env = BufferWrapper(env, 4)
-    env = ScaledFloatFrame(env)
-    return env
+        return np.array(obs).astype(np.float) / 255.0
 
 
 class DQN(nn.Module):
@@ -319,164 +162,139 @@ class DQN(nn.Module):
         return self.fc(conv_out)
 
 
-Experience = collections.namedtuple('Experience', field_names=['state', 'action', 'reward', 'done', 'new_state'])
-
-
-class ExperienceBuffer:
+class Buffer:
     def __init__(self, capacity):
-        self.capacity = capacity
-        self.buffer = collections.deque()
+        self.buffer = collections.deque(maxlen=capacity)
 
     def __len__(self):
         return len(self.buffer)
 
-    def append(self, experience):
-        self.buffer.append(experience)
-        while len(self.buffer) > self.capacity:
-            self.buffer.popleft()
+    def add(self, item):
+        self.buffer.append(item)
 
-    def sample(self, batch_size):
-        indices = np.random.choice(len(self.buffer), batch_size, replace=False)
-        return [self.buffer[idx] for idx in indices]
+    def sample_batch(self, batch_size):
+        obses_t, actions, rewards, dones, obses_tp1 = [], [], [], [], []
+        for i in range(batch_size):
+            idx = random.randint(0, len(self.buffer)-1)
+            obs_t, action, reward, done, obs_tp1 = self.buffer[idx]
 
-
-class Agent:
-    def __init__(self, env, exp_buffer):
-        self.env = env
-        self.exp_buffer = exp_buffer
-        self._reset()
-
-    def _reset(self):
-        self.state = env.reset()
-        self.total_reward = 0.0
-
-    def play_step(self, net, epsilon=0.0, cuda=False):
-        done_reward = None
-
-        if np.random.random() < epsilon:
-            action = env.action_space.sample()
-        else:
-            state_v = Variable(torch.from_numpy(np.array([self.state], copy=False)))
-            if cuda:
-                state_v = state_v.cuda()
-            q_vals_v = net(state_v)
-            _, act_v = torch.max(q_vals_v, dim=1)
-            action = int(act_v.data.cpu().numpy()[0])
-
-        # do step in the environment
-        new_state, reward, is_done, _ = self.env.step(action)
-        self.total_reward += reward
-        new_state = new_state
-
-        self.exp_buffer.append(Experience(self.state, action, reward, is_done, new_state))
-        self.state = new_state
-        if is_done:
-            done_reward = self.total_reward
-            self._reset()
-        return done_reward
+            obses_t.append(np.array(obs_t, copy=False))
+            actions.append(np.array(action, copy=False))
+            rewards.append(reward)
+            obses_tp1.append(np.array(obs_tp1, copy=False))
+            dones.append(done)
+        return np.array(obses_t, dtype=np.float32), \
+               np.array(actions), \
+               np.array(rewards, dtype=np.float32), \
+               np.array(dones), \
+               np.array(obses_tp1, dtype=np.float32)
 
 
-def calc_loss(batch, net, target_net, cuda=False):
-    states, actions, rewards, dones, next_states = zip(*batch)
-    states_v = Variable(torch.from_numpy(np.array(states, copy=False)))
-    next_states_v = Variable(torch.from_numpy(np.array(next_states, copy=False)), volatile=True)
-    actions_v = Variable(torch.LongTensor(actions))
-    rewards_v = Variable(torch.FloatTensor(rewards))
-    done_mask_t = torch.ByteTensor(dones)
-
-    if cuda:
-        states_v = states_v.cuda()
-        next_states_v = next_states_v.cuda()
-        actions_v = actions_v.cuda()
-        rewards_v = rewards_v.cuda()
-        done_mask_t = done_mask_t.cuda()
-
-    state_action_values_v = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
-    next_state_values_v = target_net(next_states_v).max(1)[0]
-    next_state_values_v[done_mask_t] = 0.0
-    next_state_values_v.volatile = False
-
-    bellman_q_v = rewards_v + next_state_values_v * GAMMA
-    loss_v = nn.MSELoss()(state_action_values_v, bellman_q_v)
-    return loss_v
-
-
-def calc_loss_naive(batch, net, target_net, cuda=False):
-    loss_v = Variable(torch.FloatTensor([0.0]))
-
-    x = [exp.state for exp in batch]
-    x_v = Variable(torch.from_numpy(np.array(x, copy=False)))
-    new_x = [exp.new_state for exp in batch]
-    new_x_v = Variable(torch.from_numpy(np.array(new_x, copy=False)))
-    if cuda:
-        loss_v = loss_v.cuda(async=True)
-        x_v = x_v.cuda(async=True)
-        new_x_v = new_x_v.cuda(async=True)
-
-    q_v = net(x_v)
-    new_q_v = target_net(new_x_v)
-    new_q = new_q_v.data.cpu().numpy()
-
-    for idx, exp in enumerate(batch):
-        R = exp.reward
-        if not exp.done:
-            R += GAMMA * np.max(new_q[idx])
-        loss_v += (q_v[idx][exp.action] - R) ** 2
-
-    return loss_v / len(batch)
+def make_env():
+    env = gym.make(ENV_NAME)
+    env = MaxAndSkipEnv(env)
+    env = FireResetEnv(env)
+    env = ProcessFrame84(env)
+    env = ImageToPyTorch(env)
+    env = BufferWrapper(env, 4)
+    env = ScaledFloatFrame(env)
+    return env
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda mode")
+    parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
 
-    writer = SummaryWriter(comment='-pong-copy')
     env = make_env()
-
     net = DQN(env.observation_space.shape, env.action_space.n)
     tgt_net = DQN(env.observation_space.shape, env.action_space.n)
-    print(net)
+    writer = SummaryWriter(comment="-pong-new")
 
-    exp_buffer = ExperienceBuffer(capacity=REPLAY_SIZE)
-    agent = Agent(env, exp_buffer)
-
-    optimizer = optim.RMSprop(net.parameters(), lr=LEARNING_RATE, momentum=0.95)
     if args.cuda:
         net.cuda()
         tgt_net.cuda()
 
-    epsilon = EPSILON_START
-    episode_rewards = []
+    buffer = Buffer(REPLAY_SIZE)
+    epsilon = 1.0
+
+    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    total_rewards = [0.0]
+    state = env.reset()
     frame_idx = 0
-    last_ts = time.time()
-    last_frame = 0
+    ts_frame = 0
+    ts = time.time()
 
     while True:
         frame_idx += 1
-        epsilon = max(EPSILON_FINAL, EPSILON_START - frame_idx / EPSILON_DECAY_LAST_FRAME)
-        reward = agent.play_step(tgt_net, epsilon=epsilon, cuda=args.cuda)
-        if reward is not None:
-            episode_rewards.append(reward)
-            speed = (frame_idx - last_frame) / (time.time() - last_ts)
-            last_ts = time.time()
-            last_frame = frame_idx
-            mean_100 = np.mean(episode_rewards[-100:])
-            print("%d: reward %.1f, mean rewards %.2f, episodes %d, speed %.2f frames/sec, epsilon %.2f" % (
-                frame_idx, reward, mean_100, len(episode_rewards), speed, epsilon))
-            writer.add_scalar("reward", reward, frame_idx)
-            writer.add_scalar("speed", speed, frame_idx)
-            writer.add_scalar("epsilon", epsilon, frame_idx)
-            writer.add_scalar("reward_100", mean_100, frame_idx)
+        if np.random.random() < epsilon:
+            action = env.action_space.sample()
+        else:
+            state_v = Variable(torch.FloatTensor([state]), volatile=True)
+            if args.cuda:
+                state_v = state_v.cuda()
+            q_vals_t = net(state_v)[0]
+            q_vals = q_vals_t.data.cpu().numpy()
+            action = np.argmax(q_vals)
 
-        if frame_idx < REPLAY_START_SIZE:
+        new_state, reward, done, _ = env.step(action)
+        buffer.add((state, action, reward, done, new_state))
+        state = new_state
+        total_rewards[-1] += reward
+        if done:
+            state = env.reset()
+            total_rewards.append(0.0)
+            speed = (frame_idx - ts_frame) / (time.time() - ts)
+            ts_frame = frame_idx
+            ts = time.time()
+            mean_reward = np.mean(total_rewards[-100:-1])
+            print("%d: done %d games, mean reward %.3f, eps %.2f, speed %.2f f/s" % (
+                frame_idx, len(total_rewards), mean_reward, epsilon,
+                speed
+            ))
+            writer.add_scalar("epsilon", epsilon, frame_idx)
+            writer.add_scalar("speed", speed, frame_idx)
+            writer.add_scalar("reward_mean", mean_reward, frame_idx)
+            writer.add_scalar("reward", total_rewards[-2], frame_idx)
+
+        if len(buffer) < REPLAY_START_SIZE:
             continue
 
-        batch = exp_buffer.sample(BATCH_SIZE)
+        # train
         optimizer.zero_grad()
-        loss_v = calc_loss(batch, net, tgt_net, cuda=args.cuda)
-        loss_v.backward()
+        obses_t, actions, rewards, dones, obses_tp1 = buffer.sample_batch(BATCH_SIZE)
+
+        obses_t_v = Variable(torch.from_numpy(obses_t))
+        obses_tp1_v = Variable(torch.from_numpy(obses_tp1), volatile=True)
+        actions_v = Variable(torch.from_numpy(actions))
+        rewards_v = Variable(torch.from_numpy(rewards))
+        done_mask = torch.ByteTensor(dones.astype(np.uint8))
+        if args.cuda:
+            obses_t_v = obses_t_v.cuda()
+            obses_tp1_v = obses_tp1_v.cuda()
+            actions_v = actions_v.cuda()
+            rewards_v = rewards_v.cuda()
+            done_mask = done_mask.cuda()
+
+        state_action_values = net(obses_t_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
+        next_state_values = tgt_net(obses_tp1_v).max(1)[0]
+        next_state_values[done_mask] = 0.0
+        next_state_values.volatile = False
+
+        expected_state_action_values = next_state_values * GAMMA + rewards_v
+        loss_t = nn.MSELoss()(state_action_values, expected_state_action_values)
+
+        # for idx in range(BATCH_SIZE):
+        #     R = rewards[idx]
+        #     if not dones[idx]:
+        #         R += GAMMA * np.max(q_vals_tp1[idx])
+        #     loss_t += (q_vals_t[idx][actions[idx]] - R) ** 2
+        # loss_t /= BATCH_SIZE
+        loss_t.backward()
         optimizer.step()
+
+        epsilon = max(0.02, 1.0 - frame_idx / 10 ** 5)
 
         if frame_idx % SYNC_TARGET_FRAMES == 0:
             tgt_net.load_state_dict(net.state_dict())
+    pass
