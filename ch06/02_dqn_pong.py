@@ -294,26 +294,6 @@ def calc_loss_naive(batch, net, target_net, cuda=False):
     return loss_v / len(batch)
 
 
-
-def play_episode(env, net, cuda=False):
-    state = env.reset()
-    total_reward = 0.0
-
-    while True:
-        state_v = Variable(torch.from_numpy(np.array([state], copy=False)))
-        if cuda:
-            state_v = state_v.cuda()
-        q_vals_v = net(state_v)
-        _, act_v = torch.max(q_vals_v, dim=1)
-        action = act_v.data.cpu().numpy()[0]
-        new_state, reward, is_done, _ = env.step(action)
-        total_reward += reward
-        if is_done:
-            break
-        state = new_state
-    return total_reward
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda mode")
@@ -321,7 +301,6 @@ if __name__ == "__main__":
 
     writer = SummaryWriter(comment='-pong-fast')
     env = make_env()
-    test_env = make_env()
 
     net = DQN(env.observation_space.shape, env.action_space.n)
     tgt_net = DQN(env.observation_space.shape, env.action_space.n)
@@ -369,6 +348,3 @@ if __name__ == "__main__":
 
         if frame_idx % SYNC_TARGET_FRAMES == 0:
             tgt_net.load_state_dict(net.state_dict())
-            reward = play_episode(test_env, tgt_net, cuda=args.cuda)
-            writer.add_scalar("reward_test", reward, frame_idx)
-            print("%d: synced, test episode reward=%.1f" % (frame_idx, reward))
