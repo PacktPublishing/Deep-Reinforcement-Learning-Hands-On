@@ -2,7 +2,6 @@
 import argparse
 import gym
 import gym.spaces
-import random
 import time
 import numpy as np
 import collections
@@ -25,6 +24,10 @@ REPLAY_SIZE = 10000
 LEARNING_RATE = 1e-4
 SYNC_TARGET_FRAMES = 1000
 REPLAY_START_SIZE = 10000
+
+EPSILON_DECAY_LAST_FRAME = 10**5
+EPSILON_START = 1.0
+EPSILON_FINAL = 0.02
 
 
 class BufferWrapper(gym.ObservationWrapper):
@@ -130,7 +133,7 @@ class ScaledFloatFrame(gym.ObservationWrapper):
     def _observation(self, obs):
         # careful! This undoes the memory optimization, use
         # with smaller replay buffers only.
-        return np.array(obs).astype(np.float) / 255.0
+        return np.array(obs).astype(np.float32) / 255.0
 
 
 class DQN(nn.Module):
@@ -162,43 +165,7 @@ class DQN(nn.Module):
         return self.fc(conv_out)
 
 
-class Buffer:
-    def __init__(self, capacity):
-        self.buffer = collections.deque(maxlen=capacity)
-
-    def __len__(self):
-        return len(self.buffer)
-
-    def add(self, item):
-        self.buffer.append(item)
-
-    def sample_batch(self, batch_size):
-        obses_t, actions, rewards, dones, obses_tp1 = [], [], [], [], []
-        for i in range(batch_size):
-            idx = random.randint(0, len(self.buffer)-1)
-            obs_t, action, reward, done, obs_tp1 = self.buffer[idx]
-
-            obses_t.append(np.array(obs_t, copy=False))
-            actions.append(np.array(action, copy=False))
-            rewards.append(reward)
-            obses_tp1.append(np.array(obs_tp1, copy=False))
-            dones.append(done)
-        return np.array(obses_t, dtype=np.float32), \
-               np.array(actions), \
-               np.array(rewards, dtype=np.float32), \
-               np.array(dones), \
-               np.array(obses_tp1, dtype=np.float32)
-
-
-def make_env():
-    env = gym.make(ENV_NAME)
-    env = MaxAndSkipEnv(env)
-    env = FireResetEnv(env)
-    env = ProcessFrame84(env)
-    env = ImageToPyTorch(env)
-    env = BufferWrapper(env, 4)
-    env = ScaledFloatFrame(env)
-    return env
+Experience = collections.namedtuple('Experience', field_names=['state', 'action', 'reward', 'done', 'new_state'])
 
 
 class ExperienceBuffer:
@@ -216,7 +183,93 @@ class ExperienceBuffer:
 
     def sample(self, batch_size):
         indices = np.random.choice(len(self.buffer), batch_size, replace=False)
-        return [self.buffer[idx] for idx in indices]
+        states, actions, rewards, dones, next_states = zip(*[self.buffer[idx] for idx in indices])
+        return np.array(states, copy=False), np.array(actions), np.array(rewards, dtype=np.float32), \
+               np.array(dones, dtype=np.uint8), np.array(next_states, copy=False)
+
+
+class Agent:
+    def __init__(self, env, exp_buffer):
+        self.env = env
+        self.exp_buffer = exp_buffer
+        self._reset()
+
+    def _reset(self):
+        self.state = env.reset()
+        self.total_reward = 0.0
+
+    def play_step(self, net, epsilon=0.0, cuda=False):
+        done_reward = None
+
+        if np.random.random() < epsilon:
+            action = env.action_space.sample()
+        else:
+            state_v = Variable(torch.from_numpy(np.array([self.state], copy=False)))
+            if cuda:
+                state_v = state_v.cuda()
+            q_vals_v = net(state_v)
+            _, act_v = torch.max(q_vals_v, dim=1)
+            action = int(act_v.data.cpu().numpy()[0])
+
+        # do step in the environment
+        new_state, reward, is_done, _ = self.env.step(action)
+        self.total_reward += reward
+        new_state = new_state
+
+        self.exp_buffer.append(Experience(self.state, action, reward, is_done, new_state))
+        self.state = new_state
+        if is_done:
+            done_reward = self.total_reward
+            self._reset()
+        return done_reward
+
+
+def calc_loss(batch, net, tgt_net, cuda=False):
+    states, actions, rewards, dones, next_states = batch
+
+    states_v = Variable(torch.from_numpy(states))
+    next_states_v = Variable(torch.from_numpy(next_states), volatile=True)
+    actions_v = Variable(torch.from_numpy(actions))
+    rewards_v = Variable(torch.from_numpy(rewards))
+    done_mask = torch.ByteTensor(dones)
+    if cuda:
+        states_v = states_v.cuda()
+        next_states_v = next_states_v.cuda()
+        actions_v = actions_v.cuda()
+        rewards_v = rewards_v.cuda()
+        done_mask = done_mask.cuda()
+
+    state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
+    next_state_values = tgt_net(next_states_v).max(1)[0]
+    next_state_values[done_mask] = 0.0
+    next_state_values.volatile = False
+
+    expected_state_action_values = next_state_values * GAMMA + rewards_v
+    return nn.MSELoss()(state_action_values, expected_state_action_values)
+
+
+def calc_loss_naive(batch, net, tgt_net, cuda=False):
+    states, actions, rewards, dones, next_states = batch
+
+    states_v = Variable(torch.from_numpy(states))
+    next_states_v = Variable(torch.from_numpy(next_states), volatile=True)
+    loss_v = Variable(torch.FloatTensor([0]))
+    if cuda:
+        states_v = states_v.cuda()
+        next_states_v = next_states_v.cuda()
+        loss_v = loss_v.cuda()
+
+    state_values = net(states_v)
+    next_state_values = tgt_net(next_states_v).max(1)[0]
+    next_state_values = next_state_values.data.cpu().numpy()
+
+    for idx in range(BATCH_SIZE):
+        R = float(rewards[idx])
+        if not dones[idx]:
+            R += GAMMA * np.max(next_state_values[idx])
+        loss_v += (state_values[idx][actions[idx]] - R) ** 2
+
+    return loss_v / BATCH_SIZE
 
 
 if __name__ == "__main__":
@@ -224,7 +277,14 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
 
-    env = make_env()
+    env = gym.make(ENV_NAME)
+    env = MaxAndSkipEnv(env)
+    env = FireResetEnv(env)
+    env = ProcessFrame84(env)
+    env = ImageToPyTorch(env)
+    env = BufferWrapper(env, 4)
+    env = ScaledFloatFrame(env)
+
     net = DQN(env.observation_space.shape, env.action_space.n)
     tgt_net = DQN(env.observation_space.shape, env.action_space.n)
     writer = SummaryWriter(comment="-pong-new-buf")
@@ -234,38 +294,26 @@ if __name__ == "__main__":
         tgt_net.cuda()
 
     buffer = ExperienceBuffer(REPLAY_SIZE)
+    agent = Agent(env, buffer)
     epsilon = 1.0
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
-    total_rewards = [0.0]
-    state = env.reset()
+    total_rewards = []
     frame_idx = 0
     ts_frame = 0
     ts = time.time()
 
     while True:
         frame_idx += 1
-        if np.random.random() < epsilon:
-            action = env.action_space.sample()
-        else:
-            state_v = Variable(torch.FloatTensor([state]), volatile=True)
-            if args.cuda:
-                state_v = state_v.cuda()
-            q_vals_t = net(state_v)[0]
-            q_vals = q_vals_t.data.cpu().numpy()
-            action = np.argmax(q_vals)
+        epsilon = max(EPSILON_FINAL, EPSILON_START - frame_idx / EPSILON_DECAY_LAST_FRAME)
 
-        new_state, reward, done, _ = env.step(action)
-        buffer.append((state, action, reward, done, new_state))
-        state = new_state
-        total_rewards[-1] += reward
-        if done:
-            state = env.reset()
-            total_rewards.append(0.0)
+        reward = agent.play_step(net, epsilon, cuda=args.cuda)
+        if reward is not None:
+            total_rewards.append(reward)
             speed = (frame_idx - ts_frame) / (time.time() - ts)
             ts_frame = frame_idx
             ts = time.time()
-            mean_reward = np.mean(total_rewards[-100:-1])
+            mean_reward = np.mean(total_rewards[-100:])
             print("%d: done %d games, mean reward %.3f, eps %.2f, speed %.2f f/s" % (
                 frame_idx, len(total_rewards), mean_reward, epsilon,
                 speed
@@ -273,47 +321,16 @@ if __name__ == "__main__":
             writer.add_scalar("epsilon", epsilon, frame_idx)
             writer.add_scalar("speed", speed, frame_idx)
             writer.add_scalar("reward_100", mean_reward, frame_idx)
-            writer.add_scalar("reward", total_rewards[-2], frame_idx)
+            writer.add_scalar("reward", reward, frame_idx)
 
         if len(buffer) < REPLAY_START_SIZE:
             continue
 
-        # train
-        optimizer.zero_grad()
-        batch = buffer.sample(BATCH_SIZE)
-        obses_t, actions, rewards, dones, obses_tp1 = zip(*batch)
-
-        obses_t_v = Variable(torch.from_numpy(np.array(obses_t, copy=False, dtype=np.float32)))
-        obses_tp1_v = Variable(torch.from_numpy(np.array(obses_tp1, copy=False, dtype=np.float32)), volatile=True)
-        actions_v = Variable(torch.from_numpy(np.array(actions)))
-        rewards_v = Variable(torch.from_numpy(np.array(rewards, dtype=np.float32)))
-        done_mask = torch.ByteTensor(np.array(dones, dtype=np.uint8))
-        if args.cuda:
-            obses_t_v = obses_t_v.cuda()
-            obses_tp1_v = obses_tp1_v.cuda()
-            actions_v = actions_v.cuda()
-            rewards_v = rewards_v.cuda()
-            done_mask = done_mask.cuda()
-
-        state_action_values = net(obses_t_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
-        next_state_values = tgt_net(obses_tp1_v).max(1)[0]
-        next_state_values[done_mask] = 0.0
-        next_state_values.volatile = False
-
-        expected_state_action_values = next_state_values * GAMMA + rewards_v
-        loss_t = nn.MSELoss()(state_action_values, expected_state_action_values)
-
-        # for idx in range(BATCH_SIZE):
-        #     R = rewards[idx]
-        #     if not dones[idx]:
-        #         R += GAMMA * np.max(q_vals_tp1[idx])
-        #     loss_t += (q_vals_t[idx][actions[idx]] - R) ** 2
-        # loss_t /= BATCH_SIZE
-        loss_t.backward()
-        optimizer.step()
-
-        epsilon = max(0.02, 1.0 - frame_idx / 10 ** 5)
-
         if frame_idx % SYNC_TARGET_FRAMES == 0:
             tgt_net.load_state_dict(net.state_dict())
-    pass
+
+        optimizer.zero_grad()
+        batch = buffer.sample(BATCH_SIZE)
+        loss_t = calc_loss(batch, net, tgt_net, cuda=args.cuda)
+        loss_t.backward()
+        optimizer.step()
