@@ -68,6 +68,54 @@ class BufferWrapper(gym.ObservationWrapper):
         return self.buffer
 
 
+
+class LazyFrames(object):
+    def __init__(self, frames):
+        """This object ensures that common frames between the observations are only stored once.
+        It exists purely to optimize memory usage which can be huge for DQN's 1M frames replay
+        buffers.
+        This object should only be converted to numpy array before being passed to the model.
+        You'd not belive how complex the previous solution was."""
+        self._frames = frames
+
+    def __array__(self, dtype=None):
+        out = np.concatenate(self._frames, axis=0)
+        if dtype is not None:
+            out = out.astype(dtype)
+        return out
+
+
+class FrameStack(gym.Wrapper):
+    def __init__(self, env, k):
+        """Stack k last frames.
+        Returns lazy array, which is much more memory efficient.
+        See Also
+        --------
+        baselines.common.atari_wrappers.LazyFrames
+        """
+        gym.Wrapper.__init__(self, env)
+        self.k = k
+        self.frames = deque([], maxlen=k)
+        shp = env.observation_space.shape
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(shp[0]*k, shp[1], shp[2]))
+
+    def _reset(self):
+        ob = self.env.reset()
+        for _ in range(self.k):
+            self.frames.append(ob)
+        return self._get_ob()
+
+    def _step(self, action):
+        ob, reward, done, info = self.env.step(action)
+        self.frames.append(ob)
+        return self._get_ob(), reward, done, info
+
+    def _get_ob(self):
+        assert len(self.frames) == self.k
+        return LazyFrames(list(self.frames))
+
+
+
 class FireResetEnv(gym.Wrapper):
     def __init__(self, env=None):
         """For environments where the user need to press FIRE for the game to start."""
@@ -154,7 +202,8 @@ def make_env():
 #    env = ImageWrapper(env)
     env = ProcessFrame84(env)
     env = ScaledFloatFrame(env)
-    env = BufferWrapper(env, 4, dtype=np.float32)
+#    env = BufferWrapper(env, 4, dtype=np.float32)
+    env = FrameStack(env, 4)
     return env
 
 
