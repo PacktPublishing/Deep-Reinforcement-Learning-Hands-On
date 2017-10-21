@@ -254,7 +254,7 @@ if __name__ == "__main__":
             ))
             writer.add_scalar("epsilon", epsilon, frame_idx)
             writer.add_scalar("speed", speed, frame_idx)
-            writer.add_scalar("reward_mean", mean_reward, frame_idx)
+            writer.add_scalar("reward_100", mean_reward, frame_idx)
             writer.add_scalar("reward", total_rewards[-2], frame_idx)
 
         if len(buffer) < REPLAY_START_SIZE:
