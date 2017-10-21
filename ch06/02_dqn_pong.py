@@ -30,34 +30,6 @@ EPSILON_START = 1.0
 EPSILON_FINAL = 0.02
 
 
-class BufferWrapper(gym.ObservationWrapper):
-    def __init__(self, env, n_steps, dtype=np.uint8):
-        super(BufferWrapper, self).__init__(env)
-        self.dtype = dtype
-        old_space = env.observation_space
-        self.observation_space = gym.spaces.Box(old_space.low.repeat(n_steps, axis=0),
-                                                old_space.high.repeat(n_steps, axis=0))
-
-    def _reset(self):
-        self.buffer = np.zeros_like(self.observation_space.low, dtype=self.dtype)
-        return self._observation(self.env.reset())
-
-    def _observation(self, observation):
-        self.buffer[:-1] = self.buffer[1:]
-        self.buffer[-1] = observation
-        return self.buffer
-
-
-class ImageToPyTorch(gym.ObservationWrapper):
-    def __init__(self, env):
-        super(ImageToPyTorch, self).__init__(env)
-        old_shape = self.observation_space.shape
-        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(old_shape[-1], old_shape[0], old_shape[1]))
-
-    def _observation(self, observation):
-        return np.moveaxis(observation, 2, 0)
-
-
 class FireResetEnv(gym.Wrapper):
     def __init__(self, env=None):
         """For environments where the user need to press FIRE for the game to start."""
@@ -93,9 +65,7 @@ class MaxAndSkipEnv(gym.Wrapper):
             total_reward += reward
             if done:
                 break
-
         max_frame = np.max(np.stack(self._obs_buffer), axis=0)
-
         return max_frame, total_reward, done, info
 
     def _reset(self):
@@ -129,11 +99,32 @@ class ProcessFrame84(gym.ObservationWrapper):
         return x_t.astype(np.uint8)
 
 
-class ScaledFloatFrame(gym.ObservationWrapper):
-    def _observation(self, obs):
-        # careful! This undoes the memory optimization, use
-        # with smaller replay buffers only.
-        return np.array(obs).astype(np.float32) / 255.0
+class ScreenToPyTorch(gym.ObservationWrapper):
+    def __init__(self, env):
+        super(ScreenToPyTorch, self).__init__(env)
+        old_shape = self.observation_space.shape
+        self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(old_shape[-1], old_shape[0], old_shape[1]))
+
+    def _observation(self, observation):
+        return np.moveaxis(observation, 2, 0).astype(np.float32) / 255
+
+
+class BufferWrapper(gym.ObservationWrapper):
+    def __init__(self, env, n_steps, dtype=np.float32):
+        super(BufferWrapper, self).__init__(env)
+        self.dtype = dtype
+        old_space = env.observation_space
+        self.observation_space = gym.spaces.Box(old_space.low.repeat(n_steps, axis=0),
+                                                old_space.high.repeat(n_steps, axis=0))
+
+    def _reset(self):
+        self.buffer = np.zeros_like(self.observation_space.low, dtype=self.dtype)
+        return self._observation(self.env.reset())
+
+    def _observation(self, observation):
+        self.buffer[:-1] = self.buffer[1:]
+        self.buffer[-1] = observation
+        return self.buffer
 
 
 class DQN(nn.Module):
@@ -281,13 +272,12 @@ if __name__ == "__main__":
     env = MaxAndSkipEnv(env)
     env = FireResetEnv(env)
     env = ProcessFrame84(env)
-    env = ImageToPyTorch(env)
+    env = ScreenToPyTorch(env)
     env = BufferWrapper(env, 4)
-    env = ScaledFloatFrame(env)
 
     net = DQN(env.observation_space.shape, env.action_space.n)
     tgt_net = DQN(env.observation_space.shape, env.action_space.n)
-    writer = SummaryWriter(comment="-pong-new-buf")
+    writer = SummaryWriter(comment="-pong")
 
     if args.cuda:
         net.cuda()
