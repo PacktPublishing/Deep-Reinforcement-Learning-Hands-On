@@ -201,6 +201,24 @@ def make_env():
     return env
 
 
+class ExperienceBuffer:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.buffer = collections.deque()
+
+    def __len__(self):
+        return len(self.buffer)
+
+    def append(self, experience):
+        self.buffer.append(experience)
+        while len(self.buffer) > self.capacity:
+            self.buffer.popleft()
+
+    def sample(self, batch_size):
+        indices = np.random.choice(len(self.buffer), batch_size, replace=False)
+        return [self.buffer[idx] for idx in indices]
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
@@ -209,13 +227,13 @@ if __name__ == "__main__":
     env = make_env()
     net = DQN(env.observation_space.shape, env.action_space.n)
     tgt_net = DQN(env.observation_space.shape, env.action_space.n)
-    writer = SummaryWriter(comment="-pong-new")
+    writer = SummaryWriter(comment="-pong-new-buf")
 
     if args.cuda:
         net.cuda()
         tgt_net.cuda()
 
-    buffer = Buffer(REPLAY_SIZE)
+    buffer = ExperienceBuffer(REPLAY_SIZE)
     epsilon = 1.0
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
@@ -238,7 +256,7 @@ if __name__ == "__main__":
             action = np.argmax(q_vals)
 
         new_state, reward, done, _ = env.step(action)
-        buffer.add((state, action, reward, done, new_state))
+        buffer.append((state, action, reward, done, new_state))
         state = new_state
         total_rewards[-1] += reward
         if done:
@@ -262,13 +280,14 @@ if __name__ == "__main__":
 
         # train
         optimizer.zero_grad()
-        obses_t, actions, rewards, dones, obses_tp1 = buffer.sample_batch(BATCH_SIZE)
+        batch = buffer.sample(BATCH_SIZE)
+        obses_t, actions, rewards, dones, obses_tp1 = zip(*batch)
 
-        obses_t_v = Variable(torch.from_numpy(obses_t))
-        obses_tp1_v = Variable(torch.from_numpy(obses_tp1), volatile=True)
-        actions_v = Variable(torch.from_numpy(actions))
-        rewards_v = Variable(torch.from_numpy(rewards))
-        done_mask = torch.ByteTensor(dones.astype(np.uint8))
+        obses_t_v = Variable(torch.from_numpy(np.array(obses_t, copy=False, dtype=np.float32)))
+        obses_tp1_v = Variable(torch.from_numpy(np.array(obses_tp1, copy=False, dtype=np.float32)), volatile=True)
+        actions_v = Variable(torch.from_numpy(np.array(actions)))
+        rewards_v = Variable(torch.from_numpy(np.array(rewards, dtype=np.float32)))
+        done_mask = torch.ByteTensor(np.array(dones, dtype=np.uint8))
         if args.cuda:
             obses_t_v = obses_t_v.cuda()
             obses_tp1_v = obses_tp1_v.cuda()
