@@ -199,7 +199,7 @@ class Agent:
                 state_v = state_v.cuda()
             q_vals_v = net(state_v)
             _, act_v = torch.max(q_vals_v, dim=1)
-            action = act_v.data.cpu().numpy()[0]
+            action = int(act_v.data.cpu().numpy()[0])
 
         # do step in the environment
         new_state, reward, is_done, _ = self.env.step(action)
@@ -215,28 +215,30 @@ class Agent:
 
 
 def calc_loss(batch, net, target_net, cuda=False):
-    loss_v = Variable(torch.FloatTensor([0.0]))
+    states, actions, rewards, dones, next_states = zip(*batch)
+    states = list(map(obs_to_np, states))
+    next_states = list(map(obs_to_np, next_states))
+    states_v = Variable(torch.FloatTensor(states))
+    next_states_v = Variable(torch.FloatTensor(next_states), volatile=True)
+    actions_v = Variable(torch.LongTensor(actions))
+    rewards_v = Variable(torch.FloatTensor(rewards))
+    done_mask_t = torch.ByteTensor(dones)
 
-    x = [obs_to_np(exp.state) for exp in batch]
-    x_v = Variable(torch.FloatTensor(x))
-    new_x = [obs_to_np(exp.new_state) for exp in batch]
-    new_x_v = Variable(torch.FloatTensor(new_x))
     if cuda:
-        loss_v = loss_v.cuda(async=True)
-        x_v = x_v.cuda(async=True)
-        new_x_v = new_x_v.cuda(async=True)
+        states_v = states_v.cuda()
+        next_states_v = next_states_v.cuda()
+        actions_v = actions_v.cuda()
+        rewards_v = rewards_v.cuda()
+        done_mask_t = done_mask_t.cuda()
 
-    q_v = net(x_v)
-    new_q_v = target_net(new_x_v)
-    new_q = new_q_v.data.cpu().numpy()
+    state_action_values_v = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
+    next_state_values_v = tgt_net(next_states_v).max(1)[0]
+    next_state_values_v[done_mask_t] = 0.0
+    next_state_values_v.volatile = False
 
-    for idx, exp in enumerate(batch):
-        R = exp.reward
-        if not exp.done:
-            R += GAMMA * np.max(new_q[idx])
-        loss_v += (q_v[idx][exp.action] - R) ** 2
-
-    return loss_v / len(batch)
+    bellman_q_v = rewards_v + next_state_values_v * GAMMA
+    loss_v = nn.MSELoss()(state_action_values_v, bellman_q_v)
+    return loss_v
 
 
 def play_episode(env, net, cuda=False):
@@ -263,7 +265,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda mode")
     args = parser.parse_args()
 
-    writer = SummaryWriter(comment='-pong-slow')
+    writer = SummaryWriter(comment='-pong-fast')
     env = make_env()
     test_env = make_env()
 
