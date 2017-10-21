@@ -115,17 +115,26 @@ class MaxAndSkipEnv(gym.Wrapper):
         return obs
 
 
+class ScaledFloatFrame(gym.ObservationWrapper):
+    def _observation(self, obs):
+        # careful! This undoes the memory optimization, use
+        # with smaller replay buffers only.
+        return np.array(obs).astype(np.float32) / 255.0
+
+
 def make_env():
     env = gym.make(ENV_NAME)
     env = FireResetEnv(env)
     env = MaxAndSkipEnv(env)
     env = ImageWrapper(env)
-    env = BufferWrapper(env, 4)
+    env = ScaledFloatFrame(env)
+    env = BufferWrapper(env, 4, dtype=np.float32)
     return env
 
 
 def obs_to_np(obs):
-    return obs.astype(np.float) / 255
+#    return obs.astype(np.float32) / 255
+    return obs
 
 
 class DQN(nn.Module):
@@ -194,7 +203,7 @@ class Agent:
         if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
-            state_v = Variable(torch.FloatTensor([obs_to_np(self.state)]))
+            state_v = Variable(torch.from_numpy(np.array([obs_to_np(self.state)], copy=False)))
             if cuda:
                 state_v = state_v.cuda()
             q_vals_v = net(state_v)
@@ -218,8 +227,8 @@ def calc_loss(batch, net, target_net, cuda=False):
     states, actions, rewards, dones, next_states = zip(*batch)
     states = list(map(obs_to_np, states))
     next_states = list(map(obs_to_np, next_states))
-    states_v = Variable(torch.FloatTensor(states))
-    next_states_v = Variable(torch.FloatTensor(next_states), volatile=True)
+    states_v = Variable(torch.from_numpy(np.array(states, copy=False)))
+    next_states_v = Variable(torch.from_numpy(np.array(next_states, copy=False)), volatile=True)
     actions_v = Variable(torch.LongTensor(actions))
     rewards_v = Variable(torch.FloatTensor(rewards))
     done_mask_t = torch.ByteTensor(dones)
@@ -232,7 +241,7 @@ def calc_loss(batch, net, target_net, cuda=False):
         done_mask_t = done_mask_t.cuda()
 
     state_action_values_v = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
-    next_state_values_v = tgt_net(next_states_v).max(1)[0]
+    next_state_values_v = target_net(next_states_v).max(1)[0]
     next_state_values_v[done_mask_t] = 0.0
     next_state_values_v.volatile = False
 
@@ -246,7 +255,7 @@ def play_episode(env, net, cuda=False):
     total_reward = 0.0
 
     while True:
-        state_v = Variable(torch.FloatTensor([obs_to_np(state)]))
+        state_v = Variable(torch.from_numpy(np.array([obs_to_np(state)], copy=False)))
         if cuda:
             state_v = state_v.cuda()
         q_vals_v = net(state_v)
