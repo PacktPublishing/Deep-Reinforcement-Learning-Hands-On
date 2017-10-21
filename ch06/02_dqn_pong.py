@@ -274,7 +274,7 @@ class ScaledFloatFrame(gym.ObservationWrapper):
     def _observation(self, obs):
         # careful! This undoes the memory optimization, use
         # with smaller replay buffers only.
-        return np.array(obs).astype(np.float) / 255.0
+        return np.array(obs).astype(np.float32) / 255.0
 
 
 def make_env():
