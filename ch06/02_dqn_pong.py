@@ -201,9 +201,9 @@ def make_env():
     env = MaxAndSkipEnv(env)
 #    env = ImageWrapper(env)
     env = ProcessFrame84(env)
-    env = ScaledFloatFrame(env)
 #    env = BufferWrapper(env, 4, dtype=np.float32)
     env = FrameStack(env, 4)
+    env = ScaledFloatFrame(env)
     return env
 
 
