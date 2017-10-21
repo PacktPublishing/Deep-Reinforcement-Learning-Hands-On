@@ -99,14 +99,19 @@ class ProcessFrame84(gym.ObservationWrapper):
         return x_t.astype(np.uint8)
 
 
-class ScreenToPyTorch(gym.ObservationWrapper):
+class ImageToPyTorch(gym.ObservationWrapper):
     def __init__(self, env):
-        super(ScreenToPyTorch, self).__init__(env)
+        super(ImageToPyTorch, self).__init__(env)
         old_shape = self.observation_space.shape
         self.observation_space = spaces.Box(low=0.0, high=1.0, shape=(old_shape[-1], old_shape[0], old_shape[1]))
 
     def _observation(self, observation):
-        return np.moveaxis(observation, 2, 0).astype(np.float32) / 255
+        return np.moveaxis(observation, 2, 0)
+
+
+class ScaledFloatFrame(gym.ObservationWrapper):
+    def _observation(self, obs):
+        return np.array(obs).astype(np.float32) / 255.0
 
 
 class BufferWrapper(gym.ObservationWrapper):
@@ -248,8 +253,9 @@ if __name__ == "__main__":
     env = MaxAndSkipEnv(env)
     env = FireResetEnv(env)
     env = ProcessFrame84(env)
-    env = ScreenToPyTorch(env)
+    env = ImageToPyTorch(env)
     env = BufferWrapper(env, 4)
+    env = ScaledFloatFrame(env)
 
     net = DQN(env.observation_space.shape, env.action_space.n)
     tgt_net = DQN(env.observation_space.shape, env.action_space.n)
