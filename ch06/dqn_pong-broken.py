@@ -430,7 +430,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda mode")
     args = parser.parse_args()
 
-    writer = SummaryWriter(comment='-pong-copy')
+    writer = SummaryWriter(comment='-pong-tgt')
     env = make_env()
 
     net = DQN(env.observation_space.shape, env.action_space.n)
@@ -454,7 +454,7 @@ if __name__ == "__main__":
     while True:
         frame_idx += 1
         epsilon = max(EPSILON_FINAL, EPSILON_START - frame_idx / EPSILON_DECAY_LAST_FRAME)
-        reward = agent.play_step(tgt_net, epsilon=epsilon, cuda=args.cuda)
+        reward = agent.play_step(net, epsilon=epsilon, cuda=args.cuda)
         if reward is not None:
             episode_rewards.append(reward)
             speed = (frame_idx - last_frame) / (time.time() - last_ts)
