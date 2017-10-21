@@ -239,30 +239,6 @@ def calc_loss(batch, net, tgt_net, cuda=False):
     return nn.MSELoss()(state_action_values, expected_state_action_values)
 
 
-def calc_loss_naive(batch, net, tgt_net, cuda=False):
-    states, actions, rewards, dones, next_states = batch
-
-    states_v = Variable(torch.from_numpy(states))
-    next_states_v = Variable(torch.from_numpy(next_states), volatile=True)
-    loss_v = Variable(torch.FloatTensor([0]))
-    if cuda:
-        states_v = states_v.cuda()
-        next_states_v = next_states_v.cuda()
-        loss_v = loss_v.cuda()
-
-    state_values = net(states_v)
-    next_state_values = tgt_net(next_states_v).max(1)[0]
-    next_state_values = next_state_values.data.cpu().numpy()
-
-    for idx in range(BATCH_SIZE):
-        R = float(rewards[idx])
-        if not dones[idx]:
-            R += GAMMA * np.max(next_state_values[idx])
-        loss_v += (state_values[idx][actions[idx]] - R) ** 2
-
-    return loss_v / BATCH_SIZE
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
