@@ -263,7 +263,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda mode")
     args = parser.parse_args()
 
-    writer = SummaryWriter(comment='-pong')
+    writer = SummaryWriter(comment='-pong-slow')
     env = make_env()
     test_env = make_env()
 
@@ -288,15 +288,15 @@ if __name__ == "__main__":
     while True:
         frame_idx += 1
         epsilon = max(EPSILON_FINAL, EPSILON_START - frame_idx / EPSILON_DECAY_LAST_FRAME)
-        reward = agent.play_step(tgt_net.target_model, epsilon=epsilon, cuda=args.cuda)
+        reward = agent.play_step(tgt_net, epsilon=epsilon, cuda=args.cuda)
         if reward is not None:
             episode_rewards.append(reward)
             speed = (frame_idx - last_frame) / (time.time() - last_ts)
             last_ts = time.time()
             last_frame = frame_idx
             mean_100 = np.mean(episode_rewards[-100:])
-            print("%d: reward %f, mean 100 rewards %.2f, done %d, speed %.2f frames/sec" % (
-                frame_idx, reward, len(episode_rewards), mean_100, speed))
+            print("%d: reward %.1f, mean rewards %.2f, episodes %d, speed %.2f frames/sec, epsilon %.2f" % (
+                frame_idx, reward, len(episode_rewards), mean_100, speed, epsilon))
             writer.add_scalar("reward", reward, frame_idx)
             writer.add_scalar("speed", speed, frame_idx)
             writer.add_scalar("epsilon", epsilon, frame_idx)
@@ -307,12 +307,12 @@ if __name__ == "__main__":
 
         batch = exp_buffer.sample(BATCH_SIZE)
         optimizer.zero_grad()
-        loss_v = calc_loss(batch, net, tgt_net.target_model, cuda=args.cuda)
+        loss_v = calc_loss(batch, net, tgt_net, cuda=args.cuda)
         loss_v.backward()
         optimizer.step()
 
         if frame_idx % SYNC_TARGET_FRAMES == 0:
             tgt_net.load_state_dict(net.state_dict())
-            reward = play_episode(test_env, tgt_net.target_model, cuda=args.cuda)
+            reward = play_episode(test_env, tgt_net, cuda=args.cuda)
             writer.add_scalar("reward_test", reward, frame_idx)
-            print("%d: synced, test episode reward=%f" % (frame_idx, reward))
+            print("%d: synced, test episode reward=%.1f" % (frame_idx, reward))
