@@ -299,8 +299,9 @@ if __name__ == "__main__":
             writer.add_scalar("reward_100", mean_reward, frame_idx)
             writer.add_scalar("reward", reward, frame_idx)
             if best_mean_reward is None or best_mean_reward < mean_reward:
-                torch.save(net.state_dict(), ENV_NAME + ".dat")
-                print("Best mean reward updated %.3f -> %.3f, model saved" % (best_mean_reward, mean_reward))
+                torch.save(net.state_dict(), ENV_NAME + "-best.dat")
+                if best_mean_reward is not None:
+                    print("Best mean reward updated %.3f -> %.3f, model saved" % (best_mean_reward, mean_reward))
                 best_mean_reward = mean_reward
             if mean_reward > MEAN_REWARD_BOUND:
                 print("Solved in %d frames!" % frame_idx)
