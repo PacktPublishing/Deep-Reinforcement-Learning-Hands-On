@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import gym
 import ptan
+import time
 import numpy as np
 import argparse
 
@@ -8,6 +9,8 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
+
+from tensorboardX import SummaryWriter
 
 from lib import dqn_model
 
@@ -70,6 +73,7 @@ if __name__ == "__main__":
     env = ptan.common.wrappers.wrap_dqn(env)
     env = ptan.common.wrappers.ScaledFloatFrame(env)
 
+    writer = SummaryWriter(comment="-pong-ptan")
     net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
@@ -83,6 +87,9 @@ if __name__ == "__main__":
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
     frame_idx = 0
+    ts_frame = 0
+    ts = time.time()
+
     total_rewards = []
     while True:
         frame_idx += 1
@@ -92,7 +99,21 @@ if __name__ == "__main__":
         new_rewards = exp_source.pop_total_rewards()
         if new_rewards:
             total_rewards.extend(new_rewards)
-            print("%d: %s" % (frame_idx, new_rewards))
+            speed = (frame_idx - ts_frame) / (time.time() - ts)
+            ts_frame = frame_idx
+            ts = time.time()
+            mean_reward = np.mean(total_rewards[-100:])
+            print("%d: done %d games, mean reward %.3f, eps %.2f, speed %.2f f/s" % (
+                frame_idx, len(total_rewards), mean_reward, epsilon_greedy_selector.epsilon,
+                speed
+            ))
+            writer.add_scalar("epsilon", epsilon_greedy_selector.epsilon, frame_idx)
+            writer.add_scalar("speed", speed, frame_idx)
+            writer.add_scalar("reward_100", mean_reward, frame_idx)
+            writer.add_scalar("reward", new_rewards[0], frame_idx)
+            if mean_reward > MEAN_REWARD_BOUND:
+                print("Solved in %d frames!" % frame_idx)
+                break
 
         if len(buffer) < REPLAY_START_SIZE:
             continue
