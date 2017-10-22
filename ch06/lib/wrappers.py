@@ -106,3 +106,12 @@ class BufferWrapper(gym.ObservationWrapper):
         self.buffer[-1] = observation
         return self.buffer
 
+
+def make_env(env_name):
+    env = gym.make(env_name)
+    env = MaxAndSkipEnv(env)
+    env = FireResetEnv(env)
+    env = ProcessFrame84(env)
+    env = ImageToPyTorch(env)
+    env = BufferWrapper(env, 4)
+    return ScaledFloatFrame(env)

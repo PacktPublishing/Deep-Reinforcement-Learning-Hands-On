@@ -2,7 +2,6 @@
 from lib import wrappers
 from lib import dqn_model
 
-import gym
 import argparse
 import time
 import numpy as np
@@ -16,7 +15,9 @@ from torch.autograd import Variable
 from tensorboardX import SummaryWriter
 
 
-ENV_NAME = "PongNoFrameskip-v4"
+DEFAULT_ENV_NAME = "PongNoFrameskip-v4"
+MEAN_REWARD_BOUND = 19.5
+
 GAMMA = 0.99
 BATCH_SIZE = 32
 REPLAY_SIZE = 10000
@@ -27,8 +28,6 @@ REPLAY_START_SIZE = 10000
 EPSILON_DECAY_LAST_FRAME = 10**5
 EPSILON_START = 1.0
 EPSILON_FINAL = 0.02
-
-MEAN_REWARD_BOUND = 19.5
 
 
 Experience = collections.namedtuple('Experience', field_names=['state', 'action', 'reward', 'done', 'new_state'])
@@ -114,19 +113,17 @@ def calc_loss(batch, net, tgt_net, cuda=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
+    parser.add_argument("--env", default=DEFAULT_ENV_NAME,
+                        help="Name of the environment, default=" + DEFAULT_ENV_NAME)
+    parser.add_argument("--reward", type=float, default=MEAN_REWARD_BOUND,
+                        help="Mean reward boundary for stop of training, default=%.2f" % MEAN_REWARD_BOUND)
     args = parser.parse_args()
 
-    env = gym.make(ENV_NAME)
-    env = wrappers.MaxAndSkipEnv(env)
-    env = wrappers.FireResetEnv(env)
-    env = wrappers.ProcessFrame84(env)
-    env = wrappers.ImageToPyTorch(env)
-    env = wrappers.BufferWrapper(env, 4)
-    env = wrappers.ScaledFloatFrame(env)
+    env = wrappers.make_env(args.env)
 
     net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
     tgt_net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
-    writer = SummaryWriter(comment="-pong")
+    writer = SummaryWriter(comment="-" + args.env)
 
     if args.cuda:
         net.cuda()
@@ -163,11 +160,11 @@ if __name__ == "__main__":
             writer.add_scalar("reward_100", mean_reward, frame_idx)
             writer.add_scalar("reward", reward, frame_idx)
             if best_mean_reward is None or best_mean_reward < mean_reward:
-                torch.save(net.state_dict(), ENV_NAME + "-best.dat")
+                torch.save(net.state_dict(), args.env + "-best.dat")
                 if best_mean_reward is not None:
                     print("Best mean reward updated %.3f -> %.3f, model saved" % (best_mean_reward, mean_reward))
                 best_mean_reward = mean_reward
-            if mean_reward > MEAN_REWARD_BOUND:
+            if mean_reward > args.reward:
                 print("Solved in %d frames!" % frame_idx)
                 break
 

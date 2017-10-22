@@ -3,3 +3,4 @@ runs
 records
 *.txt
 *.dat
+__pycache__

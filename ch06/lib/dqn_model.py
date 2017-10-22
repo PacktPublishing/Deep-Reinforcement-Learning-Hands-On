@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
+import numpy as np
+
 
 class DQN(nn.Module):
     def __init__(self, input_shape, n_actions):
