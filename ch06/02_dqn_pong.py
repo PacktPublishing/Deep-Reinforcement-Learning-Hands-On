@@ -124,6 +124,7 @@ if __name__ == "__main__":
     net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
     tgt_net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
     writer = SummaryWriter(comment="-" + args.env)
+    print(net)
 
     if args.cuda:
         net.cuda()
