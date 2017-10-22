@@ -17,6 +17,7 @@ import cv2
 from collections import deque
 from gym import spaces
 
+
 ENV_NAME = "PongNoFrameskip-v4"
 GAMMA = 0.99
 BATCH_SIZE = 32
@@ -28,6 +29,8 @@ REPLAY_START_SIZE = 10000
 EPSILON_DECAY_LAST_FRAME = 10**5
 EPSILON_START = 1.0
 EPSILON_FINAL = 0.02
+
+MEAN_REWARD_BOUND = 19.5
 
 
 class FireResetEnv(gym.Wrapper):
@@ -274,6 +277,7 @@ if __name__ == "__main__":
     frame_idx = 0
     ts_frame = 0
     ts = time.time()
+    best_mean_reward = None
 
     while True:
         frame_idx += 1
@@ -294,6 +298,13 @@ if __name__ == "__main__":
             writer.add_scalar("speed", speed, frame_idx)
             writer.add_scalar("reward_100", mean_reward, frame_idx)
             writer.add_scalar("reward", reward, frame_idx)
+            if best_mean_reward is None or best_mean_reward < mean_reward:
+                torch.save(net.state_dict(), ENV_NAME + ".dat")
+                print("Best mean reward updated %.3f -> %.3f, model saved" % (best_mean_reward, mean_reward))
+                best_mean_reward = mean_reward
+            if mean_reward > MEAN_REWARD_BOUND:
+                print("Solved in %d frames!" % frame_idx)
+                break
 
         if len(buffer) < REPLAY_START_SIZE:
             continue
@@ -306,3 +317,4 @@ if __name__ == "__main__":
         loss_t = calc_loss(batch, net, tgt_net, cuda=args.cuda)
         loss_t.backward()
         optimizer.step()
+    writer.close()
