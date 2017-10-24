@@ -134,7 +134,7 @@ if __name__ == "__main__":
 
     buffer = ExperienceBuffer(REPLAY_SIZE)
     agent = Agent(env, buffer)
-    epsilon = 1.0
+    epsilon = EPSILON_START
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
     total_rewards = []
