@@ -66,7 +66,8 @@ class Agent:
         if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
-            state_v = Variable(torch.from_numpy(np.array([self.state], copy=False)))
+            state_a = np.array([self.state], copy=False)
+            state_v = Variable(torch.from_numpy(state_a))
             if cuda:
                 state_v = state_v.cuda()
             q_vals_v = net(state_v)
@@ -78,7 +79,8 @@ class Agent:
         self.total_reward += reward
         new_state = new_state
 
-        self.exp_buffer.append(Experience(self.state, action, reward, is_done, new_state))
+        exp = Experience(self.state, action, reward, is_done, new_state)
+        self.exp_buffer.append(exp)
         self.state = new_state
         if is_done:
             done_reward = self.total_reward
