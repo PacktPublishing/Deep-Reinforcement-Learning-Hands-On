@@ -28,7 +28,7 @@ REPLAY_START_SIZE = 10000
 
 EPSILON_DECAY_LAST_FRAME = 10**5
 EPSILON_START = 1.0
-EPSILON_FINAL = 0.02
+EPSILON_FINAL = 0.1
 
 
 def unpack_batch(batch):
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     env = ptan.common.wrappers.wrap_dqn(env)
     env = ptan.common.wrappers.ScaledFloatFrame(env)
 
-    writer = SummaryWriter(comment="-breakout-n-steps")
+    writer = SummaryWriter(comment="-breakout-4-steps")
     net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
