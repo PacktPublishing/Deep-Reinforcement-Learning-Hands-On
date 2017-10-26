@@ -18,7 +18,7 @@ from lib import dqn_model
 DEFAULT_ENV_NAME = "BreakoutNoFrameskip-v0"
 MEAN_REWARD_BOUND = 800.0
 
-REWARD_STEPS = 4
+REWARD_STEPS = 2
 GAMMA = 0.99
 BATCH_SIZE = 32
 REPLAY_SIZE = 10000
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     env = ptan.common.wrappers.wrap_dqn(env)
     env = ptan.common.wrappers.ScaledFloatFrame(env)
 
-    writer = SummaryWriter(comment="-breakout-4-steps")
+    writer = SummaryWriter(comment="-breakout-2-steps")
     net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
