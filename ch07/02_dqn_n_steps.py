@@ -36,13 +36,16 @@ def unpack_batch(batch):
     last_states = [exp[-1].state for exp in batch]
     actions = [exp[0].action for exp in batch]
     rewards = []
+    dones = []
     for exp in batch:
         r = 0.0
+        was_done = False
         for e in reversed(exp[:-1]):
             r *= GAMMA
             r += e.reward
+            was_done |= e.done
         rewards.append(r)
-    dones = [exp[-2].done for exp in batch]
+        dones.append(was_done)
     return np.array(states, copy=False), np.array(actions), np.array(rewards, dtype=np.float32), \
            np.array(dones, dtype=np.uint8), np.array(last_states, copy=False)
 
