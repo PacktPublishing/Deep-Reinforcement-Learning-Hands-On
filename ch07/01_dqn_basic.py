@@ -15,8 +15,8 @@ from tensorboardX import SummaryWriter
 from lib import dqn_model
 
 
-DEFAULT_ENV_NAME = "PongNoFrameskip-v4"
-MEAN_REWARD_BOUND = 19.5
+DEFAULT_ENV_NAME = "BreakoutNoFrameskip-v0"
+MEAN_REWARD_BOUND = 800.0
 
 GAMMA = 0.99
 BATCH_SIZE = 32
@@ -69,11 +69,11 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
 
-    env = gym.make("PongNoFrameskip-v4")
+    env = gym.make(DEFAULT_ENV_NAME)
     env = ptan.common.wrappers.wrap_dqn(env)
     env = ptan.common.wrappers.ScaledFloatFrame(env)
 
-    writer = SummaryWriter(comment="-pong-ptan")
+    writer = SummaryWriter(comment="-breakout-basic")
     net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
