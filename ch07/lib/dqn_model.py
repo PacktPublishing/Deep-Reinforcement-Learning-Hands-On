@@ -3,35 +3,25 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-import math
 import numpy as np
 
 
 class NoisyLinear(nn.Linear):
     def __init__(self, in_features, out_features, sigma_init=0.017, bias=True):
-        super(NoisyLinear, self).__init__(in_features, out_features, bias=True)
-        self.sigma_init = sigma_init
-        self.sigma_weight = nn.Parameter(torch.Tensor(out_features, in_features))
-        self.sigma_bias = nn.Parameter(torch.Tensor(out_features))
+        super(NoisyLinear, self).__init__(in_features, out_features, bias=bias)
+        self.sigma_weight = nn.Parameter(torch.Tensor(out_features, in_features).fill_(sigma_init))
         self.register_buffer("epsilon_weight", torch.zeros(out_features, in_features))
-        self.register_buffer("epsilon_bias", torch.zeros(out_features))
-        self.reset_parameters()
-
-    def reset_parameters(self):
-        if hasattr(self, 'sigma_weight'):
-            nn.init.uniform(self.weight, -math.sqrt(3 / self.in_features), math.sqrt(3 / self.in_features))
-            nn.init.uniform(self.bias, -math.sqrt(3 / self.in_features), math.sqrt(3 / self.in_features))
-            nn.init.constant(self.sigma_weight, self.sigma_init)
-            nn.init.constant(self.sigma_bias, self.sigma_init)
+        if bias:
+            self.sigma_bias = nn.Parameter(torch.Tensor(out_features).fill_(sigma_init))
+            self.register_buffer("epsilon_bias", torch.zeros(out_features))
 
     def forward(self, input):
-        self.sample_noise()
-        return F.linear(input, self.weight + self.sigma_weight * Variable(self.epsilon_weight),
-                        self.bias + self.sigma_bias * Variable(self.epsilon_bias))
-
-    def sample_noise(self):
         torch.randn(self.epsilon_weight.size(), out=self.epsilon_weight)
-        torch.randn(self.epsilon_bias.size(), out=self.epsilon_bias)
+        bias = self.bias
+        if bias is not None:
+            torch.randn(self.epsilon_bias.size(), out=self.epsilon_bias)
+            bias += self.sigma_bias * Variable(self.epsilon_bias)
+        return F.linear(input, self.weight + self.sigma_weight * Variable(self.epsilon_weight), bias)
 
 
 class DQN(nn.Module):
