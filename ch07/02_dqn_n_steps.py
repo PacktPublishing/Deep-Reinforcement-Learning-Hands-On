@@ -83,7 +83,7 @@ if __name__ == "__main__":
     env = ptan.common.wrappers.wrap_dqn(env)
     env = ptan.common.wrappers.ScaledFloatFrame(env)
 
-    writer = SummaryWriter(comment="-breakout-2-steps")
+    writer = SummaryWriter(comment="-pong-2-steps")
     net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
