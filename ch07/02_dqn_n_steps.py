@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import sys
 import gym
 import ptan
 import time
@@ -117,6 +118,7 @@ if __name__ == "__main__":
                 frame_idx, len(total_rewards), mean_reward, epsilon_greedy_selector.epsilon,
                 speed
             ))
+            sys.stdout.flush()
             writer.add_scalar("epsilon", epsilon_greedy_selector.epsilon, frame_idx)
             writer.add_scalar("speed", speed, frame_idx)
             writer.add_scalar("reward_100", mean_reward, frame_idx)

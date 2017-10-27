@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import sys
 import gym
 import ptan
 import time
@@ -100,6 +101,7 @@ if __name__ == "__main__":
             print("%d: done %d games, mean reward %.3f, speed %.2f f/s" % (
                 frame_idx, len(total_rewards), mean_reward, speed
             ))
+            sys.stdout.flush()
             writer.add_scalar("speed", speed, frame_idx)
             writer.add_scalar("reward_100", mean_reward, frame_idx)
             writer.add_scalar("reward", new_rewards[0], frame_idx)
