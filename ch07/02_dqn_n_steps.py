@@ -15,7 +15,7 @@ from tensorboardX import SummaryWriter
 from lib import dqn_model
 
 
-DEFAULT_ENV_NAME = "BreakoutNoFrameskip-v0"
+DEFAULT_ENV_NAME = "BreakoutNoFrameskip-v4"
 MEAN_REWARD_BOUND = 800.0
 
 REWARD_STEPS = 2
