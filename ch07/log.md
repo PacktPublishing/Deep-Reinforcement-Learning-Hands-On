@@ -17,4 +17,8 @@ Next to implement: noisy nets, using noisy layer using https://github.com/Kaixhi
  
 --Noisy layer in Kaixhin looks suspicious, need to check with noise turned off.--
 Found the reason, original code assumed sample_noise call every iteration.
-Rerun
+Rerun started, need to wait.
+
+Todo:
+1. run new version of noisy net, check convergence. Started as log-noisy-3.txt
+2. implement factorized gaussian noise from the paper

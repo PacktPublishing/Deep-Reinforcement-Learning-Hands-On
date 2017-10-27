@@ -20,7 +20,7 @@ class NoisyLinear(nn.Linear):
         bias = self.bias
         if bias is not None:
             torch.randn(self.epsilon_bias.size(), out=self.epsilon_bias)
-            bias += self.sigma_bias * Variable(self.epsilon_bias)
+            bias = bias + self.sigma_bias * Variable(self.epsilon_bias)
         return F.linear(input, self.weight + self.sigma_weight * Variable(self.epsilon_weight), bias)
 
 
