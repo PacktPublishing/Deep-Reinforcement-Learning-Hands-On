@@ -25,6 +25,7 @@ class NoisyLinear(nn.Linear):
             nn.init.constant(self.sigma_bias, self.sigma_init)
 
     def forward(self, input):
+        self.sample_noise()
         return F.linear(input, self.weight + self.sigma_weight * Variable(self.epsilon_weight),
                         self.bias + self.sigma_bias * Variable(self.epsilon_bias))
 

@@ -15,4 +15,6 @@ Upd: convergence is weird, reverted epsilon back to 2% and restarted.
 
 Next to implement: noisy nets, using noisy layer using https://github.com/Kaixhin/NoisyNet-A3C/blob/master/model.py
  
-Noisy layer in Kaixhin looks suspicious, need to check with noise turned off.
+--Noisy layer in Kaixhin looks suspicious, need to check with noise turned off.--
+Found the reason, original code assumed sample_noise call every iteration.
+Rerun
