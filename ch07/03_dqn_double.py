@@ -15,8 +15,8 @@ from tensorboardX import SummaryWriter
 from lib import dqn_model
 
 
-DEFAULT_ENV_NAME = "BreakoutNoFrameskip-v4"
-MEAN_REWARD_BOUND = 800.0
+DEFAULT_ENV_NAME = "PongNoFrameskip-v4"
+MEAN_REWARD_BOUND = 19.5
 
 GAMMA = 0.99
 BATCH_SIZE = 32
