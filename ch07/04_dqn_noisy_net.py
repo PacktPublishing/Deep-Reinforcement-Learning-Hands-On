@@ -25,10 +25,6 @@ LEARNING_RATE = 1e-4
 SYNC_TARGET_FRAMES = 1000
 REPLAY_START_SIZE = 10000
 
-EPSILON_DECAY_LAST_FRAME = 10**5
-EPSILON_START = 1.0
-EPSILON_FINAL = 0.02
-
 
 def unpack_batch(batch):
     states = [exp[0].state for exp in batch]
@@ -73,14 +69,13 @@ if __name__ == "__main__":
     env = ptan.common.wrappers.wrap_dqn(env)
     env = ptan.common.wrappers.ScaledFloatFrame(env)
 
-    writer = SummaryWriter(comment="-pong-basic")
-    net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
+    writer = SummaryWriter(comment="-pong-noisy-net")
+    net = dqn_model.DQN(env.observation_space.shape, env.action_space.n, noisy_net=True)
     if args.cuda:
         net.cuda()
 
     tgt_net = ptan.agent.TargetNet(net)
-    epsilon_greedy_selector = ptan.actions.EpsilonGreedyActionSelector(epsilon=1.0)
-    agent = ptan.agent.DQNAgent(net, epsilon_greedy_selector, cuda=args.cuda)
+    agent = ptan.agent.DQNAgent(net, ptan.actions.ArgmaxActionSelector(), cuda=args.cuda)
 
     exp_source = ptan.experience.ExperienceSource(env, agent, steps_count=2)
     buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=REPLAY_SIZE)
@@ -94,7 +89,6 @@ if __name__ == "__main__":
     while True:
         frame_idx += 1
         buffer.populate(1)
-        epsilon_greedy_selector.epsilon = max(EPSILON_FINAL, EPSILON_START - frame_idx / EPSILON_DECAY_LAST_FRAME)
 
         new_rewards = exp_source.pop_total_rewards()
         if new_rewards:
@@ -103,11 +97,9 @@ if __name__ == "__main__":
             ts_frame = frame_idx
             ts = time.time()
             mean_reward = np.mean(total_rewards[-100:])
-            print("%d: done %d games, mean reward %.3f, eps %.2f, speed %.2f f/s" % (
-                frame_idx, len(total_rewards), mean_reward, epsilon_greedy_selector.epsilon,
-                speed
+            print("%d: done %d games, mean reward %.3f, speed %.2f f/s" % (
+                frame_idx, len(total_rewards), mean_reward, speed
             ))
-            writer.add_scalar("epsilon", epsilon_greedy_selector.epsilon, frame_idx)
             writer.add_scalar("speed", speed, frame_idx)
             writer.add_scalar("reward_100", mean_reward, frame_idx)
             writer.add_scalar("reward", new_rewards[0], frame_idx)
