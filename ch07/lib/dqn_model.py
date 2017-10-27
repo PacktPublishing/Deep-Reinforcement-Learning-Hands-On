@@ -13,8 +13,8 @@ class NoisyLinear(nn.Linear):
         self.sigma_init = sigma_init
         self.sigma_weight = nn.Parameter(torch.Tensor(out_features, in_features))
         self.sigma_bias = nn.Parameter(torch.Tensor(out_features))
-        self.register_buffer('epsilon_weight', torch.zeros(out_features, in_features))
-        self.register_buffer('epsilon_bias', torch.zeros(out_features))
+        self.register_buffer("epsilon_weight", torch.zeros(out_features, in_features))
+        self.register_buffer("epsilon_bias", torch.zeros(out_features))
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -30,12 +30,8 @@ class NoisyLinear(nn.Linear):
                         self.bias + self.sigma_bias * Variable(self.epsilon_bias))
 
     def sample_noise(self):
-        self.epsilon_weight = torch.randn(self.out_features, self.in_features)
-        self.epsilon_bias = torch.randn(self.out_features)
-
-    def remove_noise(self):
-        self.epsilon_weight = torch.zeros(self.out_features, self.in_features)
-        self.epsilon_bias = torch.zeros(self.out_features)
+        torch.randn(self.epsilon_weight.size(), out=self.epsilon_weight)
+        torch.randn(self.epsilon_bias.size(), out=self.epsilon_bias)
 
 
 class DQN(nn.Module):
