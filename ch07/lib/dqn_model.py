@@ -84,7 +84,7 @@ class DQN(nn.Module):
             nn.ReLU()
         )
 
-        OutLayer = NoisyLinear if noisy_net else nn.Linear
+        OutLayer = NoisyFactorizedLinear if noisy_net else nn.Linear
 
         conv_out_size = self._get_conv_out(input_shape)
         self.fc = nn.Sequential(
