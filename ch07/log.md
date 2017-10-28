@@ -38,5 +38,8 @@ Still need to be implemented and verified:
 
 Factorized noise v1 converges badly. Will try:
 1. separate random var for bias (v2)
+2. fix initialization and f(x) (v3)
 2. remove requires_grad from vars
 3. roll back to full noise
+
+Need to bring initialization to independent noise and test it.

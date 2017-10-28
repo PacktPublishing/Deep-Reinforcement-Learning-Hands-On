@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -14,6 +15,12 @@ class NoisyLinear(nn.Linear):
         if bias:
             self.sigma_bias = nn.Parameter(torch.Tensor(out_features).fill_(sigma_init))
             self.register_buffer("epsilon_bias", torch.zeros(out_features))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        std = math.sqrt(3 / self.in_features)
+        nn.init.uniform(self.weight, -std, std)
+        nn.init.uniform(self.bias, -std, std)
 
     def forward(self, input):
         torch.randn(self.epsilon_weight.size(), out=self.epsilon_weight)
@@ -27,8 +34,10 @@ class NoisyLinear(nn.Linear):
 class NoisyFactorizedLinear(nn.Linear):
     """
     NoisyNet layer with factorized gaussian noise
+
+    N.B. nn.Linear already initializes weight and bias to
     """
-    def __init__(self, in_features, out_features, sigma_init=0.017, bias=True):
+    def __init__(self, in_features, out_features, sigma_init=0.4, bias=True):
         super(NoisyFactorizedLinear, self).__init__(in_features, out_features, bias=bias)
         self.sigma_weight = nn.Parameter(torch.Tensor(out_features, in_features).fill_(sigma_init))
         self.register_buffer("epsilon_input", torch.zeros(1, in_features))
@@ -61,7 +70,7 @@ class DQN(nn.Module):
             nn.ReLU()
         )
 
-        OutLayer = NoisyFactorizedLinear if noisy_net else nn.Linear
+        OutLayer = NoisyLinear if noisy_net else nn.Linear
 
         conv_out_size = self._get_conv_out(input_shape)
         self.fc = nn.Sequential(
