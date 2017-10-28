@@ -70,8 +70,11 @@ if __name__ == "__main__":
     env = ptan.common.wrappers.wrap_dqn(env)
     env = ptan.common.wrappers.ScaledFloatFrame(env)
 
+    frame_idx = 0
     writer = SummaryWriter(comment="-pong-noisy-net")
-    net = dqn_model.DQN(env.observation_space.shape, env.action_space.n, noisy_net=True)
+    def writer_func(val, name):
+        writer.add_scalar(val, name, frame_idx)
+    net = dqn_model.DQN(env.observation_space.shape, env.action_space.n, noisy_net=True, writer=writer)
     if args.cuda:
         net.cuda()
 
@@ -82,7 +85,6 @@ if __name__ == "__main__":
     buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=REPLAY_SIZE)
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
-    frame_idx = 0
     ts_frame = 0
     ts = time.time()
 

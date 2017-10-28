@@ -43,3 +43,6 @@ Factorized noise v1 converges badly. Will try:
 3. roll back to full noise
 
 Need to bring initialization to independent noise and test it.
+Independent noise works perfectly.
+
+As an idea: check mean and l2 for mean and std for sigma.
