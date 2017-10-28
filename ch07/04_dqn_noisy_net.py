@@ -73,8 +73,8 @@ if __name__ == "__main__":
     frame_idx = 0
     writer = SummaryWriter(comment="-pong-noisy-net")
     def writer_func(val, name):
-        writer.add_scalar(val, name, frame_idx)
-    net = dqn_model.DQN(env.observation_space.shape, env.action_space.n, noisy_net=True, writer=writer)
+        writer.add_scalar(name, val.data.cpu().numpy(), frame_idx)
+    net = dqn_model.DQN(env.observation_space.shape, env.action_space.n, noisy_net=True, writer=writer_func)
     if args.cuda:
         net.cuda()
 
