@@ -42,7 +42,7 @@ class NoisyFactorizedLinear(nn.Linear):
         torch.randn(self.epsilon_output.size(), out=self.epsilon_output)
         bias = self.bias
         if bias is not None:
-            torch.randn(self.epsilon_bias.size(), out=self.epsison_bias)
+            torch.randn(self.epsilon_bias.size(), out=self.epsilon_bias)
             bias = bias + self.sigma_bias * Variable(self.epsilon_bias, requires_grad=False)
         noise_v = Variable(torch.mul(self.epsilon_input, self.epsilon_output), requires_grad=False)
         return F.linear(input, self.weight + self.sigma_weight * noise_v, bias)
