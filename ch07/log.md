@@ -35,3 +35,8 @@ Still need to be implemented and verified:
 * Dueling version
 * Prio replay buffer
 * Distributional
+
+Factorized noise v1 converges badly. Will try:
+1. separate random var for bias (v2)
+2. remove requires_grad from vars
+3. roll back to full noise

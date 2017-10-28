@@ -35,13 +35,15 @@ class NoisyFactorizedLinear(nn.Linear):
         self.register_buffer("epsilon_output", torch.zeros(out_features, 1))
         if bias:
             self.sigma_bias = nn.Parameter(torch.Tensor(out_features).fill_(sigma_init))
+            self.register_buffer("epsilon_bias", torch.zeros(out_features))
 
     def forward(self, input):
         torch.randn(self.epsilon_input.size(), out=self.epsilon_input)
         torch.randn(self.epsilon_output.size(), out=self.epsilon_output)
         bias = self.bias
         if bias is not None:
-            bias = bias + self.sigma_bias * Variable(self.epsilon_output.t())
+            torch.randn(self.epsilon_bias.size(), out=self.epsison_bias)
+            bias = bias + self.sigma_bias * Variable(self.epsilon_bias, requires_grad=False)
         noise_v = Variable(torch.mul(self.epsilon_input, self.epsilon_output), requires_grad=False)
         return F.linear(input, self.weight + self.sigma_weight * noise_v, bias)
 
