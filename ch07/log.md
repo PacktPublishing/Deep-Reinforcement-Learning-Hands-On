@@ -37,9 +37,9 @@ Still need to be implemented and verified:
 * Distributional
 
 Factorized noise v1 converges badly. Will try:
-1. separate random var for bias (v2)
-2. fix initialization and f(x) (v3)
-2. remove requires_grad from vars
+1. separate random var for bias (v2) -- not helped much
+2. fix initialization and f(x) (v3) -- not converging
+2. remove requires_grad=False from vars (v4)
 3. roll back to full noise
 
 Need to bring initialization to independent noise and test it.
