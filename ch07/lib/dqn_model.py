@@ -56,8 +56,8 @@ class NoisyFactorizedLinear(nn.Linear):
 
         bias = self.bias
         if bias is not None:
-            bias = bias + self.sigma_bias * Variable(eps_out.t(), requires_grad=False)
-        noise_v = Variable(torch.mul(eps_in, eps_out), requires_grad=False)
+            bias = bias + self.sigma_bias * Variable(eps_out.t())
+        noise_v = Variable(torch.mul(eps_in, eps_out))
         return F.linear(input, self.weight + self.sigma_weight * noise_v, bias)
 
 
