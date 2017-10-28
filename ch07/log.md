@@ -22,3 +22,16 @@ Rerun started, need to wait.
 Todo:
 1. run new version of noisy net, check convergence. Started as log-noisy-3.txt
 2. implement factorized gaussian noise from the paper
+
+# 2017-10-28
+
+Noisy net converged. Still need to check factorized version, but so far I have done:
+1. basic test
+2. 2-step
+3. double net
+4. noisy net
+
+Still need to be implemented and verified:
+* Dueling version
+* Prio replay buffer
+* Distributional
