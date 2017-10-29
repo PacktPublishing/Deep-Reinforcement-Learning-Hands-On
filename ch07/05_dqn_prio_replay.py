@@ -8,7 +8,6 @@ import argparse
 import collections
 
 import torch
-import torch.nn as nn
 import torch.optim as optim
 from torch.autograd import Variable
 
@@ -167,3 +166,4 @@ if __name__ == "__main__":
 
         if frame_idx % SYNC_TARGET_FRAMES == 0:
             tgt_net.sync()
+    writer.close()
