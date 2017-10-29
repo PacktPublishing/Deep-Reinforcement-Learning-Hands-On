@@ -51,3 +51,7 @@ As an idea: check mean and l2 for mean and std for sigma.
 
 Graphs of sigma have shown that values become NaNs, I guess it's due to zero division. To avoid this, clamp applied to abs.
 Clamp are not working, leave factorized gradients for now.
+
+Dueling modification implemented and converges good.
+
+Want to have an extra environment of greater complexity (SpaceInvaders)
