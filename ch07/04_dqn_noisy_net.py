@@ -70,7 +70,7 @@ if __name__ == "__main__":
     env = ptan.common.wrappers.wrap_dqn(env)
     env = ptan.common.wrappers.ScaledFloatFrame(env)
 
-    writer = SummaryWriter(comment="-pong-noisy-net-ind")
+    writer = SummaryWriter(comment="-pong-noisy-net-clamp")
     net = dqn_model.DQN(env.observation_space.shape, env.action_space.n, noisy_net=True)
     if args.cuda:
         net.cuda()

@@ -46,3 +46,7 @@ Need to bring initialization to independent noise and test it.
 Independent noise works perfectly.
 
 As an idea: check mean and l2 for mean and std for sigma.
+
+# 2017-10-29
+
+Graphs of sigma have shown that values become NaNs, I guess it's due to zero division. To avoid this, clamp applied to abs.
