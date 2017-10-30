@@ -74,7 +74,7 @@ def calc_loss(batch, net, tgt_net, cuda=False):
     next_state_values[done_mask] = 0.0
     next_state_values.volatile = False
 
-    expected_state_action_values = next_state_values * GAMMA + rewards_v
+    expected_state_action_values = next_state_values * (GAMMA**REWARD_STEPS) + rewards_v
     return nn.MSELoss()(state_action_values, expected_state_action_values)
 
 
