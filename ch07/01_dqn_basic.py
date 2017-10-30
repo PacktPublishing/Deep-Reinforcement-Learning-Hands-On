@@ -15,7 +15,7 @@ from tensorboardX import SummaryWriter
 
 from lib import dqn_model
 
-PONG_MODE = False
+PONG_MODE = True
 
 if PONG_MODE:
     DEFAULT_ENV_NAME = "PongNoFrameskip-v4"
@@ -39,13 +39,18 @@ EPSILON_FINAL = 0.02
 
 
 def unpack_batch(batch):
-    states = [exp[0].state for exp in batch]
-    next_states = [exp[-1].state for exp in batch]
-    actions = [exp[0].action for exp in batch]
-    rewards = [exp[0].reward for exp in batch]
-    dones = [exp[0].done for exp in batch]
+    states, actions, rewards, dones, last_states = [], [], [], [], []
+    for exp in batch:
+        states.append(exp.state)
+        actions.append(exp.action)
+        rewards.append(exp.reward)
+        dones.append(exp.last_state is None)
+        if exp.last_state is None:
+            last_states.append(exp.state)       # the result will be masked anyway
+        else:
+            last_states.append(exp.last_state)
     return np.array(states, copy=False), np.array(actions), np.array(rewards, dtype=np.float32), \
-           np.array(dones, dtype=np.uint8), np.array(next_states, copy=False)
+           np.array(dones, dtype=np.uint8), np.array(last_states, copy=False)
 
 
 def calc_loss(batch, net, tgt_net, cuda=False):
@@ -90,7 +95,7 @@ if __name__ == "__main__":
     epsilon_greedy_selector = ptan.actions.EpsilonGreedyActionSelector(epsilon=1.0)
     agent = ptan.agent.DQNAgent(net, epsilon_greedy_selector, cuda=args.cuda)
 
-    exp_source = ptan.experience.ExperienceSource(env, agent, steps_count=2)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=1)
     buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=REPLAY_SIZE)
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
