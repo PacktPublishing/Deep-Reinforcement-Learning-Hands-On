@@ -15,17 +15,24 @@ from tensorboardX import SummaryWriter
 
 from lib import dqn_model
 
+PONG_MODE = True
 
-DEFAULT_ENV_NAME = "PongNoFrameskip-v4"
-MEAN_REWARD_BOUND = 19.5
+if PONG_MODE:
+    DEFAULT_ENV_NAME = "PongNoFrameskip-v4"
+    MEAN_REWARD_BOUND = 19.5
+    RUN_NAME = "pong"
+else:
+    DEFAULT_ENV_NAME = "SpaceInvadersNoFrameskip-v4"
+    MEAN_REWARD_BOUND = 1000
+    RUN_NAME = "invaders"
 
-REWARD_STEPS = 2
 GAMMA = 0.99
 BATCH_SIZE = 32
 REPLAY_SIZE = 10000
 LEARNING_RATE = 1e-4
 SYNC_TARGET_FRAMES = 1000
 REPLAY_START_SIZE = 10000
+REWARD_STEPS = 2
 
 EPSILON_DECAY_LAST_FRAME = 10**5
 EPSILON_START = 1.0
@@ -33,45 +40,41 @@ EPSILON_FINAL = 0.02
 
 
 def unpack_batch(batch):
-    states = [exp[0].state for exp in batch]
-    last_states = [exp[-1].state for exp in batch]
-    actions = [exp[0].action for exp in batch]
-    rewards = []
-    dones = []
+    states, actions, rewards, dones, last_states = [], [], [], [], []
     for exp in batch:
-        r = 0.0
-        was_done = False
-        for e in reversed(exp[:-1]):
-            r *= GAMMA
-            r += e.reward
-            was_done |= e.done
-        rewards.append(r)
-        dones.append(was_done)
-    return np.array(states, copy=False), np.array(actions), np.array(rewards, dtype=np.float32), \
-           np.array(dones, dtype=np.uint8), np.array(last_states, copy=False)
+        states.append(exp.state)
+        actions.append(exp.action)
+        rewards.append(exp.reward)
+        dones.append(exp.last_state is None)
+        if exp.last_state is None:
+            last_states.append(exp.state)       # the result will be masked anyway
+        else:
+            last_states.append(exp.last_state)
+    return np.array(states), np.array(actions), np.array(rewards, dtype=np.float32), \
+           np.array(dones, dtype=np.uint8), np.array(last_states)
 
 
 def calc_loss(batch, net, tgt_net, cuda=False):
-    states, actions, rewards, dones, last_states = unpack_batch(batch)
+    states, actions, rewards, dones, next_states = unpack_batch(batch)
 
     states_v = Variable(torch.from_numpy(states))
-    last_states_v = Variable(torch.from_numpy(last_states), volatile=True)
+    next_states_v = Variable(torch.from_numpy(next_states), volatile=True)
     actions_v = Variable(torch.from_numpy(actions))
     rewards_v = Variable(torch.from_numpy(rewards))
     done_mask = torch.ByteTensor(dones)
     if cuda:
         states_v = states_v.cuda()
-        last_states_v = last_states_v.cuda()
+        next_states_v = next_states_v.cuda()
         actions_v = actions_v.cuda()
         rewards_v = rewards_v.cuda()
         done_mask = done_mask.cuda()
 
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
-    last_state_values = tgt_net(last_states_v).max(1)[0]
-    last_state_values[done_mask] = 0.0
-    last_state_values.volatile = False
+    next_state_values = tgt_net(next_states_v).max(1)[0]
+    next_state_values[done_mask] = 0.0
+    next_state_values.volatile = False
 
-    expected_state_action_values = last_state_values * (GAMMA**REWARD_STEPS) + rewards_v
+    expected_state_action_values = next_state_values * GAMMA + rewards_v
     return nn.MSELoss()(state_action_values, expected_state_action_values)
 
 
@@ -84,7 +87,7 @@ if __name__ == "__main__":
     env = ptan.common.wrappers.wrap_dqn(env)
     env = ptan.common.wrappers.ScaledFloatFrame(env)
 
-    writer = SummaryWriter(comment="-pong-2-steps")
+    writer = SummaryWriter(comment="-" + RUN_NAME + "-2-steps")
     net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
@@ -93,7 +96,7 @@ if __name__ == "__main__":
     epsilon_greedy_selector = ptan.actions.EpsilonGreedyActionSelector(epsilon=1.0)
     agent = ptan.agent.DQNAgent(net, epsilon_greedy_selector, cuda=args.cuda)
 
-    exp_source = ptan.experience.ExperienceSource(env, agent, steps_count=REWARD_STEPS+1)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
     buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=REPLAY_SIZE)
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
