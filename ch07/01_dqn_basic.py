@@ -49,8 +49,8 @@ def unpack_batch(batch):
             last_states.append(exp.state)       # the result will be masked anyway
         else:
             last_states.append(exp.last_state)
-    return np.array(states, copy=False), np.array(actions), np.array(rewards, dtype=np.float32), \
-           np.array(dones, dtype=np.uint8), np.array(last_states, copy=False)
+    return np.array(states), np.array(actions), np.array(rewards, dtype=np.float32), \
+           np.array(dones, dtype=np.uint8), np.array(last_states)
 
 
 def calc_loss(batch, net, tgt_net, cuda=False):
