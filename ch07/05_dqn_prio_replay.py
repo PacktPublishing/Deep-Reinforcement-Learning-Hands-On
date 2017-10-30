@@ -15,9 +15,16 @@ from tensorboardX import SummaryWriter
 
 from lib import dqn_model
 
+PONG_MODE = False
 
-DEFAULT_ENV_NAME = "PongNoFrameskip-v4"
-MEAN_REWARD_BOUND = 19.5
+if PONG_MODE:
+    DEFAULT_ENV_NAME = "PongNoFrameskip-v4"
+    MEAN_REWARD_BOUND = 19.5
+    RUN_NAME = "pong"
+else:
+    DEFAULT_ENV_NAME = "SpaceInvadersNoFrameskip-v4"
+    MEAN_REWARD_BOUND = 1000
+    RUN_NAME = "invaders"
 
 GAMMA = 0.99
 BATCH_SIZE = 32
@@ -111,7 +118,7 @@ if __name__ == "__main__":
     env = ptan.common.wrappers.wrap_dqn(env)
     env = ptan.common.wrappers.ScaledFloatFrame(env)
 
-    writer = SummaryWriter(comment="-pong-prio-replay")
+    writer = SummaryWriter(comment="-" + RUN_NAME + "-prio-replay")
     net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
