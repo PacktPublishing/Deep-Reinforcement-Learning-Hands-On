@@ -50,7 +50,7 @@ class NoisyFactorizedLinear(nn.Linear):
         torch.randn(self.epsilon_input.size(), out=self.epsilon_input)
         torch.randn(self.epsilon_output.size(), out=self.epsilon_output)
 
-        func = lambda x: torch.sign(x) / torch.sqrt(torch.clamp(torch.abs(x), min=1e-6, max=1e6))
+        func = lambda x: torch.sign(x) * torch.sqrt(torch.abs(x))
         eps_in = func(self.epsilon_input)
         eps_out = func(self.epsilon_output)
 
@@ -74,7 +74,7 @@ class DQN(nn.Module):
             nn.ReLU()
         )
 
-        OutLayer = NoisyLinear if noisy_net else nn.Linear
+        OutLayer = NoisyFactorizedLinear if noisy_net else nn.Linear
 
         conv_out_size = self._get_conv_out(input_shape)
         self.fc = nn.Sequential(
