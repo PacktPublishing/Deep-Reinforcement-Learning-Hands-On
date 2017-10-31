@@ -41,16 +41,17 @@ EPSILON_FINAL = 0.02
 def unpack_batch(batch):
     states, actions, rewards, dones, last_states = [], [], [], [], []
     for exp in batch:
-        states.append(exp.state)
+        state = np.array(exp.state, copy=False)
+        states.append(state)
         actions.append(exp.action)
         rewards.append(exp.reward)
         dones.append(exp.last_state is None)
         if exp.last_state is None:
-            last_states.append(exp.state)       # the result will be masked anyway
+            last_states.append(state)       # the result will be masked anyway
         else:
-            last_states.append(exp.last_state)
-    return np.array(states), np.array(actions), np.array(rewards, dtype=np.float32), \
-           np.array(dones, dtype=np.uint8), np.array(last_states)
+            last_states.append(np.array(exp.last_state, copy=False))
+    return np.array(states, copy=False), np.array(actions), np.array(rewards, dtype=np.float32), \
+           np.array(dones, dtype=np.uint8), np.array(last_states, copy=False)
 
 
 def calc_loss(batch, net, tgt_net, cuda=False):
@@ -84,7 +85,7 @@ if __name__ == "__main__":
 
     env = gym.make(DEFAULT_ENV_NAME)
     env = ptan.common.wrappers.wrap_dqn(env)
-    env = ptan.common.wrappers.ScaledFloatFrame(env)
+#    env = ptan.common.wrappers.ScaledFloatFrame(env)
 
     writer = SummaryWriter(comment="-" + RUN_NAME + "-basic")
     net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
