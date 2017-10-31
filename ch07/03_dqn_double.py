@@ -40,8 +40,8 @@ EPSILON_FINAL = 0.02
 
 
 def unpack_batch(batch):
-    states = [np.array(exp[0].state, copy=False) for exp in batch]
-    next_states = [np.array(exp[-1].state, copy=False) for exp in batch]
+    states = [exp[0].state for exp in batch]
+    next_states = [exp[-1].state for exp in batch]
     actions = [exp[0].action for exp in batch]
     rewards = [exp[0].reward for exp in batch]
     dones = [exp[0].done for exp in batch]
