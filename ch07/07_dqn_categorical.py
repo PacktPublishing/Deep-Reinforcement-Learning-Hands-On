@@ -167,7 +167,7 @@ if __name__ == "__main__":
     env = gym.make(DEFAULT_ENV_NAME)
     env = ptan.common.wrappers.wrap_dqn(env)
 
-   writer = SummaryWriter(comment="-" + RUN_NAME + "-categorical")
+    writer = SummaryWriter(comment="-" + RUN_NAME + "-categorical")
     net = CategoricalDQN(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
