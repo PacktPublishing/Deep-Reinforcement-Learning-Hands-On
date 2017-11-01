@@ -21,17 +21,19 @@ if PONG_MODE:
     DEFAULT_ENV_NAME = "PongNoFrameskip-v4"
     MEAN_REWARD_BOUND = 19.5
     RUN_NAME = "pong"
+    REPLAY_SIZE = 10000
+    REPLAY_START_SIZE = 10000
 else:
-    DEFAULT_ENV_NAME = "SpaceInvadersNoFrameskip-v4"
+    DEFAULT_ENV_NAME = "BreakoutNoFrameskip-v4"
     MEAN_REWARD_BOUND = 1000
-    RUN_NAME = "invaders"
+    RUN_NAME = "breakout"
+    REPLAY_SIZE = 100000
+    REPLAY_START_SIZE = 50000
 
 GAMMA = 0.99
 BATCH_SIZE = 32
-REPLAY_SIZE = 10000
 LEARNING_RATE = 1e-4
 SYNC_TARGET_FRAMES = 1000
-REPLAY_START_SIZE = 10000
 
 
 def unpack_batch(batch):
