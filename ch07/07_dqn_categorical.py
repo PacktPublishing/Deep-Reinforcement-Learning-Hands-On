@@ -133,11 +133,9 @@ def calc_loss(batch, net, tgt_net, cuda=False):
 
     # for samples at the end of episode, next distribution will have 1 probability at 0 score
     dones = dones.astype(np.bool)
-    next_best_distr[dones] = 0.0
-    next_best_distr[dones, N_ATOMS//2] = 1.0
 
     # project our distribution using Bellman update
-    proj_distr = tools.distr_projection(next_best_distr, rewards, Vmin, Vmax, N_ATOMS, GAMMA)
+    proj_distr = tools.distr_projection(next_best_distr, rewards, dones, Vmin, Vmax, N_ATOMS, GAMMA)
 
     # calculate net output
     distr_v = net(states_v)

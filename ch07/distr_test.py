@@ -16,7 +16,7 @@ if __name__ == "__main__":
     src_hist = np.zeros(shape=(1, N_ATOMS), dtype=np.float32)
     src_hist[0, N_ATOMS//2+1] = 1.0
     tools.save_distr(atoms, src_hist[0], "peak-01")
-    proj_hist = tools.distr_projection(src_hist, np.array([2], dtype=np.float32),
+    proj_hist = tools.distr_projection(src_hist, np.array([2], dtype=np.float32), np.array([False]),
                                        Vmin, Vmax, N_ATOMS, gamma=0.9)
     tools.save_distr(atoms, proj_hist[0], "peak-02")
 
@@ -26,8 +26,13 @@ if __name__ == "__main__":
     tools.save_distr(atoms, hist[0], "normal-01")
 
     src_hist = hist[0]
-    proj_hist = tools.distr_projection(np.array([src_hist]), np.array([2], dtype=np.float32),
+    proj_hist = tools.distr_projection(np.array([src_hist]), np.array([2], dtype=np.float32), np.array([False]),
                                        Vmin, Vmax, N_ATOMS, gamma=0.9)
     tools.save_distr(atoms, proj_hist[0], "normal-02")
+
+    # normal distribution, but done episode
+    proj_hist = tools.distr_projection(np.array([src_hist]), np.array([2], dtype=np.float32), np.array([True]),
+                                       Vmin, Vmax, N_ATOMS, gamma=0.9)
+    tools.save_distr(atoms, proj_hist[0], "normal-03")
 
     pass
