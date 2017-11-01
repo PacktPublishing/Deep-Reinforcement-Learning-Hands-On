@@ -14,6 +14,8 @@ from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
+from lib import tools
+
 PONG_MODE = True
 
 if PONG_MODE:
@@ -44,6 +46,7 @@ Vmin = -10
 N_ATOMS = 51
 DELTA_Z = (Vmax - Vmin) / (N_ATOMS - 1)
 
+saved = False
 
 class CategoricalDQN(nn.Module):
     def __init__(self, input_shape, n_actions):
@@ -131,6 +134,8 @@ def calc_loss(batch, net, tgt_net, cuda=False):
 
     # for samples at the end of episode, next distribution will have 1 probability at 0 score
     dones = dones.astype(np.bool)
+    if dones.any():
+        print("Done found")
     next_best_distr[dones] = 0.0
     next_best_distr[dones, N_ATOMS//2] = 1.0
 
@@ -144,6 +149,12 @@ def calc_loss(batch, net, tgt_net, cuda=False):
         u = np.ceil(b_j)
         proj_distr[:, atom] += next_best_distr[:, atom] * (u - b_j)
         proj_distr[:, atom] += next_best_distr[:, atom] * (b_j - l)
+
+    global saved
+    if not saved:
+        tools.save_distr(next_best_distr[0], "01-distr")
+        tools.save_distr(proj_distr[0], "02-distr")
+        saved = True
 
     # calculate net output
     distr_v = net(states_v)
