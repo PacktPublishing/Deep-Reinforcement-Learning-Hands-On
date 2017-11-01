@@ -15,7 +15,7 @@ from tensorboardX import SummaryWriter
 
 from lib import dqn_model
 
-PONG_MODE = True
+PONG_MODE = False
 
 if PONG_MODE:
     DEFAULT_ENV_NAME = "PongNoFrameskip-v4"
