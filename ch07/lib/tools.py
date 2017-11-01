@@ -27,8 +27,10 @@ def distr_projection(next_distr, rewards, Vmin, Vmax, n_atoms, gamma):
     for atom in range(n_atoms):
         tz_j = rewards + (Vmin + atom * delta_z) * gamma
         b_j = (tz_j - Vmin) / delta_z
-        l = np.floor(b_j)
-        u = np.ceil(b_j)
-        proj_distr[:, atom] += next_distr[:, atom] * (u - b_j)
-        proj_distr[:, atom] += next_distr[:, atom] * (b_j - l)
+        l = np.floor(b_j).astype(np.int64)
+        u = np.ceil(b_j).astype(np.int64)
+        l_mask = np.logical_and(l >= 0, l < n_atoms)
+        u_mask = np.logical_and(u >= 0, u < n_atoms)
+        proj_distr[l_mask, l[l_mask]] += next_distr[l_mask, atom] * ((u - b_j)[l_mask])
+        proj_distr[u_mask, u[u_mask]] += next_distr[u_mask, atom] * ((b_j - l)[u_mask])
     return proj_distr
