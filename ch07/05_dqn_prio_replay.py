@@ -68,7 +68,7 @@ def calc_loss(batch, batch_weights, net, tgt_net, cuda=False):
     actions_v = Variable(torch.from_numpy(actions))
     rewards_v = Variable(torch.from_numpy(rewards))
     done_mask = torch.ByteTensor(dones)
-    batch_weights_v = Variable(torch.from_numpy(batch_weights))
+    batch_weights_v = Variable(torch.from_numpy(np.array(batch_weights, dtype=np.float32)))
     if cuda:
         states_v = states_v.cuda()
         next_states_v = next_states_v.cuda()
