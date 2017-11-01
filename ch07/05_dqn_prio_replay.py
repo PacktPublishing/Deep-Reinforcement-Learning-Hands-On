@@ -15,25 +15,28 @@ from tensorboardX import SummaryWriter
 
 from lib import dqn_model
 
-PONG_MODE = True
+PONG_MODE = False
 
 if PONG_MODE:
     DEFAULT_ENV_NAME = "PongNoFrameskip-v4"
     MEAN_REWARD_BOUND = 19.5
     RUN_NAME = "pong"
+    REPLAY_SIZE = 10000
+    REPLAY_START_SIZE = 10000
+    EPSILON_DECAY_LAST_FRAME = 10 ** 5
 else:
-    DEFAULT_ENV_NAME = "SpaceInvadersNoFrameskip-v4"
-    MEAN_REWARD_BOUND = 1000
-    RUN_NAME = "invaders"
+    DEFAULT_ENV_NAME = "BreakoutNoFrameskip-v4"
+    MEAN_REWARD_BOUND = 500
+    RUN_NAME = "breakout"
+    REPLAY_SIZE = 100000
+    REPLAY_START_SIZE = 50000
+    EPSILON_DECAY_LAST_FRAME = 10**6
 
 GAMMA = 0.99
 BATCH_SIZE = 32
-REPLAY_SIZE = 10000
 LEARNING_RATE = 1e-4
 SYNC_TARGET_FRAMES = 1000
-REPLAY_START_SIZE = 10000
 
-EPSILON_DECAY_LAST_FRAME = 10**5
 EPSILON_START = 1.0
 EPSILON_FINAL = 0.02
 
