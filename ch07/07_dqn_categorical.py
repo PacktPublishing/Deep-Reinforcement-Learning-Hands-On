@@ -21,7 +21,7 @@ if PONG_MODE:
     MEAN_REWARD_BOUND = 19.5
     RUN_NAME = "pong"
     REPLAY_SIZE = 10000
-    REPLAY_START_SIZE = 100 # TODO: return back
+    REPLAY_START_SIZE = 10000
     EPSILON_DECAY_LAST_FRAME = 10 ** 5
 else:
     DEFAULT_ENV_NAME = "BreakoutNoFrameskip-v4"
