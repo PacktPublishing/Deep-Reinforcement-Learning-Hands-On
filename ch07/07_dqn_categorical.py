@@ -65,8 +65,7 @@ class CategoricalDQN(nn.Module):
             nn.Linear(512, n_actions * N_ATOMS)
         )
 
-        support_t = torch.arange(Vmin, Vmax, DELTA_Z)
-        self.register_buffer("supports", Variable(support_t, volatile=True))
+        self.register_buffer("supports", torch.arange(Vmin, Vmax, DELTA_Z))
         self.softmax = nn.Softmax()
 
     def _get_conv_out(self, shape):
@@ -83,7 +82,7 @@ class CategoricalDQN(nn.Module):
     def both(self, x):
         cat_out = self(x)
         probs = self.apply_softmax(cat_out)
-        weights = probs * self.supports
+        weights = probs * Variable(self.supports, volatile=True)
         res = weights.sum(dim=2)
         return cat_out, res
 
@@ -143,10 +142,8 @@ def calc_loss(batch, net, tgt_net, cuda=False):
         b_j = (tz_j - Vmin) / DELTA_Z
         l = np.floor(b_j)
         u = np.ceil(b_j)
-        l_mask = l >= 0
-        u_mask = u < N_ATOMS
-        proj_distr[l_mask, atom] += next_best_distr[l_mask, atom] * (u[l_mask] - b_j[l_mask])
-        proj_distr[u_mask, atom] += next_best_distr[u_mask, atom] * (b_j[u_mask] - l[u_mask])
+        proj_distr[:, atom] += next_best_distr[:, atom] * (u - b_j)
+        proj_distr[:, atom] += next_best_distr[:, atom] * (b_j - l)
 
     # calculate net output
     distr_v = net(states_v)
