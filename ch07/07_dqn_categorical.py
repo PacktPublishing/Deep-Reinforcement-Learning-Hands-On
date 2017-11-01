@@ -221,4 +221,4 @@ if __name__ == "__main__":
 
         if frame_idx % SYNC_TARGET_FRAMES == 0:
             tgt_net.sync()
-   writer.close()
+    writer.close()
