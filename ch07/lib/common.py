@@ -127,7 +127,7 @@ class EpsilonTracker:
             max(self.epsilon_final, self.epsilon_start - frame / self.epsilon_frames)
 
 
-def distr_projection(next_distr, rewards, dones, Vmin, Vmax, n_atoms, gamma):
+def distr_projection(next_distr, rewards, dones, Vmin, Vmax, n_atoms, gamma, clip=False):
     """
     Perform distribution projection aka Catergorical Algorithm from the
     "A Distributional Perspective on RL" paper
@@ -136,20 +136,30 @@ def distr_projection(next_distr, rewards, dones, Vmin, Vmax, n_atoms, gamma):
     proj_distr = np.zeros((batch_size, n_atoms), dtype=np.float32)
     delta_z = (Vmax - Vmin) / (n_atoms - 1)
     for atom in range(n_atoms):
-        tz_j = rewards + (Vmin + atom * delta_z) * gamma
-        b_j = 1e-6 + (tz_j - Vmin) / delta_z
+        tz_j = np.minimum(Vmax, np.maximum(Vmin, rewards + (Vmin + atom * delta_z) * gamma))
+        b_j = (tz_j - Vmin) / delta_z
         l = np.floor(b_j).astype(np.int64)
         u = np.ceil(b_j).astype(np.int64)
-        l_mask = np.logical_and(l >= 0, l < n_atoms)
-        u_mask = np.logical_and(u >= 0, u < n_atoms)
-        proj_distr[l_mask, l[l_mask]] += next_distr[l_mask, atom] * ((u - b_j)[l_mask])
-        proj_distr[u_mask, u[u_mask]] += next_distr[u_mask, atom] * ((b_j - l)[u_mask])
+        if (u == l).any():
+            if (u == n_atoms-1).any():
+                if not clip:
+                    l[u == l] -= 1
+            else:
+                u[u == l] += 1
+        proj_distr[:, l] += next_distr[:, atom] * (u - b_j)
+        proj_distr[:, u] += next_distr[:, atom] * (b_j - l)
     if dones.any():
         proj_distr[dones] = 0.0
-        # Warning: here we assume that our rewards at the end of the episode will be in Vmin...Vmax range
-        b_j = 1e-6 + (rewards[dones] - Vmin) / delta_z
+        tz_j = np.minimum(Vmax, np.maximum(Vmin, rewards[dones]))
+        b_j = (tz_j - Vmin) / delta_z
         l = np.floor(b_j).astype(np.int64)
         u = np.ceil(b_j).astype(np.int64)
+        if (u == l).any():
+            if (u == n_atoms-1).any():
+                if not clip:
+                    l[u == l] -= 1
+            else:
+                u[u == l] += 1
         proj_distr[dones, l] += u - b_j
         proj_distr[dones, u] += b_j - l
     return proj_distr

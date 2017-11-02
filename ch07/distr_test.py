@@ -30,7 +30,7 @@ if __name__ == "__main__":
     save_distr(src_hist[0], "peak-01")
     proj_hist = common.distr_projection(src_hist, np.array([2], dtype=np.float32), np.array([False]),
                                         Vmin, Vmax, N_ATOMS, gamma=0.9)
-    save_distr(atoms, proj_hist[0], "peak-02")
+    save_distr(proj_hist[0], "peak-02")
 
     # normal distribution
     data = np.random.normal(size=1000, scale=3)
@@ -46,5 +46,15 @@ if __name__ == "__main__":
     proj_hist = common.distr_projection(np.array([src_hist]), np.array([2], dtype=np.float32), np.array([True]),
                                         Vmin, Vmax, N_ATOMS, gamma=0.9)
     save_distr(proj_hist[0], "normal-03")
+
+    # clipping for out-of-range distribution
+    proj_dist = common.distr_projection(np.array([src_hist]), np.array([10], dtype=np.float32), np.array([False]),
+                                        Vmin, Vmax, N_ATOMS, gamma=0.9)
+    save_distr(proj_dist[0], "normal-04")
+
+    proj_dist = common.distr_projection(np.array([src_hist]), np.array([10], dtype=np.float32), np.array([False]),
+                                        Vmin, Vmax, N_ATOMS, gamma=0.9, clip=True)
+    save_distr(proj_dist[0], "normal-05")
+
 
     pass
