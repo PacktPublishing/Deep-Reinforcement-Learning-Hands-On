@@ -1,4 +1,7 @@
 import numpy as np
+import torch
+import torch.nn as nn
+from torch.autograd import Variable
 
 
 def unpack_batch(batch):
@@ -15,6 +18,31 @@ def unpack_batch(batch):
             last_states.append(np.array(exp.last_state, copy=False))
     return np.array(states, copy=False), np.array(actions), np.array(rewards, dtype=np.float32), \
            np.array(dones, dtype=np.uint8), np.array(last_states, copy=False)
+
+
+def calc_loss_dqn(batch, net, tgt_net, gamma, cuda=False):
+    states, actions, rewards, dones, next_states = unpack_batch(batch)
+
+    states_v = Variable(torch.from_numpy(states))
+    next_states_v = Variable(torch.from_numpy(next_states), volatile=True)
+    actions_v = Variable(torch.from_numpy(actions))
+    rewards_v = Variable(torch.from_numpy(rewards))
+    done_mask = torch.ByteTensor(dones)
+    if cuda:
+        states_v = states_v.cuda()
+        next_states_v = next_states_v.cuda()
+        actions_v = actions_v.cuda()
+        rewards_v = rewards_v.cuda()
+        done_mask = done_mask.cuda()
+
+    state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
+    next_state_values = tgt_net(next_states_v).max(1)[0]
+    next_state_values[done_mask] = 0.0
+    next_state_values.volatile = False
+
+    expected_state_action_values = next_state_values * gamma + rewards_v
+    return nn.MSELoss()(state_action_values, expected_state_action_values)
+
 
 
 def distr_projection(next_distr, rewards, dones, Vmin, Vmax, n_atoms, gamma):
