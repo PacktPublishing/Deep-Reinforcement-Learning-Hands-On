@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-import sys
 import gym
 import ptan
-import time
 import numpy as np
 import argparse
 import collections
@@ -15,62 +13,8 @@ from tensorboardX import SummaryWriter
 
 from lib import dqn_model, common
 
-PONG_MODE = True
-
-if PONG_MODE:
-    DEFAULT_ENV_NAME = "PongNoFrameskip-v4"
-    MEAN_REWARD_BOUND = 19.5
-    RUN_NAME = "pong"
-    REPLAY_SIZE = 10000
-    SYNC_TARGET_FRAMES = 1000
-    REPLAY_START_SIZE = 10000
-    EPSILON_DECAY_LAST_FRAME = 10 ** 5
-    EPSILON_FINAL = 0.02
-    LEARNING_RATE = 0.0001
-else:
-    DEFAULT_ENV_NAME = "BreakoutNoFrameskip-v4"
-    MEAN_REWARD_BOUND = 500
-    RUN_NAME = "breakout"
-    REPLAY_SIZE = 1000000
-    REPLAY_START_SIZE = 50000
-    SYNC_TARGET_FRAMES = 10000
-    EPSILON_DECAY_LAST_FRAME = 10**6
-    EPSILON_FINAL = 0.1
-    LEARNING_RATE = 0.00025
-
-GAMMA = 0.99
-BATCH_SIZE = 32
-EPSILON_START = 1.0
-
 PRIO_REPLAY_ALPHA = 0.6
 PRIO_REPLAY_BETA = 0.4
-
-
-def calc_loss(batch, batch_weights, net, tgt_net, cuda=False):
-    states, actions, rewards, dones, next_states = common.unpack_batch(batch)
-
-    states_v = Variable(torch.from_numpy(states))
-    next_states_v = Variable(torch.from_numpy(next_states), volatile=True)
-    actions_v = Variable(torch.from_numpy(actions))
-    rewards_v = Variable(torch.from_numpy(rewards))
-    done_mask = torch.ByteTensor(dones)
-    batch_weights_v = Variable(torch.from_numpy(np.array(batch_weights, dtype=np.float32)))
-    if cuda:
-        states_v = states_v.cuda()
-        next_states_v = next_states_v.cuda()
-        actions_v = actions_v.cuda()
-        rewards_v = rewards_v.cuda()
-        done_mask = done_mask.cuda()
-        batch_weights_v = batch_weights_v.cuda()
-
-    state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
-    next_state_values = tgt_net(next_states_v).max(1)[0]
-    next_state_values[done_mask] = 0.0
-    next_state_values.volatile = False
-
-    expected_state_action_values = next_state_values * GAMMA + rewards_v
-    losses_v = batch_weights_v * (state_action_values - expected_state_action_values) ** 2
-    return losses_v.mean(), losses_v
 
 
 class PrioReplayBuffer:
@@ -104,67 +48,79 @@ class PrioReplayBuffer:
             self.priorities[idx] = prio
 
 
+def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
+    states, actions, rewards, dones, next_states = common.unpack_batch(batch)
+
+    states_v = Variable(torch.from_numpy(states))
+    next_states_v = Variable(torch.from_numpy(next_states), volatile=True)
+    actions_v = Variable(torch.from_numpy(actions))
+    rewards_v = Variable(torch.from_numpy(rewards))
+    done_mask = torch.ByteTensor(dones)
+    batch_weights_v = Variable(torch.from_numpy(np.array(batch_weights, dtype=np.float32)))
+    if cuda:
+        states_v = states_v.cuda()
+        next_states_v = next_states_v.cuda()
+        actions_v = actions_v.cuda()
+        rewards_v = rewards_v.cuda()
+        done_mask = done_mask.cuda()
+        batch_weights_v = batch_weights_v.cuda()
+
+    state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
+    next_state_values = tgt_net(next_states_v).max(1)[0]
+    next_state_values[done_mask] = 0.0
+    next_state_values.volatile = False
+
+    expected_state_action_values = next_state_values * gamma + rewards_v
+    losses_v = batch_weights_v * (state_action_values - expected_state_action_values) ** 2
+    return losses_v.mean(), losses_v
+
+
 if __name__ == "__main__":
+    params = common.HYPERPARAMS['pong']
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
 
-    env = gym.make(DEFAULT_ENV_NAME)
+    env = gym.make(params['env_name'])
     env = ptan.common.wrappers.wrap_dqn(env)
 
-    writer = SummaryWriter(comment="-" + RUN_NAME + "-prio-replay")
+    writer = SummaryWriter(comment="-" + params['run_name'] + "-prio-replay")
     net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
 
     tgt_net = ptan.agent.TargetNet(net)
-    epsilon_greedy_selector = ptan.actions.EpsilonGreedyActionSelector(epsilon=1.0)
-    agent = ptan.agent.DQNAgent(net, epsilon_greedy_selector, cuda=args.cuda)
+    selector = ptan.actions.EpsilonGreedyActionSelector(epsilon=params['epsilon_start'])
+    epsilon_tracker = common.EpsilonTracker(selector, params)
+    agent = ptan.agent.DQNAgent(net, selector, cuda=args.cuda)
 
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=1)
-    buffer = PrioReplayBuffer(exp_source, REPLAY_SIZE, PRIO_REPLAY_ALPHA)
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=params['gamma'], steps_count=1)
+    buffer = PrioReplayBuffer(exp_source, params['replay_size'], PRIO_REPLAY_ALPHA)
+    optimizer = optim.Adam(net.parameters(), lr=params['learning_rate'])
 
     frame_idx = 0
-    ts_frame = 0
-    ts = time.time()
 
-    total_rewards = []
-    while True:
-        frame_idx += 1
-        buffer.populate(1)
-        epsilon_greedy_selector.epsilon = max(EPSILON_FINAL, EPSILON_START - frame_idx / EPSILON_DECAY_LAST_FRAME)
+    with common.RewardTracker(writer, params['stop_reward']) as reward_tracker:
+        while True:
+            frame_idx += 1
+            buffer.populate(1)
+            epsilon_tracker.frame(frame_idx)
 
-        new_rewards = exp_source.pop_total_rewards()
-        if new_rewards:
-            total_rewards.extend(new_rewards)
-            speed = (frame_idx - ts_frame) / (time.time() - ts)
-            ts_frame = frame_idx
-            ts = time.time()
-            mean_reward = np.mean(total_rewards[-100:])
-            print("%d: done %d games, mean reward %.3f, eps %.2f, speed %.2f f/s" % (
-                frame_idx, len(total_rewards), mean_reward, epsilon_greedy_selector.epsilon,
-                speed
-            ))
-            sys.stdout.flush()
-            writer.add_scalar("epsilon", epsilon_greedy_selector.epsilon, frame_idx)
-            writer.add_scalar("speed", speed, frame_idx)
-            writer.add_scalar("reward_100", mean_reward, frame_idx)
-            writer.add_scalar("reward", new_rewards[0], frame_idx)
-            if mean_reward > MEAN_REWARD_BOUND:
-                print("Solved in %d frames!" % frame_idx)
-                break
+            new_rewards = exp_source.pop_total_rewards()
+            if new_rewards:
+                if reward_tracker.reward(new_rewards[0], frame_idx, selector.epsilon):
+                    break
 
-        if len(buffer) < REPLAY_START_SIZE:
-            continue
+            if len(buffer) < params['replay_initial']:
+                continue
 
-        optimizer.zero_grad()
-        batch, batch_indices, batch_weights = buffer.sample(BATCH_SIZE, PRIO_REPLAY_BETA)
-        loss_v, sample_prios_v = calc_loss(batch, batch_weights, net, tgt_net.target_model, cuda=args.cuda)
-        loss_v.backward()
-        optimizer.step()
-        buffer.update_priorities(batch_indices, sample_prios_v.data.cpu().numpy())
+            optimizer.zero_grad()
+            batch, batch_indices, batch_weights = buffer.sample(params['batch_size'], PRIO_REPLAY_BETA)
+            loss_v, sample_prios_v = calc_loss(batch, batch_weights, net, tgt_net.target_model,
+                                               params['gamma'], cuda=args.cuda)
+            loss_v.backward()
+            optimizer.step()
+            buffer.update_priorities(batch_indices, sample_prios_v.data.cpu().numpy())
 
-        if frame_idx % SYNC_TARGET_FRAMES == 0:
-            tgt_net.sync()
-    writer.close()
+            if frame_idx % params['target_net_sync'] == 0:
+                tgt_net.sync()
