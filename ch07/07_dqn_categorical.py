@@ -14,7 +14,7 @@ from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
-from lib import tools
+from lib import common
 
 PONG_MODE = True
 
@@ -135,7 +135,7 @@ def calc_loss(batch, net, tgt_net, cuda=False):
     dones = dones.astype(np.bool)
 
     # project our distribution using Bellman update
-    proj_distr = tools.distr_projection(next_best_distr, rewards, dones, Vmin, Vmax, N_ATOMS, GAMMA)
+    proj_distr = common.distr_projection(next_best_distr, rewards, dones, Vmin, Vmax, N_ATOMS, GAMMA)
 
     # calculate net output
     distr_v = net(states_v)
