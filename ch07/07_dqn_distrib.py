@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-import sys
 import gym
 import ptan
-import time
 import numpy as np
 import argparse
 
