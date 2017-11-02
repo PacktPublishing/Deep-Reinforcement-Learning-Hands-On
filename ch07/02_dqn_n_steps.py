@@ -6,10 +6,7 @@ import time
 import numpy as np
 import argparse
 
-import torch
-import torch.nn as nn
 import torch.optim as optim
-from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
@@ -40,30 +37,6 @@ REWARD_STEPS = 2
 
 EPSILON_START = 1.0
 EPSILON_FINAL = 0.02
-
-
-def calc_loss(batch, net, tgt_net, cuda=False):
-    states, actions, rewards, dones, next_states = common.unpack_batch(batch)
-
-    states_v = Variable(torch.from_numpy(states))
-    next_states_v = Variable(torch.from_numpy(next_states), volatile=True)
-    actions_v = Variable(torch.from_numpy(actions))
-    rewards_v = Variable(torch.from_numpy(rewards))
-    done_mask = torch.ByteTensor(dones)
-    if cuda:
-        states_v = states_v.cuda()
-        next_states_v = next_states_v.cuda()
-        actions_v = actions_v.cuda()
-        rewards_v = rewards_v.cuda()
-        done_mask = done_mask.cuda()
-
-    state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
-    next_state_values = tgt_net(next_states_v).max(1)[0]
-    next_state_values[done_mask] = 0.0
-    next_state_values.volatile = False
-
-    expected_state_action_values = next_state_values * (GAMMA**REWARD_STEPS) + rewards_v
-    return nn.MSELoss()(state_action_values, expected_state_action_values)
 
 
 if __name__ == "__main__":
@@ -122,7 +95,7 @@ if __name__ == "__main__":
 
         optimizer.zero_grad()
         batch = buffer.sample(BATCH_SIZE)
-        loss_v = calc_loss(batch, net, tgt_net.target_model, cuda=args.cuda)
+        loss_v = common.calc_loss_dqn(batch, net, tgt_net.target_model, gamma=GAMMA**REWARD_STEPS, cuda=args.cuda)
         loss_v.backward()
         optimizer.step()
 
