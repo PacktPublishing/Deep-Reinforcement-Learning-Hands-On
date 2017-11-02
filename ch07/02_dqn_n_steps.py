@@ -12,31 +12,33 @@ from tensorboardX import SummaryWriter
 
 from lib import dqn_model, common
 
-PONG_MODE = False
+PONG_MODE = True
 
 if PONG_MODE:
     DEFAULT_ENV_NAME = "PongNoFrameskip-v4"
     MEAN_REWARD_BOUND = 19.5
     RUN_NAME = "pong"
     REPLAY_SIZE = 10000
+    SYNC_TARGET_FRAMES = 1000
     REPLAY_START_SIZE = 10000
     EPSILON_DECAY_LAST_FRAME = 10 ** 5
+    EPSILON_FINAL = 0.02
+    LEARNING_RATE = 0.0001
 else:
     DEFAULT_ENV_NAME = "BreakoutNoFrameskip-v4"
     MEAN_REWARD_BOUND = 500
     RUN_NAME = "breakout"
-    REPLAY_SIZE = 100000
+    REPLAY_SIZE = 1000000
     REPLAY_START_SIZE = 50000
+    SYNC_TARGET_FRAMES = 10000
     EPSILON_DECAY_LAST_FRAME = 10**6
+    EPSILON_FINAL = 0.1
+    LEARNING_RATE = 0.00025
 
 GAMMA = 0.99
 BATCH_SIZE = 32
-LEARNING_RATE = 1e-4
-SYNC_TARGET_FRAMES = 1000
 REWARD_STEPS = 2
-
 EPSILON_START = 1.0
-EPSILON_FINAL = 0.02
 
 
 if __name__ == "__main__":
