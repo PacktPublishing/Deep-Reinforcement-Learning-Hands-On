@@ -47,9 +47,9 @@ N_ATOMS = 51
 DELTA_Z = (Vmax - Vmin) / (N_ATOMS - 1)
 
 
-class CategoricalDQN(nn.Module):
+class DistributionalDQN(nn.Module):
     def __init__(self, input_shape, n_actions):
-        super(CategoricalDQN, self).__init__()
+        super(DistributionalDQN, self).__init__()
 
         self.conv = nn.Sequential(
             nn.Conv2d(input_shape[0], 32, kernel_size=8, stride=4),
@@ -156,8 +156,8 @@ if __name__ == "__main__":
     env = gym.make(DEFAULT_ENV_NAME)
     env = ptan.common.wrappers.wrap_dqn(env)
 
-    writer = SummaryWriter(comment="-" + RUN_NAME + "-categorical")
-    net = CategoricalDQN(env.observation_space.shape, env.action_space.n)
+    writer = SummaryWriter(comment="-" + RUN_NAME + "-distrib")
+    net = DistributionalDQN(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
 
