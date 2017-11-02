@@ -13,7 +13,7 @@ from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
-from lib import dqn_model
+from lib import dqn_model, common
 
 PONG_MODE = False
 
@@ -42,24 +42,8 @@ LEARNING_RATE = 0.00025
 EPSILON_START = 1.0
 
 
-def unpack_batch(batch):
-    states, actions, rewards, dones, last_states = [], [], [], [], []
-    for exp in batch:
-        state = np.array(exp.state, copy=False)
-        states.append(state)
-        actions.append(exp.action)
-        rewards.append(exp.reward)
-        dones.append(exp.last_state is None)
-        if exp.last_state is None:
-            last_states.append(state)       # the result will be masked anyway
-        else:
-            last_states.append(np.array(exp.last_state, copy=False))
-    return np.array(states, copy=False), np.array(actions), np.array(rewards, dtype=np.float32), \
-           np.array(dones, dtype=np.uint8), np.array(last_states, copy=False)
-
-
 def calc_loss(batch, net, tgt_net, cuda=False):
-    states, actions, rewards, dones, next_states = unpack_batch(batch)
+    states, actions, rewards, dones, next_states = common.unpack_batch(batch)
 
     states_v = Variable(torch.from_numpy(states))
     next_states_v = Variable(torch.from_numpy(next_states), volatile=True)

@@ -14,7 +14,7 @@ from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
-from lib import tools
+from lib import common
 
 PONG_MODE = True
 
@@ -95,24 +95,8 @@ class DistributionalDQN(nn.Module):
         return self.softmax(t.view(-1, N_ATOMS)).view(t.size())
 
 
-def unpack_batch(batch):
-    states, actions, rewards, dones, last_states = [], [], [], [], []
-    for exp in batch:
-        state = np.array(exp.state, copy=False)
-        states.append(state)
-        actions.append(exp.action)
-        rewards.append(exp.reward)
-        dones.append(exp.last_state is None)
-        if exp.last_state is None:
-            last_states.append(state)       # the result will be masked anyway
-        else:
-            last_states.append(np.array(exp.last_state, copy=False))
-    return np.array(states, copy=False), np.array(actions), np.array(rewards, dtype=np.float32), \
-           np.array(dones, dtype=np.uint8), np.array(last_states, copy=False)
-
-
 def calc_loss(batch, net, tgt_net, cuda=False):
-    states, actions, rewards, dones, next_states = unpack_batch(batch)
+    states, actions, rewards, dones, next_states = common.unpack_batch(batch)
     batch_size = len(batch)
 
     states_v = Variable(torch.from_numpy(states))
@@ -135,7 +119,7 @@ def calc_loss(batch, net, tgt_net, cuda=False):
     dones = dones.astype(np.bool)
 
     # project our distribution using Bellman update
-    proj_distr = tools.distr_projection(next_best_distr, rewards, dones, Vmin, Vmax, N_ATOMS, GAMMA)
+    proj_distr = common.distr_projection(next_best_distr, rewards, dones, Vmin, Vmax, N_ATOMS, GAMMA)
 
     # calculate net output
     distr_v = net(states_v)

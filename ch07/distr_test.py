@@ -1,6 +1,6 @@
 import numpy as np
 
-from lib import tools
+from lib import common
 
 import matplotlib as mpl
 mpl.use("Agg")
@@ -28,8 +28,8 @@ if __name__ == "__main__":
     src_hist = np.zeros(shape=(1, N_ATOMS), dtype=np.float32)
     src_hist[0, N_ATOMS//2+1] = 1.0
     save_distr(src_hist[0], "peak-01")
-    proj_hist = tools.distr_projection(src_hist, np.array([2], dtype=np.float32), np.array([False]),
-                                       Vmin, Vmax, N_ATOMS, gamma=0.9)
+    proj_hist = common.distr_projection(src_hist, np.array([2], dtype=np.float32), np.array([False]),
+                                        Vmin, Vmax, N_ATOMS, gamma=0.9)
     save_distr(atoms, proj_hist[0], "peak-02")
 
     # normal distribution
@@ -38,13 +38,13 @@ if __name__ == "__main__":
     save_distr(hist[0], "normal-01")
 
     src_hist = hist[0]
-    proj_hist = tools.distr_projection(np.array([src_hist]), np.array([2], dtype=np.float32), np.array([False]),
-                                       Vmin, Vmax, N_ATOMS, gamma=0.9)
+    proj_hist = common.distr_projection(np.array([src_hist]), np.array([2], dtype=np.float32), np.array([False]),
+                                        Vmin, Vmax, N_ATOMS, gamma=0.9)
     save_distr(proj_hist[0], "normal-02")
 
     # normal distribution, but done episode
-    proj_hist = tools.distr_projection(np.array([src_hist]), np.array([2], dtype=np.float32), np.array([True]),
-                                       Vmin, Vmax, N_ATOMS, gamma=0.9)
+    proj_hist = common.distr_projection(np.array([src_hist]), np.array([2], dtype=np.float32), np.array([True]),
+                                        Vmin, Vmax, N_ATOMS, gamma=0.9)
     save_distr(proj_hist[0], "normal-03")
 
     pass
