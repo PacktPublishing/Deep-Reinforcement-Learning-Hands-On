@@ -1,19 +1,4 @@
 import numpy as np
-import matplotlib as mpl
-mpl.use("Agg")
-import matplotlib.pyplot as plt
-
-# Vmax = 10
-# Vmin = -10
-# N_ATOMS = 51
-# DELTA_Z = (Vmax - Vmin) / (N_ATOMS - 1)
-
-
-def save_distr(atoms, vec, name):
-    plt.cla()
-#    p = np.arange(Vmin, Vmax+DELTA_Z, DELTA_Z)
-    plt.bar(atoms, vec, width=0.5)
-    plt.savefig(name + ".png")
 
 
 def distr_projection(next_distr, rewards, dones, Vmin, Vmax, n_atoms, gamma):
