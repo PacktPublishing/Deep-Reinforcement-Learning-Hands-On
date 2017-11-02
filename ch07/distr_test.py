@@ -49,7 +49,7 @@ if __name__ == "__main__":
 
     # clipping for out-of-range distribution
     proj_dist = common.distr_projection(np.array([src_hist]), np.array([10], dtype=np.float32), np.array([False]),
-                                        Vmin, Vmax, N_ATOMS, gamma=0.9)
+                                        Vmin, Vmax, N_ATOMS, gamma=0.9, clip=False)
     save_distr(proj_dist[0], "normal-04")
 
     proj_dist = common.distr_projection(np.array([src_hist]), np.array([10], dtype=np.float32), np.array([False]),
