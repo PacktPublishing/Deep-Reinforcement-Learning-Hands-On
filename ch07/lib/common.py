@@ -4,6 +4,38 @@ import torch.nn as nn
 from torch.autograd import Variable
 
 
+HYPERPARAMS = {
+    'pong': {
+        'env_name':         "PongNoFrameskip-v4",
+        'stop_reward':      19.5,
+        'run_name':         'pong',
+        'replay_size':      10000,
+        'replay_initial':   10000,
+        'target_net_sync':  1000,
+        'epsilon_frames':   10**5,
+        'epsilon_start':    1.0,
+        'epsilon_final':    0.02,
+        'learning_rate':    0.0001,
+        'gamma':            0.99,
+        'batch_size':       32
+    },
+    'breakout': {
+        'env_name':         "BreakoutNoFrameskip-v4",
+        'stop_reward':      500.0,
+        'run_name':         'breakout',
+        'replay_size':      10 ** 6,
+        'replay_initial':   50000,
+        'target_net_sync':  10000,
+        'epsilon_frames':   10 ** 6,
+        'epsilon_start':    1.0,
+        'epsilon_final':    0.1,
+        'learning_rate':    0.00025,
+        'gamma':            0.99,
+        'batch_size':       32
+    }
+}
+
+
 def unpack_batch(batch):
     states, actions, rewards, dones, last_states = [], [], [], [], []
     for exp in batch:
