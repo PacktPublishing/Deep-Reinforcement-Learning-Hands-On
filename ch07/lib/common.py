@@ -127,7 +127,7 @@ class EpsilonTracker:
             max(self.epsilon_final, self.epsilon_start - frame / self.epsilon_frames)
 
 
-def distr_projection(next_distr, rewards, dones, Vmin, Vmax, n_atoms, gamma, clip=True):
+def distr_projection(next_distr, rewards, dones, Vmin, Vmax, n_atoms, gamma, clip=False):
     """
     Perform distribution projection aka Catergorical Algorithm from the
     "A Distributional Perspective on RL" paper
