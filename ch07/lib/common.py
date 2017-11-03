@@ -17,7 +17,7 @@ HYPERPARAMS = {
         'epsilon_frames':   10**5,
         'epsilon_start':    1.0,
         'epsilon_final':    0.02,
-        'learning_rate':    0.00005,
+        'learning_rate':    0.0002,
         'gamma':            0.99,
         'batch_size':       32
     },
