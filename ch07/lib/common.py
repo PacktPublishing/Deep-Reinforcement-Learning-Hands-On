@@ -127,7 +127,7 @@ class EpsilonTracker:
             max(self.epsilon_final, self.epsilon_start - frame / self.epsilon_frames)
 
 
-def distr_projection(next_distr, rewards, dones, Vmin, Vmax, n_atoms, gamma, clip=False):
+def distr_projection(next_distr, rewards, dones, Vmin, Vmax, n_atoms, gamma):
     """
     Perform distribution projection aka Catergorical Algorithm from the
     "A Distributional Perspective on RL" paper
@@ -140,26 +140,26 @@ def distr_projection(next_distr, rewards, dones, Vmin, Vmax, n_atoms, gamma, cli
         b_j = (tz_j - Vmin) / delta_z
         l = np.floor(b_j).astype(np.int64)
         u = np.ceil(b_j).astype(np.int64)
-        if (u == l).any():
-            if (u == n_atoms-1).any():
-                if not clip:
-                    l[u == l] -= 1
-            else:
-                u[u == l] += 1
-        proj_distr[:, l] += next_distr[:, atom] * (u - b_j)
-        proj_distr[:, u] += next_distr[:, atom] * (b_j - l)
+        eq_mask = u == l
+        proj_distr[eq_mask, l[eq_mask]] += next_distr[eq_mask, atom]
+        ne_mask = u != l
+        proj_distr[ne_mask, l[ne_mask]] += next_distr[ne_mask, atom] * (u - b_j)[ne_mask]
+        proj_distr[ne_mask, u[ne_mask]] += next_distr[ne_mask, atom] * (b_j - l)[ne_mask]
     if dones.any():
         proj_distr[dones] = 0.0
         tz_j = np.minimum(Vmax, np.maximum(Vmin, rewards[dones]))
         b_j = (tz_j - Vmin) / delta_z
         l = np.floor(b_j).astype(np.int64)
         u = np.ceil(b_j).astype(np.int64)
-        if (u == l).any():
-            if (u == n_atoms-1).any():
-                if not clip:
-                    l[u == l] -= 1
-            else:
-                u[u == l] += 1
-        proj_distr[dones, l] += u - b_j
-        proj_distr[dones, u] += b_j - l
+        eq_mask = u == l
+        eq_dones = dones.copy()
+        eq_dones[dones] = eq_mask
+        if eq_dones.any():
+            proj_distr[eq_dones, l] = 1.0
+        ne_mask = u != l
+        ne_dones = dones.copy()
+        ne_dones[dones] = ne_mask
+        if ne_dones.any():
+            proj_distr[ne_dones, l] = (u - b_j)[ne_mask]
+            proj_distr[ne_dones, u] = (b_j - l)[ne_mask]
     return proj_distr
