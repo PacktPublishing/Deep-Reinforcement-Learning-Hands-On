@@ -9,7 +9,7 @@ from torch.autograd import Variable
 HYPERPARAMS = {
     'pong': {
         'env_name':         "PongNoFrameskip-v4",
-        'stop_reward':      19.5,
+        'stop_reward':      18.0,
         'run_name':         'pong',
         'replay_size':      10000,
         'replay_initial':   10000,
