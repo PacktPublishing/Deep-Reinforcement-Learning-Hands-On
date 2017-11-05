@@ -9,19 +9,20 @@ from tensorboardX import SummaryWriter
 
 from lib import dqn_model, common
 
-REWARD_STEPS = 2
+REWARD_STEPS_DEFAULT = 2
 
 
 if __name__ == "__main__":
     params = common.HYPERPARAMS['pong']
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
+    parser.add_argument("-n", default=REWARD_STEPS_DEFAULT, type=int, help="Count of steps to unroll Bellman")
     args = parser.parse_args()
 
     env = gym.make(params['env_name'])
     env = ptan.common.wrappers.wrap_dqn(env)
 
-    writer = SummaryWriter(comment="-" + params['run_name'] + "-2-step")
+    writer = SummaryWriter(comment="-" + params['run_name'] + "-%d-step" % args.n)
     net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
@@ -31,7 +32,7 @@ if __name__ == "__main__":
     epsilon_tracker = common.EpsilonTracker(selector, params)
     agent = ptan.agent.DQNAgent(net, selector, cuda=args.cuda)
 
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=params['gamma'], steps_count=REWARD_STEPS)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=params['gamma'], steps_count=args.n)
     buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=params['replay_size'])
     optimizer = optim.Adam(net.parameters(), lr=params['learning_rate'])
 
@@ -53,7 +54,7 @@ if __name__ == "__main__":
 
             optimizer.zero_grad()
             batch = buffer.sample(params['batch_size'])
-            loss_v = common.calc_loss_dqn(batch, net, tgt_net.target_model, gamma=params['gamma']**REWARD_STEPS,
+            loss_v = common.calc_loss_dqn(batch, net, tgt_net.target_model, gamma=params['gamma']**args.n,
                                           cuda=args.cuda)
             loss_v.backward()
             optimizer.step()
