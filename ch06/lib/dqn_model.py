@@ -30,6 +30,5 @@ class DQN(nn.Module):
         return int(np.prod(o.size()))
 
     def forward(self, x):
-        fx = x.float() / 256
-        conv_out = self.conv(fx).view(fx.size()[0], -1)
+        conv_out = self.conv(x).view(x.size()[0], -1)
         return self.fc(conv_out)
