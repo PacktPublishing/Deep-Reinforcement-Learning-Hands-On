@@ -49,15 +49,11 @@ if __name__ == "__main__":
             if len(buffer) < params['replay_initial']:
                 continue
 
-            if frame_idx % params['target_net_sync'] == 0:
-                tgt_net.sync()
-
-            if frame_idx % params['train_every_frame'] != 0:
-                continue
-                
             optimizer.zero_grad()
             batch = buffer.sample(params['batch_size'])
             loss_v = common.calc_loss_dqn(batch, net, tgt_net.target_model, gamma=params['gamma'], cuda=args.cuda)
             loss_v.backward()
             optimizer.step()
 
+            if frame_idx % params['target_net_sync'] == 0:
+                tgt_net.sync()
