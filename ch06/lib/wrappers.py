@@ -114,4 +114,4 @@ def make_env(env_name):
     env = ProcessFrame84(env)
     env = ImageToPyTorch(env)
     env = BufferWrapper(env, 4)
-    return ScaledFloatFrame(env)
+    return env
