@@ -62,7 +62,7 @@ class NoisyFactorizedLinear(nn.Linear):
 
 
 class DQN(nn.Module):
-    def __init__(self, input_shape, n_actions, noisy_net=False):
+    def __init__(self, input_shape, n_actions):
         super(DQN, self).__init__()
 
         self.conv = nn.Sequential(
@@ -74,13 +74,11 @@ class DQN(nn.Module):
             nn.ReLU()
         )
 
-        OutLayer = NoisyLinear if noisy_net else nn.Linear
-
         conv_out_size = self._get_conv_out(input_shape)
         self.fc = nn.Sequential(
             nn.Linear(conv_out_size, 512),
             nn.ReLU(),
-            OutLayer(512, n_actions)
+            nn.Linear(512, n_actions)
         )
 
     def _get_conv_out(self, shape):
