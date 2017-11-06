@@ -28,10 +28,14 @@ class NoisyDQN(nn.Module):
         )
 
         conv_out_size = self._get_conv_out(input_shape)
-        self.fc = nn.Sequential(
+        self.noisy_layers = [
             dqn_model.NoisyLinear(conv_out_size, 512),
-            nn.ReLU(),
             dqn_model.NoisyLinear(512, n_actions)
+        ]
+        self.fc = nn.Sequential(
+            self.noisy_layers[0],
+            nn.ReLU(),
+            self.noisy_layers[1]
         )
 
     def _get_conv_out(self, shape):
@@ -43,6 +47,11 @@ class NoisyDQN(nn.Module):
         conv_out = self.conv(fx).view(fx.size()[0], -1)
         return self.fc(conv_out)
 
+    def noisy_layers_sigma_l2(self):
+        return [
+            (layer.sigma_weight ** 2).sum().sqrt().data.cpu().numpy()[0]
+            for layer in self.noisy_layers
+        ]
 
 
 if __name__ == "__main__":
@@ -89,3 +98,8 @@ if __name__ == "__main__":
 
             if frame_idx % params['target_net_sync'] == 0:
                 tgt_net.sync()
+
+            if frame_idx % 500 == 0:
+                for layer_idx, sigma_l2 in enumerate(net.noisy_layers_sigma_l2()):
+                    writer.add_scalar("sigma_l2_layer_%d" % (layer_idx+1),
+                                      sigma_l2, frame_idx)
