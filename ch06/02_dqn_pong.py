@@ -35,19 +35,13 @@ Experience = collections.namedtuple('Experience', field_names=['state', 'action'
 
 class ExperienceBuffer:
     def __init__(self, capacity):
-        self.buffer = []
-        self.capacity = capacity
-        self.pos = 0
+        self.buffer = collections.deque(maxlen=capacity)
 
     def __len__(self):
         return len(self.buffer)
 
     def append(self, experience):
-        if len(self.buffer) < self.capacity:
-            self.buffer.append(experience)
-        else:
-            self.buffer[self.pos] = experience
-            self.pos = (self.pos + 1) % self.capacity
+        self.buffer.append(experience)
 
     def sample(self, batch_size):
         indices = np.random.choice(len(self.buffer), batch_size, replace=True)
