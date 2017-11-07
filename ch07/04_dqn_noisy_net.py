@@ -49,14 +49,15 @@ class NoisyDQN(nn.Module):
 
     def noisy_layers_sigma_l2(self):
         return [
-            (layer.sigma_weight ** 2).sum().sqrt().data.cpu().numpy()[0]
+            ((layer.weight ** 2).mean().sqrt() / (layer.sigma_weight ** 2).mean().sqrt()).data.cpu().numpy()[0]
+#            ((layer.weight.abs() - layer.sigma_weight.abs()) / layer.weight.abs()).mean().data.cpu().numpy()[0]
+#            (layer.sigma_weight ** 2).sum().sqrt().data.cpu().numpy()[0]
             for layer in self.noisy_layers
         ]
 
 
 if __name__ == "__main__":
     params = common.HYPERPARAMS['pong']
-#    params['stop_reward'] = 20.0
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
