@@ -30,7 +30,7 @@ def calc_values_of_states(states, net, cuda=False):
 
 
 if __name__ == "__main__":
-    params = common.HYPERPARAMS['breakout']
+    params = common.HYPERPARAMS['pong']
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
