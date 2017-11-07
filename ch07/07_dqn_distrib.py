@@ -174,6 +174,7 @@ if __name__ == "__main__":
     frame_idx = 0
     eval_states = None
     prev_save = 0
+    save_prefix = None
 
     with common.RewardTracker(writer, params['stop_reward']) as reward_tracker:
         while True:
@@ -197,12 +198,12 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             batch = buffer.sample(params['batch_size'])
 
-            interesting = any(map(lambda s: s.last_state is None or s.reward != 0.0, batch))
-            if interesting and frame_idx // 10000 > prev_save:
-                save_prefix = "images/img_%05d" % frame_idx
-                prev_save = frame_idx // 10000
-            else:
-                save_prefix = None
+            # interesting = any(map(lambda s: s.last_state is None or s.reward != 0.0, batch))
+            # if interesting and frame_idx // 10000 > prev_save:
+            #     save_prefix = "images/img_%05d" % frame_idx
+            #     prev_save = frame_idx // 10000
+            # else:
+            #     save_prefix = None
 
             loss_v = calc_loss(batch, net, tgt_net.target_model, gamma=params['gamma'],
                                cuda=args.cuda, save_prefix=save_prefix)
