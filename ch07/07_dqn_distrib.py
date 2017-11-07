@@ -14,6 +14,10 @@ from tensorboardX import SummaryWriter
 
 from lib import common
 
+import matplotlib as mpl
+mpl.use("Agg")
+import matplotlib.pylab as plt
+
 Vmax = 10
 Vmin = -10
 N_ATOMS = 51
@@ -84,7 +88,7 @@ def calc_values_of_states(states, net, cuda=False):
     return np.mean(mean_vals)
 
 
-def calc_loss(batch, net, tgt_net, gamma, cuda=False):
+def calc_loss(batch, net, tgt_net, gamma, cuda=False, save_prefix=None):
     states, actions, rewards, dones, next_states = common.unpack_batch(batch)
     batch_size = len(batch)
 
@@ -114,6 +118,30 @@ def calc_loss(batch, net, tgt_net, gamma, cuda=False):
     proj_distr_v = Variable(torch.from_numpy(proj_distr))
     if cuda:
         proj_distr_v = proj_distr_v.cuda()
+
+    if save_prefix is not None:
+        pred = F.softmax(state_action_values).data.cpu().numpy()
+        for batch_idx in range(batch_size):
+            is_done = dones[batch_idx]
+            reward = rewards[batch_idx]
+            plt.clf()
+            p = np.arange(Vmin, Vmax+DELTA_Z, DELTA_Z)
+            plt.subplot(3, 1, 1)
+            plt.bar(p, pred[batch_idx], width=0.5)
+            plt.title("Predicted")
+            plt.subplot(3, 1, 2)
+            plt.bar(p, proj_distr[batch_idx], width=0.5)
+            plt.title("Projected")
+            plt.subplot(3, 1, 3)
+            plt.bar(p, next_best_distr[batch_idx], width=0.5)
+            plt.title("Next state")
+            suffix = ""
+            if reward != 0.0:
+                suffix = suffix + "_%.0f" % reward
+            if is_done:
+                suffix = suffix + "_done"
+            plt.savefig("%s_%02d%s.png" % (save_prefix, batch_idx, suffix))
+
     loss_v = -state_log_sm_v * proj_distr_v
     return loss_v.sum(dim=1).mean()
 
@@ -144,6 +172,7 @@ if __name__ == "__main__":
 
     frame_idx = 0
     eval_states = None
+    prev_save = 0
 
     with common.RewardTracker(writer, params['stop_reward']) as reward_tracker:
         while True:
@@ -164,10 +193,18 @@ if __name__ == "__main__":
                 eval_states = [np.array(transition.state, copy=False) for transition in eval_states]
                 eval_states = np.array(eval_states, copy=False)
 
-
             optimizer.zero_grad()
             batch = buffer.sample(params['batch_size'])
-            loss_v = calc_loss(batch, net, tgt_net.target_model, gamma=params['gamma'], cuda=args.cuda)
+
+            interesting = any(map(lambda s: s.last_state is None or s.reward != 0.0, batch))
+            if interesting and frame_idx // 10000 > prev_save:
+                save_prefix = "images/img_%05d" % frame_idx
+                prev_save = frame_idx // 10000
+            else:
+                save_prefix = None
+
+            loss_v = calc_loss(batch, net, tgt_net.target_model, gamma=params['gamma'],
+                               cuda=args.cuda, save_prefix=save_prefix)
             loss_v.backward()
             optimizer.step()
 

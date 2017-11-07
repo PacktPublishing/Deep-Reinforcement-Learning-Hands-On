@@ -4,3 +4,4 @@ records
 *.txt
 *.dat
 __pycache__
+*.png
