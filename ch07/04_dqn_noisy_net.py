@@ -100,6 +100,6 @@ if __name__ == "__main__":
                 tgt_net.sync()
 
             if frame_idx % 500 == 0:
-                for layer_idx, sigma_l2 in enumerate(net.noisy_layers_sigma_l2()):
+                for layer_idx, sigma_l2 in enumerate(net.noisy_layers_sigma_snr()):
                     writer.add_scalar("sigma_snr_layer_%d" % (layer_idx+1),
                                       sigma_l2, frame_idx)
