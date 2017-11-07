@@ -29,13 +29,13 @@ class NoisyDQN(nn.Module):
 
         conv_out_size = self._get_conv_out(input_shape)
         self.noisy_layers = [
-            dqn_model.NoisyLinear(conv_out_size, 512),
+#            dqn_model.NoisyLinear(conv_out_size, 512),
             dqn_model.NoisyLinear(512, n_actions)
         ]
         self.fc = nn.Sequential(
-            self.noisy_layers[0],
+            nn.Linear(conv_out_size, 512),
             nn.ReLU(),
-            self.noisy_layers[1]
+            self.noisy_layers[0]
         )
 
     def _get_conv_out(self, shape):
@@ -56,7 +56,7 @@ class NoisyDQN(nn.Module):
 
 if __name__ == "__main__":
     params = common.HYPERPARAMS['pong']
-    params['stop_reward'] = 20.0
+#    params['stop_reward'] = 20.0
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
