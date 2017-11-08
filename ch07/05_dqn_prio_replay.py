@@ -46,10 +46,10 @@ class PrioReplayBuffer:
             prios = self.priorities
         else:
             prios = self.priorities[:self.pos]
-        probs = np.array(prios, dtype=np.float32) ** self.prob_alpha
+        probs = prios ** self.prob_alpha
 
         probs /= probs.sum()
-        indices = np.random.choice(len(self.buffer), batch_size, p=probs, replace=True)
+        indices = np.random.choice(len(self.buffer), batch_size, p=probs)
         samples = [self.buffer[idx] for idx in indices]
         total = len(self.buffer)
         weights = (total * probs[indices]) ** (-beta)
