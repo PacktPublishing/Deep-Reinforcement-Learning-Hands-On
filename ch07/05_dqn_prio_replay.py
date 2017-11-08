@@ -85,7 +85,7 @@ def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
 
     expected_state_action_values = next_state_values * gamma + rewards_v
     losses_v = batch_weights_v * (state_action_values - expected_state_action_values) ** 2
-    return losses_v.mean(), losses_v.data.cpu().numpy()
+    return losses_v.mean(), losses_v
 
 
 if __name__ == "__main__":
@@ -132,8 +132,8 @@ if __name__ == "__main__":
 
             optimizer.zero_grad()
             batch, batch_indices, batch_weights = buffer.sample(params['batch_size'], beta)
-            loss_v, sample_prios = calc_loss(batch, batch_weights, net, tgt_net.target_model,
-                                             params['gamma'], cuda=args.cuda)
+            loss_v, sample_prios_v = calc_loss(batch, batch_weights, net, tgt_net.target_model,
+                                               params['gamma'], cuda=args.cuda)
             loss_v.backward()
             optimizer.step()
             buffer.update_priorities(batch_indices, sample_prios_v.data.cpu().numpy())
