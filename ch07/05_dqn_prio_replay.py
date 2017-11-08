@@ -17,7 +17,7 @@ PRIO_REPLAY_ALPHA = 0.6
 PRIO_REPLAY_BETA = 0.4
 
 
-class PrioReplayBufferList:
+class PrioReplayBuffer:
     def __init__(self, exp_source, buf_size, prob_alpha=0.6):
         self.exp_source_iter = iter(exp_source)
         self.prob_alpha = prob_alpha
@@ -49,37 +49,6 @@ class PrioReplayBufferList:
 
         probs /= probs.sum()
         indices = np.random.choice(len(self.buffer), batch_size, p=probs, replace=True)
-        samples = [self.buffer[idx] for idx in indices]
-        total = len(self.buffer)
-        weights = (total * probs[indices]) ** (-beta)
-        weights /= weights.max()
-        return samples, indices, weights
-
-    def update_priorities(self, batch_indices, batch_priorities):
-        for idx, prio in zip(batch_indices, batch_priorities):
-            self.priorities[idx] = prio
-
-
-class PrioReplayBuffer:
-    def __init__(self, exp_source, buf_size, prob_alpha):
-        self.exp_source_iter = iter(exp_source)
-        self.prob_alpha = prob_alpha
-        self.buffer = collections.deque(maxlen=buf_size)
-        self.priorities = collections.deque(maxlen=buf_size)
-
-    def __len__(self):
-        return len(self.buffer)
-
-    def populate(self, samples):
-        max_prio = max(self.priorities) if self.priorities else 1.0
-        for _ in range(samples):
-            self.buffer.append(next(self.exp_source_iter))
-            self.priorities.append(max_prio)
-
-    def sample(self, batch_size, beta):
-        probs = np.array(self.priorities, dtype=np.float32) ** self.prob_alpha
-        probs /= probs.sum()
-        indices = np.random.choice(len(self.buffer), batch_size, p=probs, replace=False)
         samples = [self.buffer[idx] for idx in indices]
         total = len(self.buffer)
         weights = (total * probs[indices]) ** (-beta)
