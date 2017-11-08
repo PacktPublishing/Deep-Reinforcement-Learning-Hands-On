@@ -149,7 +149,8 @@ def calc_loss(batch, net, tgt_net, gamma, cuda=False, save_prefix=None):
 if __name__ == "__main__":
     params = common.HYPERPARAMS['pong']
     params['epsilon_frames'] = 200000
-    params['learning_rate'] = 0.0004
+#    params['learning_rate'] = 0.0004
+#    params['epsilon_final'] = 0.1
     params['replay_size'] = 200000
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
@@ -200,9 +201,9 @@ if __name__ == "__main__":
             batch = buffer.sample(params['batch_size'])
 
             interesting = any(map(lambda s: s.last_state is None or s.reward != 0.0, batch))
-            if interesting and frame_idx // 10000 > prev_save:
-                save_prefix = "images/img_%05d" % frame_idx
-                prev_save = frame_idx // 10000
+            if interesting and frame_idx // 30000 > prev_save:
+                save_prefix = "images/img_%08d" % frame_idx
+                prev_save = frame_idx // 30000
             else:
                 save_prefix = None
 
