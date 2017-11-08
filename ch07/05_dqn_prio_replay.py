@@ -14,7 +14,8 @@ from tensorboardX import SummaryWriter
 from lib import dqn_model, common
 
 PRIO_REPLAY_ALPHA = 0.6
-PRIO_REPLAY_BETA = 0.4
+BETA_START = 0.4
+BETA_FRAMES = 100000
 
 
 class PrioReplayBuffer:
@@ -111,15 +112,18 @@ if __name__ == "__main__":
     optimizer = optim.Adam(net.parameters(), lr=params['learning_rate'])
 
     frame_idx = 0
+    beta = BETA_START
 
     with common.RewardTracker(writer, params['stop_reward']) as reward_tracker:
         while True:
             frame_idx += 1
             buffer.populate(1)
             epsilon_tracker.frame(frame_idx)
+            beta = min(1.0, BETA_START + frame_idx * (1.0 - BETA_START) / BETA_FRAMES)
 
             new_rewards = exp_source.pop_total_rewards()
             if new_rewards:
+                writer.add_scalar("beta", beta, frame_idx)
                 if reward_tracker.reward(new_rewards[0], frame_idx, selector.epsilon):
                     break
 
@@ -127,7 +131,7 @@ if __name__ == "__main__":
                 continue
 
             optimizer.zero_grad()
-            batch, batch_indices, batch_weights = buffer.sample(params['batch_size'], PRIO_REPLAY_BETA)
+            batch, batch_indices, batch_weights = buffer.sample(params['batch_size'], beta)
             loss_v, sample_prios_v = calc_loss(batch, batch_weights, net, tgt_net.target_model,
                                                params['gamma'], cuda=args.cuda)
             loss_v.backward()
