@@ -81,11 +81,29 @@ def calc_values_of_states(states, net, cuda=False):
         states_v = Variable(torch.from_numpy(batch), volatile=True)
         if cuda:
             states_v = states_v.cuda()
-        action_values_v = net(states_v)
+        action_values_v = net.qvals(states_v)
         best_action_values_v = action_values_v.max(1)[0]
         mean_val = best_action_values_v.mean().data.cpu().numpy()[0]
         mean_vals.append(mean_val)
     return np.mean(mean_vals)
+
+
+def save_state_images(frame_idx, states, net, cuda=False):
+    ofs = 0
+    p = np.arange(Vmin, Vmax + DELTA_Z, DELTA_Z)
+    for batch in np.array_split(states, 64):
+        states_v = Variable(torch.from_numpy(batch), volatile=True)
+        if cuda:
+            states_v = states_v.cuda()
+        action_prob = net.apply_softmax(net(states_v)).data.cpu().numpy()
+        batch_size, num_actions, _ = action_prob.shape
+        for batch_idx in range(batch_size):
+            plt.clf()
+            for action_idx in range(num_actions):
+                plt.subplot(num_actions, 1, action_idx+1)
+                plt.bar(p, action_prob[batch_idx, action_idx], width=0.5)
+            plt.savefig("states/%05d_%08d.png" % (ofs + batch_idx, frame_idx))
+        ofs += batch_size
 
 
 def calc_loss(batch, net, tgt_net, gamma, cuda=False, save_prefix=None):
@@ -218,3 +236,6 @@ if __name__ == "__main__":
             if frame_idx % EVAL_EVERY_FRAME == 0:
                 mean_val = calc_values_of_states(eval_states, net, cuda=args.cuda)
                 writer.add_scalar("values_mean", mean_val, frame_idx)
+
+            if frame_idx % 10000 == 0:
+                save_state_images(frame_idx, eval_states, net, cuda=args.cuda)
