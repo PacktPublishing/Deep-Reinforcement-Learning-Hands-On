@@ -88,7 +88,7 @@ def calc_values_of_states(states, net, cuda=False):
     return np.mean(mean_vals)
 
 
-def save_state_images(frame_idx, states, net, cuda=False):
+def save_state_images(frame_idx, states, net, cuda=False, max_states=200):
     ofs = 0
     p = np.arange(Vmin, Vmax + DELTA_Z, DELTA_Z)
     for batch in np.array_split(states, 64):
@@ -104,6 +104,8 @@ def save_state_images(frame_idx, states, net, cuda=False):
                 plt.bar(p, action_prob[batch_idx, action_idx], width=0.5)
             plt.savefig("states/%05d_%08d.png" % (ofs + batch_idx, frame_idx))
         ofs += batch_size
+        if ofs >= max_states:
+            break
 
 
 def calc_loss(batch, net, tgt_net, gamma, cuda=False, save_prefix=None):
