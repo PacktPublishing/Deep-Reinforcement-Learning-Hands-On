@@ -148,8 +148,9 @@ def calc_loss(batch, net, tgt_net, gamma, cuda=False, save_prefix=None):
 
 if __name__ == "__main__":
     params = common.HYPERPARAMS['pong']
-#    params['epsilon_frames'] = 200000
-    params['learning_rate'] = 0.0004
+    # params['epsilon_frames'] = 200000
+    # params['learning_rate'] = 0.0004
+    params['replay_size'] = 300000
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
