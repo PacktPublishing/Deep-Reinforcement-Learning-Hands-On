@@ -132,7 +132,7 @@ def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
 
 
 if __name__ == "__main__":
-    params = common.HYPERPARAMS['breakout']
+    params = common.HYPERPARAMS['pong']
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     agent = ptan.agent.DQNAgent(lambda x: net.qvals(x), ptan.actions.ArgmaxActionSelector(), cuda=args.cuda)
 
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=params['gamma'], steps_count=REWARD_STEPS)
-    buffer = ptan.experience.PrioReplayBuffer(exp_source, params['replay_size'], PRIO_REPLAY_ALPHA)
+    buffer = ptan.experience.PrioritizedReplayBuffer(exp_source, params['replay_size'], PRIO_REPLAY_ALPHA)
     optimizer = optim.Adam(net.parameters(), lr=params['learning_rate'])
 
     frame_idx = 0
