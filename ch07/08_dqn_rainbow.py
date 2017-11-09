@@ -92,7 +92,7 @@ def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
 
     states_v = Variable(torch.from_numpy(states))
     actions_v = Variable(torch.from_numpy(actions))
-    next_states_v = Variable(torch.from_numpy(next_states), volatile=True)
+    next_states_v = Variable(torch.from_numpy(next_states))
     batch_weights_v = Variable(torch.from_numpy(batch_weights))
     if cuda:
         states_v = states_v.cuda()
@@ -102,7 +102,12 @@ def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
 
     # next state distribution
     # dueling arch -- actions from main net, distr from tgt_net
-    next_qvals_v = net.qvals(next_states_v)
+
+    # calc at once both next and cur states
+    distr_v, qvals_v = net.both(torch.cat((states_v, next_states_v)))
+    next_qvals_v = qvals_v[batch_size:]
+    distr_v = distr_v[:batch_size]
+
     next_actions_v = next_qvals_v.max(1)[1]
     next_distr_v = tgt_net(next_states_v)
     next_best_distr_v = next_distr_v[range(batch_size), next_actions_v.data]
@@ -115,7 +120,6 @@ def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
     proj_distr = common.distr_projection(next_best_distr, rewards, dones, Vmin, Vmax, N_ATOMS, gamma)
 
     # calculate net output
-    distr_v = net(states_v)
     state_action_values = distr_v[range(batch_size), actions_v.data]
     state_log_sm_v = F.log_softmax(state_action_values)
     proj_distr_v = Variable(torch.from_numpy(proj_distr))
