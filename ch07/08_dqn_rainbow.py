@@ -103,11 +103,12 @@ def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
     # next state distribution
     # dueling arch -- actions from main net, distr from tgt_net
     next_qvals_v = net.qvals(next_states_v)
-    next_actions = next_qvals_v.max(1)[1].data.cpu().numpy()
+    next_actions_v = next_qvals_v.max(1)[1]
     next_distr_v = tgt_net(next_states_v)
-    next_distr = tgt_net.apply_softmax(next_distr_v).data.cpu().numpy()
+    next_best_distr_v = next_distr_v[range(batch_size), next_actions_v.data]
+    next_best_distr_v = tgt_net.apply_softmax(next_best_distr_v)
+    next_best_distr = next_best_distr_v.data.cpu().numpy()
 
-    next_best_distr = next_distr[range(batch_size), next_actions]
     dones = dones.astype(np.bool)
 
     # project our distribution using Bellman update
@@ -124,7 +125,6 @@ def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
     loss_v = -state_log_sm_v * proj_distr_v
     loss_v = batch_weights_v * loss_v.sum(dim=1)
     return loss_v.mean(), loss_v
-
 
 
 if __name__ == "__main__":
