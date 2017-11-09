@@ -26,6 +26,9 @@ DELTA_Z = (Vmax - Vmin) / (N_ATOMS - 1)
 STATES_TO_EVALUATE = 1000
 EVAL_EVERY_FRAME = 100
 
+SAVE_STATES_IMG = False
+SAVE_TRANSITIONS_IMG = False
+
 
 class DistributionalDQN(nn.Module):
     def __init__(self, input_shape, n_actions):
@@ -108,6 +111,29 @@ def save_state_images(frame_idx, states, net, cuda=False, max_states=200):
             break
 
 
+def save_transition_images(batch_size, predicted, projected, next_distr, dones, rewards, save_prefix):
+    for batch_idx in range(batch_size):
+        is_done = dones[batch_idx]
+        reward = rewards[batch_idx]
+        plt.clf()
+        p = np.arange(Vmin, Vmax + DELTA_Z, DELTA_Z)
+        plt.subplot(3, 1, 1)
+        plt.bar(p, predicted[batch_idx], width=0.5)
+        plt.title("Predicted")
+        plt.subplot(3, 1, 2)
+        plt.bar(p, projected[batch_idx], width=0.5)
+        plt.title("Projected")
+        plt.subplot(3, 1, 3)
+        plt.bar(p, next_distr[batch_idx], width=0.5)
+        plt.title("Next state")
+        suffix = ""
+        if reward != 0.0:
+            suffix = suffix + "_%.0f" % reward
+        if is_done:
+            suffix = suffix + "_done"
+        plt.savefig("%s_%02d%s.png" % (save_prefix, batch_idx, suffix))
+
+
 def calc_loss(batch, net, tgt_net, gamma, cuda=False, save_prefix=None):
     states, actions, rewards, dones, next_states = common.unpack_batch(batch)
     batch_size = len(batch)
@@ -141,26 +167,7 @@ def calc_loss(batch, net, tgt_net, gamma, cuda=False, save_prefix=None):
 
     if save_prefix is not None:
         pred = F.softmax(state_action_values).data.cpu().numpy()
-        for batch_idx in range(batch_size):
-            is_done = dones[batch_idx]
-            reward = rewards[batch_idx]
-            plt.clf()
-            p = np.arange(Vmin, Vmax+DELTA_Z, DELTA_Z)
-            plt.subplot(3, 1, 1)
-            plt.bar(p, pred[batch_idx], width=0.5)
-            plt.title("Predicted")
-            plt.subplot(3, 1, 2)
-            plt.bar(p, proj_distr[batch_idx], width=0.5)
-            plt.title("Projected")
-            plt.subplot(3, 1, 3)
-            plt.bar(p, next_best_distr[batch_idx], width=0.5)
-            plt.title("Next state")
-            suffix = ""
-            if reward != 0.0:
-                suffix = suffix + "_%.0f" % reward
-            if is_done:
-                suffix = suffix + "_done"
-            plt.savefig("%s_%02d%s.png" % (save_prefix, batch_idx, suffix))
+        save_transition_images(batch_size, pred, proj_distr, next_best_distr, dones, rewards, save_prefix)
 
     loss_v = -state_log_sm_v * proj_distr_v
     return loss_v.sum(dim=1).mean()
@@ -169,8 +176,6 @@ def calc_loss(batch, net, tgt_net, gamma, cuda=False, save_prefix=None):
 if __name__ == "__main__":
     params = common.HYPERPARAMS['pong']
     params['epsilon_frames'] = 200000
-#    params['learning_rate'] = 0.0004
-#    params['epsilon_final'] = 0.1
     params['replay_size'] = 200000
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
@@ -220,12 +225,12 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             batch = buffer.sample(params['batch_size'])
 
-            interesting = any(map(lambda s: s.last_state is None or s.reward != 0.0, batch))
-            if interesting and frame_idx // 30000 > prev_save:
-                save_prefix = "images/img_%08d" % frame_idx
-                prev_save = frame_idx // 30000
-            else:
-                save_prefix = None
+            save_prefix = None
+            if SAVE_TRANSITIONS_IMG:
+                interesting = any(map(lambda s: s.last_state is None or s.reward != 0.0, batch))
+                if interesting and frame_idx // 30000 > prev_save:
+                    save_prefix = "images/img_%08d" % frame_idx
+                    prev_save = frame_idx // 30000
 
             loss_v = calc_loss(batch, net, tgt_net.target_model, gamma=params['gamma'],
                                cuda=args.cuda, save_prefix=save_prefix)
@@ -239,5 +244,5 @@ if __name__ == "__main__":
                 mean_val = calc_values_of_states(eval_states, net, cuda=args.cuda)
                 writer.add_scalar("values_mean", mean_val, frame_idx)
 
-            if frame_idx % 10000 == 0:
+            if SAVE_STATES_IMG and frame_idx % 10000 == 0:
                 save_state_images(frame_idx, eval_states, net, cuda=args.cuda)
