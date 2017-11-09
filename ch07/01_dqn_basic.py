@@ -12,22 +12,6 @@ from tensorboardX import SummaryWriter
 
 from lib import dqn_model, common
 
-STATES_TO_EVALUATE = 1000
-EVAL_EVERY_FRAME = 100
-
-
-def calc_values_of_states(states, net, cuda=False):
-    mean_vals = []
-    for batch in np.array_split(states, 64):
-        states_v = Variable(torch.from_numpy(batch), volatile=True)
-        if cuda:
-            states_v = states_v.cuda()
-        action_values_v = net(states_v)
-        best_action_values_v = action_values_v.max(1)[0]
-        mean_val = best_action_values_v.mean().data.cpu().numpy()[0]
-        mean_vals.append(mean_val)
-    return np.mean(mean_vals)
-
 
 if __name__ == "__main__":
     params = common.HYPERPARAMS['pong']
@@ -54,7 +38,6 @@ if __name__ == "__main__":
     optimizer = optim.Adam(net.parameters(), lr=params['learning_rate'])
 
     frame_idx = 0
-    eval_states = None
 
     with common.RewardTracker(writer, params['stop_reward']) as reward_tracker:
         while True:
@@ -70,11 +53,6 @@ if __name__ == "__main__":
             if len(buffer) < params['replay_initial']:
                 continue
 
-            if eval_states is None:
-                eval_states = buffer.sample(STATES_TO_EVALUATE)
-                eval_states = [np.array(transition.state, copy=False) for transition in eval_states]
-                eval_states = np.array(eval_states, copy=False)
-
             optimizer.zero_grad()
             batch = buffer.sample(params['batch_size'])
             loss_v = common.calc_loss_dqn(batch, net, tgt_net.target_model, gamma=params['gamma'], cuda=args.cuda)
@@ -83,7 +61,3 @@ if __name__ == "__main__":
 
             if frame_idx % params['target_net_sync'] == 0:
                 tgt_net.sync()
-
-            if frame_idx % EVAL_EVERY_FRAME == 0:
-                mean_val = calc_values_of_states(eval_states, net, cuda=args.cuda)
-                writer.add_scalar("values_mean", mean_val, frame_idx)
