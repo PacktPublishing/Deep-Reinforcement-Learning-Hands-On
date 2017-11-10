@@ -128,7 +128,7 @@ def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
 
     loss_v = -state_log_sm_v * proj_distr_v
     loss_v = batch_weights_v * loss_v.sum(dim=1)
-    return loss_v.mean(), loss_v
+    return loss_v.mean(), loss_v + 1e-5
 
 
 if __name__ == "__main__":
