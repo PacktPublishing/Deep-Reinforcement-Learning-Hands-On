@@ -132,7 +132,7 @@ def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
 
 
 if __name__ == "__main__":
-    params = common.HYPERPARAMS['pong']
+    params = common.HYPERPARAMS['breakout-small']
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
