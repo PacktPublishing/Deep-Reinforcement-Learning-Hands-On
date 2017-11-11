@@ -38,6 +38,10 @@ def prices_to_relative(prices):
     return Prices(open=prices.open, high=rh, low=rl, close=rc)
 
 
+def load_relative(csv_file):
+    return prices_to_relative(read_csv(csv_file))
+
+
 def price_files(dir_name):
     result = []
     for path in glob.glob(os.path.join(dir_name, "*.csv")):
