@@ -1,5 +1,6 @@
 import gym
 import gym.spaces
+from gym.utils import seeding
 import enum
 import numpy as np
 
@@ -105,13 +106,14 @@ class StocksEnv(gym.Env):
         self._state = State(bars_count, comission, reset_on_close)
         self.action_space = gym.spaces.Discrete(n=len(Actions))
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(len(self._state), ))
+        self._seed()
 
     def _reset(self):
         # make selection of the instrument and it's offset. Then reset the state
-        self._instrument = np.random.choice(list(self._prices.keys()))
+        self._instrument = self.np_random.choice(list(self._prices.keys()))
         prices = self._prices[self._instrument]
         bars = self._state.bars_count
-        offset = np.random.choice(prices.high.shape[0]-bars*10) + bars
+        offset = self.np_random.choice(prices.high.shape[0]-bars*10) + bars
         self._state.reset(prices, offset)
         return self._state.encode()
 
@@ -127,6 +129,11 @@ class StocksEnv(gym.Env):
 
     def _close(self):
         pass
+
+    def _seed(self, seed=None):
+        self.np_random, seed1 = seeding.np_random(seed)
+        seed2 = seeding.hash_seed(seed1 + 1) % 2 ** 31
+        return [seed1, seed2]
 
     @classmethod
     def from_dir(cls, data_dir, **kwargs):
