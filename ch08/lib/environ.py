@@ -16,8 +16,15 @@ class Actions(enum.Enum):
 
 
 class State:
-    def __init__(self, bars_count):
+    def __init__(self, bars_count, comission_perc, reset_on_close):
+        assert isinstance(bars_count, int)
+        assert bars_count > 0
+        assert isinstance(comission_perc, float)
+        assert comission_perc >= 0.0
+        assert isinstance(reset_on_close, bool)
         self.bars_count = bars_count
+        self.comission = comission_perc / 100.0
+        self.reset_on_close = reset_on_close
 
     def reset(self, prices, offset):
         assert isinstance(prices, data.Prices)
@@ -33,11 +40,8 @@ class State:
 
     def encode(self):
         """
-        Convert data to numpy array. Return None if there is no more data available
-        Offset is not updated
+        Convert current state into numpy array.
         """
-        if self.bars_count + self._offset > self._prices.close.shape[0]:
-            return None
         res = np.ndarray(shape=(len(self), ), dtype=np.float32)
         shift = 0
         for bar_idx in range(self.bars_count):
@@ -52,21 +56,53 @@ class State:
         if not self.have_position:
             res[shift] = 0.0
         else:
-            open = self._prices.open[self._offset-1]
-            rel_close = self._prices.close[self._offset-1]
-            close = open * (1.0 + rel_close)
-            res[shift] = (close - self.open_price) / self.open_price
+            res[shift] = (self._cur_close() - self.open_price) / self.open_price
         shift += 1
         return res
+
+    def _cur_close(self):
+        """
+        Calculate real close price for the current bar
+        """
+        open = self._prices.open[self._offset]
+        rel_close = self._prices.close[self._offset]
+        return open * (1.0 + rel_close)
+
+    def step(self, action):
+        """
+        Perform one step in our price, adjust offset, check for the end of prices
+        and handle position change
+        :param action: 
+        :return: reward, done 
+        """
+        assert isinstance(action, Actions)
+        reward = 0.0
+        self._offset += 1
+        if self.have_position:
+            # delta position profit equals cur bar change
+            reward += self._prices.open[self._offset] * self._prices.close[self._offset]
+        done = self.bars_count + self._offset > self._prices.close.shape[0]
+        if action == Actions.Buy and not self.have_position:
+            self.have_position = True
+            close = self._cur_close()
+            self.open_price = close
+            reward -= close * self.comission
+        elif action == Actions.Close and self.have_position:
+            self.have_position = False
+            self.open_price = 0.0
+            reward -= self._cur_close() * self.comission
+            done = self.reset_on_close
+        return reward, done
 
 
 class StocksEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, prices, bars_count=DEFAULT_BARS_COUNT):
+    def __init__(self, prices, bars_count=DEFAULT_BARS_COUNT,
+                 comission=DEFAULT_COMMISSION_PERC, reset_on_close=True):
         assert isinstance(prices, dict)
         self._prices = prices
-        self._state = State(bars_count)
+        self._state = State(bars_count, comission, reset_on_close)
         self.action_space = gym.spaces.Discrete(n=len(Actions))
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(len(self._state), ))
 
@@ -81,8 +117,16 @@ class StocksEnv(gym.Env):
 
     def _step(self, action_idx):
         action = Actions(action_idx)
-        reward = 0.0
+        reward, done = self._state.step(action)
+        obs = self._state.encode()
+        info = {"instrument": self._instrument, "offset": self._state._offset}
+        return obs, reward, done, info
 
+    def _render(self, mode='human', close=False):
+        pass
+
+    def _close(self):
+        pass
 
     @classmethod
     def from_dir(cls, data_dir, **kwargs):
