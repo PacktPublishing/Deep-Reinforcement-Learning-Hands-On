@@ -54,7 +54,7 @@ class PrioReplayBuffer:
         total = len(self.buffer)
         weights = (total * probs[indices]) ** (-beta)
         weights /= weights.max()
-        return samples, indices, weights
+        return samples, indices, np.array(weights, dtype=np.float32)
 
     def update_priorities(self, batch_indices, batch_priorities):
         for idx, prio in zip(batch_indices, batch_priorities):
