@@ -6,7 +6,7 @@ import numpy as np
 from . import data
 
 DEFAULT_BARS_COUNT = 10
-DEFAULT_COMMISSION = 0.01
+DEFAULT_COMMISSION_PERC = 0.1
 
 
 class Actions(enum.Enum):
