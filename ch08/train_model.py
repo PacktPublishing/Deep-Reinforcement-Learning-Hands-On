@@ -37,7 +37,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     parser.add_argument("--data", default=DEFAULT_STOCKS, help="Stocks file to train on, default=" + DEFAULT_STOCKS)
-    parser.add_argument("-r", "--run", reqired=True, help="Run name")
+    parser.add_argument("-r", "--run", required=True, help="Run name")
     args = parser.parse_args()
 
     saves_path = os.path.join("saves", args.run)
