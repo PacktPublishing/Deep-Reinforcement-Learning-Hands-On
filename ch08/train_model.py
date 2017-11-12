@@ -12,7 +12,7 @@ from lib import environ, data, models, common
 
 from tensorboardX import SummaryWriter
 
-BATCH_SIZE = 128
+BATCH_SIZE = 32
 BARS_COUNT = 10
 TARGET_NET_SYNC = 1000
 DEFAULT_STOCKS = "data/YNDX_160101_161231.csv"
@@ -74,7 +74,7 @@ if __name__ == "__main__":
             new_rewards = exp_source.pop_total_rewards()
             if new_rewards:
                 reward_tracker.reward(new_rewards[0], step_idx)
-                if max_reward is None or max_reward < new_rewards[0]:
+                if len(buffer) >= REPLAY_INITIAL and max_reward is None or max_reward < new_rewards[0]:
                     if max_reward is not None:
                         print("%d: Max reward updated %.3f -> %.3f" % (step_idx, max_reward, new_rewards[0]))
                     max_reward = new_rewards[0]
