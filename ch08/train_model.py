@@ -26,6 +26,8 @@ PRIO_REPLAY_ALPHA = 0.6
 BETA_START = 0.4
 BETA_STEPS = 100000
 
+REWARD_STEPS = 2
+
 LEARNING_RATE = 0.001
 
 STATES_TO_EVALUATE = 1000
@@ -48,7 +50,7 @@ if __name__ == "__main__":
     tgt_net = ptan.agent.TargetNet(net)
     action_selector = ptan.actions.EpsilonGreedyActionSelector(epsilon=EPSILON_START)
     agent = ptan.agent.DQNAgent(net, action_selector, cuda=args.cuda)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=1)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
     buffer = ptan.experience.PrioritizedReplayBuffer(exp_source, REPLAY_SIZE, PRIO_REPLAY_ALPHA)
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
@@ -84,7 +86,7 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             batch, batch_indices, batch_weights = buffer.sample(BATCH_SIZE, beta)
             loss_v, sample_prios_v = common.calc_loss(batch, batch_weights, net, tgt_net.target_model,
-                                                      GAMMA, cuda=args.cuda)
+                                                      GAMMA ** REWARD_STEPS, cuda=args.cuda)
             loss_v.backward()
             optimizer.step()
             buffer.update_priorities(batch_indices, sample_prios_v.data.cpu().numpy())
