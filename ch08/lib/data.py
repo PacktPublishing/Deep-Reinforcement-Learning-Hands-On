@@ -8,10 +8,13 @@ import collections
 Prices = collections.namedtuple('Prices', field_names=['open', 'high', 'low', 'close'])
 
 
-def read_csv(file_name):
+def read_csv(file_name, sep=','):
+    print("Reading", file_name)
     with open(file_name, 'rt', encoding='utf-8') as fd:
-        reader = csv.reader(fd)
+        reader = csv.reader(fd, delimiter=sep)
         h = next(reader)
+        if '<OPEN>' not in h and sep == ',':
+            return read_csv(file_name, ';')
         o_idx, c_idx, h_idx, l_idx = [h.index(s) for s in ('<OPEN>', '<CLOSE>', '<HIGH>', '<LOW>')]
         o, c, h, l = [], [], [], []
         for row in reader:
