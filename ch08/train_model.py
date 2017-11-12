@@ -36,15 +36,18 @@ EVAL_EVERY_STEP = 1000
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
-    parser.add_argument("--data", default=DEFAULT_STOCKS, help="Stocks file to train on, default=" + DEFAULT_STOCKS)
+    parser.add_argument("--data", default=DEFAULT_STOCKS, help="Stocks file or dir to train on, default=" + DEFAULT_STOCKS)
     parser.add_argument("-r", "--run", required=True, help="Run name")
     args = parser.parse_args()
 
     saves_path = os.path.join("saves", args.run)
     os.makedirs(saves_path, exist_ok=True)
 
-    stock_data = {"YNDX": data.load_relative(args.data)}
-    env = environ.StocksEnv(stock_data, bars_count=BARS_COUNT, reset_on_close=True)
+    if os.path.isfile(args.data):
+        stock_data = {"YNDX": data.load_relative(args.data)}
+        env = environ.StocksEnv(stock_data, bars_count=BARS_COUNT, reset_on_close=True)
+    elif os.path.isdir(args.data):
+        env = environ.StocksEnv.from_dir(args.data, bars_count=BARS_COUNT, reset_on_close=True)
     env = gym.wrappers.TimeLimit(env, max_episode_steps=1000)
 
     writer = SummaryWriter(comment="-simple-" + args.run)
