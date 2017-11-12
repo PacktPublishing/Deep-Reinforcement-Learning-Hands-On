@@ -79,6 +79,7 @@ if __name__ == "__main__":
             if step_idx % EVAL_EVERY_STEP == 0:
                 mean_val = common.calc_values_of_states(eval_states, net, cuda=args.cuda)
                 writer.add_scalar("values_mean", mean_val, step_idx)
+                writer.add_scalar("beta", beta, step_idx)
 
             optimizer.zero_grad()
             batch, batch_indices, batch_weights = buffer.sample(BATCH_SIZE, beta)
