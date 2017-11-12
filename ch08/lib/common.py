@@ -8,9 +8,11 @@ from torch.autograd import Variable
 
 
 class RewardTracker:
-    def __init__(self, writer, stop_reward):
+    def __init__(self, writer, stop_reward, group_rewards=1):
         self.writer = writer
         self.stop_reward = stop_reward
+        self.reward_buf = []
+        self.group_rewards = group_rewards
 
     def __enter__(self):
         self.ts = time.time()
@@ -22,6 +24,11 @@ class RewardTracker:
         self.writer.close()
 
     def reward(self, reward, frame, epsilon=None):
+        self.reward_buf.append(reward)
+        if len(self.reward_buf) < self.group_rewards:
+            return False
+        reward = np.mean(self.reward_buf)
+        self.reward_buf.clear()
         self.total_rewards.append(reward)
         speed = (frame - self.ts_frame) / (time.time() - self.ts)
         self.ts_frame = frame
@@ -29,7 +36,7 @@ class RewardTracker:
         mean_reward = np.mean(self.total_rewards[-100:])
         epsilon_str = "" if epsilon is None else ", eps %.2f" % epsilon
         print("%d: done %d games, mean reward %.3f, speed %.2f f/s%s" % (
-            frame, len(self.total_rewards), mean_reward, speed, epsilon_str
+            frame, len(self.total_rewards)*self.group_rewards, mean_reward, speed, epsilon_str
         ))
         sys.stdout.flush()
         if epsilon is not None:
