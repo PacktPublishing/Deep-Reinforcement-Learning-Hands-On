@@ -5,7 +5,7 @@ from lib import data
 
 class TestMisc(TestCase):
     def test_read_csv(self):
-        prices = data.read_csv("ch08/data/YNDX_160101_161231.csv")
+        prices = data.read_csv("data/YNDX_160101_161231.csv")
         self.assertIsInstance(prices, data.Prices)
 
     def test_prices_to_relative(self):
@@ -20,6 +20,6 @@ class TestMisc(TestCase):
         np.testing.assert_equal(rel.close, np.array([1.0]))  # 100% growth
 
     def test_price_files(self):
-        files = dict(data.price_files("ch08/data"))
+        files = dict(data.price_files("data"))
         self.assertTrue("YNDX" in files)
 
