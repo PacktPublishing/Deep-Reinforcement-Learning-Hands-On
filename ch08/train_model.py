@@ -39,6 +39,7 @@ if __name__ == "__main__":
 
     stock_data = {"YNDX": data.load_relative(args.data)}
     env = environ.StocksEnv(stock_data, bars_count=BARS_COUNT, reset_on_close=True)
+    env = gym.wrappers.TimeLimit(env, max_episode_steps=1000)
 
     writer = SummaryWriter(comment="-simple")
     net = models.SimpleFFDQN(env.observation_space.shape[0], env.action_space.n)
@@ -54,7 +55,7 @@ if __name__ == "__main__":
     beta = BETA_START
     eval_states = None
 
-    with common.RewardTracker(writer, np.inf, group_rewards=100) as reward_tracker:
+    with common.RewardTracker(writer, np.inf, group_rewards=10) as reward_tracker:
         while True:
             step_idx += 1
             buffer.populate(1)
