@@ -16,9 +16,6 @@ TARGET_NET_SYNC = 1000
 DEFAULT_STOCKS = "data/YNDX_160101_161231.csv"
 
 GAMMA = 0.99
-EPSILON_START = 1.0
-EPSILON_STOP = 0.1
-EPSILON_STEPS = 100000
 
 REPLAY_SIZE = 100000
 REPLAY_INITIAL = 10000
@@ -28,7 +25,7 @@ BETA_STEPS = 100000
 
 REWARD_STEPS = 2
 
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.0001
 
 STATES_TO_EVALUATE = 1000
 EVAL_EVERY_STEP = 100
@@ -48,8 +45,7 @@ if __name__ == "__main__":
     if args.cuda:
         net.cuda()
     tgt_net = ptan.agent.TargetNet(net)
-    action_selector = ptan.actions.EpsilonGreedyActionSelector(epsilon=EPSILON_START)
-    agent = ptan.agent.DQNAgent(net, action_selector, cuda=args.cuda)
+    agent = ptan.agent.DQNAgent(net, ptan.actions.ArgmaxActionSelector(), cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
     buffer = ptan.experience.PrioritizedReplayBuffer(exp_source, REPLAY_SIZE, PRIO_REPLAY_ALPHA)
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
@@ -63,11 +59,10 @@ if __name__ == "__main__":
             step_idx += 1
             buffer.populate(1)
             beta = min(1.0, BETA_START + step_idx * (1.0 - BETA_START) / BETA_STEPS)
-            action_selector.epsilon = max(EPSILON_STOP, EPSILON_START - step_idx / EPSILON_STEPS)
 
             new_rewards = exp_source.pop_total_rewards()
             if new_rewards:
-                reward_tracker.reward(new_rewards[0], step_idx, action_selector.epsilon)
+                reward_tracker.reward(new_rewards[0], step_idx)
 
             if len(buffer) < REPLAY_INITIAL:
                 continue
