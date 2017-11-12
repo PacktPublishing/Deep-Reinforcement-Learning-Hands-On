@@ -29,7 +29,7 @@ class State:
 
     def reset(self, prices, offset):
         assert isinstance(prices, data.Prices)
-        assert offset >= self.bars_count
+        assert offset >= self.bars_count-1
         self.have_position = False
         self.open_price = 0.0
         self._prices = prices
@@ -45,7 +45,7 @@ class State:
         """
         res = np.ndarray(shape=(len(self), ), dtype=np.float32)
         shift = 0
-        for bar_idx in range(self.bars_count):
+        for bar_idx in range(-self.bars_count+1, 1):
             res[shift] = self._prices.high[self._offset + bar_idx]
             shift += 1
             res[shift] = self._prices.low[self._offset + bar_idx]
@@ -82,7 +82,7 @@ class State:
         if self.have_position:
             # delta position profit equals cur bar change
             reward += self._prices.open[self._offset] * self._prices.close[self._offset]
-        done = self.bars_count + self._offset > self._prices.close.shape[0]
+        done = self._offset >= self._prices.close.shape[0]-1
         if action == Actions.Buy and not self.have_position:
             self.have_position = True
             close = self._cur_close()
