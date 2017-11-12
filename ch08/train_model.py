@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
+import os
 import gym
 import ptan
 import argparse
 import numpy as np
 
+import torch
 import torch.optim as optim
 
 from lib import environ, data, models, common
@@ -35,13 +37,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     parser.add_argument("--data", default=DEFAULT_STOCKS, help="Stocks file to train on, default=" + DEFAULT_STOCKS)
+    parser.add_argument("-r", "--run", reqired=True, help="Run name")
     args = parser.parse_args()
+
+    saves_path = os.path.join("saves", args.run)
+    os.makedirs(saves_path, exist_ok=True)
 
     stock_data = {"YNDX": data.load_relative(args.data)}
     env = environ.StocksEnv(stock_data, bars_count=BARS_COUNT, reset_on_close=True)
     env = gym.wrappers.TimeLimit(env, max_episode_steps=1000)
 
-    writer = SummaryWriter(comment="-simple")
+    writer = SummaryWriter(comment="-simple-" + args.run)
     net = models.SimpleFFDQN(env.observation_space.shape[0], env.action_space.n)
     if args.cuda:
         net.cuda()
@@ -54,6 +60,7 @@ if __name__ == "__main__":
     step_idx = 0
     beta = BETA_START
     eval_states = None
+    max_reward = None
 
     with common.RewardTracker(writer, np.inf, group_rewards=10) as reward_tracker:
         while True:
@@ -64,6 +71,12 @@ if __name__ == "__main__":
             new_rewards = exp_source.pop_total_rewards()
             if new_rewards:
                 reward_tracker.reward(new_rewards[0], step_idx)
+                if max_reward is None or max_reward < new_rewards[0]:
+                    if max_reward is not None:
+                        print("%d: Max reward updated %.3f -> %.3f" % (step_idx, max_reward, new_rewards[0]))
+                    max_reward = new_rewards[0]
+                    writer.add_scalar("reward_max", max_reward, step_idx)
+                    torch.save(net.state_dict(), os.path.join(saves_path, "best-%.3f.data" % max_reward))
 
             if len(buffer) < REPLAY_INITIAL:
                 continue
