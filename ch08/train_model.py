@@ -62,7 +62,7 @@ if __name__ == "__main__":
     selector = ptan.actions.EpsilonGreedyActionSelector(EPSILON_START)
     agent = ptan.agent.DQNAgent(net, selector, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
-    buffer = ptan.experience.PrioritizedReplayBuffer(exp_source, REPLAY_SIZE, PRIO_REPLAY_ALPHA)
+    buffer = ptan.experience.ExperienceReplayBuffer(exp_source, REPLAY_SIZE)
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
     step_idx = 0
@@ -92,7 +92,7 @@ if __name__ == "__main__":
 
             if eval_states is None:
                 print("Initial buffer populated, start training")
-                eval_states = buffer.sample(STATES_TO_EVALUATE, beta)[0]
+                eval_states = buffer.sample(STATES_TO_EVALUATE)
                 eval_states = [np.array(transition.state, copy=False) for transition in eval_states]
                 eval_states = np.array(eval_states, copy=False)
 
@@ -102,12 +102,11 @@ if __name__ == "__main__":
                 writer.add_scalar("beta", beta, step_idx)
 
             optimizer.zero_grad()
-            batch, batch_indices, batch_weights = buffer.sample(BATCH_SIZE, beta)
-            loss_v, sample_prios_v = common.calc_loss(batch, batch_weights, net, tgt_net.target_model,
+            batch = buffer.sample(BATCH_SIZE)
+            loss_v = common.calc_loss(batch, net, tgt_net.target_model,
                                                       GAMMA ** REWARD_STEPS, cuda=args.cuda)
             loss_v.backward()
             optimizer.step()
-            buffer.update_priorities(batch_indices, sample_prios_v.data.cpu().numpy())
 
             if step_idx % TARGET_NET_SYNC == 0:
                 tgt_net.sync()

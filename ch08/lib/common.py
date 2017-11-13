@@ -80,7 +80,7 @@ def unpack_batch(batch):
            np.array(dones, dtype=np.uint8), np.array(last_states, copy=False)
 
 
-def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
+def calc_loss(batch, net, tgt_net, gamma, cuda=False):
     states, actions, rewards, dones, next_states = unpack_batch(batch)
 
     states_v = Variable(torch.from_numpy(states))
@@ -88,14 +88,12 @@ def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
     actions_v = Variable(torch.from_numpy(actions))
     rewards_v = Variable(torch.from_numpy(rewards))
     done_mask = torch.ByteTensor(dones)
-    batch_weights_v = Variable(torch.from_numpy(batch_weights))
     if cuda:
         states_v = states_v.cuda()
         next_states_v = next_states_v.cuda()
         actions_v = actions_v.cuda()
         rewards_v = rewards_v.cuda()
         done_mask = done_mask.cuda()
-        batch_weights_v = batch_weights_v.cuda()
 
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
     next_state_actions = net(next_states_v).max(1)[1]
@@ -104,5 +102,6 @@ def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
     next_state_values.volatile = False
 
     expected_state_action_values = next_state_values * gamma + rewards_v
-    losses_v = batch_weights_v * (state_action_values - expected_state_action_values) ** 2
-    return losses_v.mean(), losses_v + 1e-5
+    return nn.MSELoss()(state_action_values, expected_state_action_values)
+#    losses_v = (state_action_values - expected_state_action_values) ** 2
+#    return losses_v.mean(), losses_v + 1e-5
