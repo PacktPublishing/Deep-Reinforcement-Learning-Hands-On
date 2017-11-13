@@ -15,13 +15,23 @@ def read_csv(file_name, sep=','):
         h = next(reader)
         if '<OPEN>' not in h and sep == ',':
             return read_csv(file_name, ';')
-        o_idx, c_idx, h_idx, l_idx = [h.index(s) for s in ('<OPEN>', '<CLOSE>', '<HIGH>', '<LOW>')]
+        indices = [h.index(s) for s in ('<OPEN>', '<CLOSE>', '<HIGH>', '<LOW>')]
         o, c, h, l = [], [], [], []
+        count_out = 0
+        count_filter = 0
         for row in reader:
-            o.append(float(row[o_idx]))
-            c.append(float(row[c_idx]))
-            h.append(float(row[h_idx]))
-            l.append(float(row[l_idx]))
+            vals = list(map(float, [row[idx] for idx in indices]))
+            if all(map(lambda v: abs(v) < 1e-3, vals)):
+                count_filter += 1
+                continue
+
+            po, pc, ph, pl = vals
+            count_out += 1
+            o.append(po)
+            c.append(pc)
+            h.append(ph)
+            l.append(pl)
+    print("Read done, %d rows filtered from %d total" % (count_filter, count_filter + count_out))
     return Prices(open=np.array(o, dtype=np.float32),
                   high=np.array(h, dtype=np.float32),
                   low=np.array(l, dtype=np.float32),
