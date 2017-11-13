@@ -32,6 +32,10 @@ LEARNING_RATE = 0.0001
 STATES_TO_EVALUATE = 1000
 EVAL_EVERY_STEP = 1000
 
+EPSILON_START = 1.0
+EPSILON_STOP = 0.1
+EPSILON_STEPS = 1000000
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -55,7 +59,8 @@ if __name__ == "__main__":
     if args.cuda:
         net.cuda()
     tgt_net = ptan.agent.TargetNet(net)
-    agent = ptan.agent.DQNAgent(net, ptan.actions.ArgmaxActionSelector(), cuda=args.cuda)
+    selector = ptan.actions.EpsilonGreedyActionSelector(EPSILON_START)
+    agent = ptan.agent.DQNAgent(net, selector, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
     buffer = ptan.experience.PrioritizedReplayBuffer(exp_source, REPLAY_SIZE, PRIO_REPLAY_ALPHA)
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
@@ -70,10 +75,11 @@ if __name__ == "__main__":
             step_idx += 1
             buffer.populate(1)
             beta = min(1.0, BETA_START + step_idx * (1.0 - BETA_START) / BETA_STEPS)
+            selector.epsilon = max(EPSILON_STOP, EPSILON_START - step_idx / EPSILON_STEPS)
 
             new_rewards = exp_source.pop_total_rewards()
             if new_rewards:
-                reward_tracker.reward(new_rewards[0], step_idx)
+                reward_tracker.reward(new_rewards[0], step_idx, selector.epsilon)
                 if max_reward is None or max_reward < new_rewards[0]:
                     if max_reward is not None:
                         print("%d: Max reward updated %.3f -> %.3f" % (step_idx, max_reward, new_rewards[0]))

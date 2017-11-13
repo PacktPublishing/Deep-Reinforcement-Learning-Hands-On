@@ -38,7 +38,7 @@ class SimpleFFDQN(nn.Module):
             nn.ReLU(),
             nn.Linear(512, 512),
             nn.ReLU(),
-            NoisyLinear(512, 1)
+            nn.Linear(512, 1)
         )
 
         self.fc_adv = nn.Sequential(
@@ -46,7 +46,7 @@ class SimpleFFDQN(nn.Module):
             nn.ReLU(),
             nn.Linear(512, 512),
             nn.ReLU(),
-            NoisyLinear(512, actions_n)
+            nn.Linear(512, actions_n)
         )
 
     def forward(self, x):
