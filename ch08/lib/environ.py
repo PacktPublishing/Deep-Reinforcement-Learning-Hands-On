@@ -17,15 +17,17 @@ class Actions(enum.Enum):
 
 
 class State:
-    def __init__(self, bars_count, comission_perc, reset_on_close):
+    def __init__(self, bars_count, comission_perc, reset_on_close, reward_on_close=True):
         assert isinstance(bars_count, int)
         assert bars_count > 0
         assert isinstance(comission_perc, float)
         assert comission_perc >= 0.0
         assert isinstance(reset_on_close, bool)
+        assert isinstance(reward_on_close, bool)
         self.bars_count = bars_count
         self.comission = comission_perc / 100.0
         self.reset_on_close = reset_on_close
+        self.reward_on_close = reward_on_close
 
     def reset(self, prices, offset):
         assert isinstance(prices, data.Prices)
@@ -73,15 +75,12 @@ class State:
         """
         Perform one step in our price, adjust offset, check for the end of prices
         and handle position change
-        :param action: 
-        :return: reward, done 
+        :param action:
+        :return: reward, done
         """
         assert isinstance(action, Actions)
         reward = 0.0
         self._offset += 1
-        if self.have_position:
-            # delta position profit equals cur bar change
-            reward += self._prices.open[self._offset] * self._prices.close[self._offset]
         done = self._offset >= self._prices.close.shape[0]-1
         if action == Actions.Buy and not self.have_position:
             self.have_position = True
@@ -89,10 +88,15 @@ class State:
             self.open_price = close
             reward -= close * self.comission
         elif action == Actions.Close and self.have_position:
+            reward -= self._cur_close() * self.comission
+            done |= self.reset_on_close
+            if self.reward_on_close:
+                reward += self._cur_close() - self.open_price
             self.have_position = False
             self.open_price = 0.0
-            reward -= self._cur_close() * self.comission
-            done = self.reset_on_close
+        if self.have_position and action == Actions.Skip:
+            # delta position profit equals cur bar change
+            reward += self._prices.open[self._offset] * self._prices.close[self._offset]
         return reward, done
 
 
