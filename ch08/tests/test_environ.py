@@ -25,7 +25,7 @@ class TestStates(unittest.TestCase):
 
     def test_basic(self):
         s = environ.State(bars_count=4, comission_perc=0.0, reset_on_close=False)
-        self.assertEqual(len(s), 4*3+2)
+        self.assertEqual(s.shape, (4*3+2,))
 
     def test_reset(self):
         s = environ.State(bars_count=1, comission_perc=0.0, reset_on_close=False)

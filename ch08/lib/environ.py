@@ -37,21 +37,16 @@ class State:
         self._prices = prices
         self._offset = offset
 
-    def __len__(self):
+    @property
+    def shape(self):
         # [h, l, c] * bars + position_flag + rel_profit (since open)
-        return 3*self.bars_count + 1 + 1
+        return (3*self.bars_count + 1 + 1, )
 
     def encode(self):
         """
         Convert current state into numpy array.
         """
-        return self._encode(self.have_position, self.open_price)
-
-    def _encode(self, have_position, open_price):
-        """
-        Utility function to easily tweak order
-        """
-        res = np.ndarray(shape=(len(self), ), dtype=np.float32)
+        res = np.ndarray(shape=self.shape, dtype=np.float32)
         shift = 0
         for bar_idx in range(-self.bars_count+1, 1):
             res[shift] = self._prices.high[self._offset + bar_idx]
@@ -60,12 +55,12 @@ class State:
             shift += 1
             res[shift] = self._prices.close[self._offset + bar_idx]
             shift += 1
-        res[shift] = float(have_position)
+        res[shift] = float(self.have_position)
         shift += 1
-        if not have_position:
+        if not self.have_position:
             res[shift] = 0.0
         else:
-            res[shift] = (self._cur_close() - open_price) / open_price
+            res[shift] = (self._cur_close() - self.open_price) / self.open_price
         return res
 
     def _cur_close(self):
@@ -92,10 +87,11 @@ class State:
             self.open_price = close
             reward -= close * self.comission
         elif action == Actions.Close and self.have_position:
-            reward -= self._cur_close() * self.comission
+            close = self._cur_close()
+            reward -= close * self.comission
             done |= self.reset_on_close
             if self.reward_on_close:
-                reward += self._cur_close() - self.open_price
+                reward += close - self.open_price
             self.have_position = False
             self.open_price = 0.0
 
@@ -118,7 +114,7 @@ class StocksEnv(gym.Env):
         self._prices = prices
         self._state = State(bars_count, comission, reset_on_close)
         self.action_space = gym.spaces.Discrete(n=len(Actions))
-        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(len(self._state), ))
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=self._state.shape)
         self._seed()
 
     def _reset(self):
