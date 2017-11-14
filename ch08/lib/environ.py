@@ -45,30 +45,38 @@ class State:
         """
         Convert current state into numpy array.
         """
+        return self._encode(self._offset, self.have_position, self.open_price)
+
+    def _encode(self, offset, have_position, open_price):
+        """
+        Utility function to easily tweak offset and order
+        """
         res = np.ndarray(shape=(len(self), ), dtype=np.float32)
         shift = 0
         for bar_idx in range(-self.bars_count+1, 1):
-            res[shift] = self._prices.high[self._offset + bar_idx]
+            res[shift] = self._prices.high[offset + bar_idx]
             shift += 1
-            res[shift] = self._prices.low[self._offset + bar_idx]
+            res[shift] = self._prices.low[offset + bar_idx]
             shift += 1
-            res[shift] = self._prices.close[self._offset + bar_idx]
+            res[shift] = self._prices.close[offset + bar_idx]
             shift += 1
-        res[shift] = float(self.have_position)
+        res[shift] = float(have_position)
         shift += 1
-        if not self.have_position:
+        if not have_position:
             res[shift] = 0.0
         else:
-            res[shift] = (self._cur_close() - self.open_price) / self.open_price
-        shift += 1
+            res[shift] = (self._close(offset) - open_price) / open_price
         return res
 
     def _cur_close(self):
+        return self._close(self._offset)
+
+    def _close(self, offset):
         """
         Calculate real close price for the current bar
         """
-        open = self._prices.open[self._offset]
-        rel_close = self._prices.close[self._offset]
+        open = self._prices.open[offset]
+        rel_close = self._prices.close[offset]
         return open * (1.0 + rel_close)
 
     def step(self, action):
@@ -148,3 +156,15 @@ class StocksEnv(gym.Env):
     def from_dir(cls, data_dir, **kwargs):
         prices = {name: data.load_relative(file) for name, file in data.price_files(data_dir)}
         return StocksEnv(prices, **kwargs)
+
+
+def generate_pretrain_orders(prices, order_steps, reward_steps, gamma):
+    """
+    Generates pseudo-transitions for a given prices list
+    :param prices: list of Prices instances with relative prices
+    :param order_steps: how long to hold the order
+    :param reward_steps: how long the Bellman is unrolled
+    :param gamma: RL gamma
+    :return: list of generated transitions
+    """
+    pass
