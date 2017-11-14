@@ -36,4 +36,4 @@ Next actions:
 * Change trading logic to open position on the current bar, rather than on the next bar's close.
 * Implement pretrain buffer with artificially-made data for one-two step order
 
-  
+Started run with trading on current bar, name Nov14_12-43-05_gpu-simple-open-at-cur-bar  
