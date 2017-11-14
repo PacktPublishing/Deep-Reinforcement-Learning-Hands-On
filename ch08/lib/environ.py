@@ -160,6 +160,7 @@ class StocksEnv(gym.Env):
         for prices in self._prices.values():
             offsets = list(range(bars_count, prices.high.shape[0] - bars_count))
             result.extend(generate_pretrain_one_step_orders(self._state, prices, offsets, gamma))
+            result.extend(generate_pretrain_no_orders(self._state, prices, offsets, gamma))
         return result
 
 
@@ -176,3 +177,14 @@ def generate_pretrain_one_step_orders(state, prices, offsets, gamma):
         reward = o_r + gamma * c_r
         yield ptan.experience.ExperienceFirstLast(o_state, Actions.Buy.value, reward, None)
 
+
+def generate_pretrain_no_orders(state, prices, offsets, gamma):
+    """
+    Generate transitions for one-step orders
+    :yield: generated transitions
+    """
+    for ofs in offsets:
+        state.reset(prices, ofs)
+        o_state = state.encode()
+        yield ptan.experience.ExperienceFirstLast(o_state, Actions.Skip.value, 0.0, None)
+        yield ptan.experience.ExperienceFirstLast(o_state, Actions.Close.value, 0.0, None)
