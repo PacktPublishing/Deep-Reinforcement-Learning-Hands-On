@@ -105,14 +105,37 @@ class State:
         return reward, done
 
 
+class State1D(State):
+    """
+    State with shape suitable for 1D convolution
+    """
+    @property
+    def shape(self):
+        return (5, self.bars_count)
+
+    def encode(self):
+        res = np.zeros(shape=self.shape, dtype=np.float32)
+        ofs = self.bars_count-1
+        res[0] = self._prices.high[self._offset-ofs:self._offset+1]
+        res[1] = self._prices.low[self._offset-ofs:self._offset+1]
+        res[2] = self._prices.close[self._offset-ofs:self._offset+1]
+        if self.have_position:
+            res[3] = 1.0
+            res[4] = (self._cur_close() - self.open_price) / self.open_price
+        return res
+
+
 class StocksEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, prices, bars_count=DEFAULT_BARS_COUNT,
-                 comission=DEFAULT_COMMISSION_PERC, reset_on_close=True):
+                 comission=DEFAULT_COMMISSION_PERC, reset_on_close=True, state_1d=False):
         assert isinstance(prices, dict)
         self._prices = prices
-        self._state = State(bars_count, comission, reset_on_close)
+        if state_1d:
+            self._state = State1D(bars_count, comission, reset_on_close)
+        else:
+            self._state = State(bars_count, comission, reset_on_close)
         self.action_space = gym.spaces.Discrete(n=len(Actions))
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=self._state.shape)
         self._seed()
