@@ -71,7 +71,7 @@ if __name__ == "__main__":
     eval_states = None
     max_reward = None
 
-    with common.RewardTracker(writer, np.inf, group_rewards=10) as reward_tracker:
+    with common.RewardTracker(writer, np.inf, group_rewards=100) as reward_tracker:
         while True:
             step_idx += 1
             buffer.populate(1)
