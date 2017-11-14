@@ -69,6 +69,7 @@ if __name__ == "__main__":
     step_idx = 0
     eval_states = None
     max_reward = None
+    best_mean_val = None
 
     with common.RewardTracker(writer, np.inf, group_rewards=10) as reward_tracker:
         while True:
@@ -98,6 +99,11 @@ if __name__ == "__main__":
             if step_idx % EVAL_EVERY_STEP == 0:
                 mean_val = common.calc_values_of_states(eval_states, net, cuda=args.cuda)
                 writer.add_scalar("values_mean", mean_val, step_idx)
+                if best_mean_val is None or best_mean_val < mean_val:
+                    if best_mean_val is not None:
+                        print("%d: Best mean value updated %.3f -> %.3f" % (step_idx, best_mean_val, mean_val))
+                    best_mean_val = mean_val
+                    torch.save(net.state_dict(), os.path.join(saves_path, "mean_val-%.3f.data" % mean_val))
 
             optimizer.zero_grad()
             batch = buffer.sample(BATCH_SIZE)
