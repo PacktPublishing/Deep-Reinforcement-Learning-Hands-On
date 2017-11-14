@@ -65,24 +65,6 @@ if __name__ == "__main__":
     buffer = ptan.experience.ExperienceReplayBuffer(exp_source, REPLAY_SIZE)
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
-    # pretrain
-    print("Starting pretrain phase...")
-    pretrain_data = stocks_env.pretrain_data(GAMMA)
-    np.random.shuffle(pretrain_data)
-    for sample in pretrain_data:
-        buffer._add(sample)
-
-    print("Generated %d pretrain data entries" % (len(pretrain_data)))
-    for step in range(PRERTRAIN_ITERATIONS):
-        optimizer.zero_grad()
-        batch = buffer.sample(BATCH_SIZE)
-        loss_v = common.calc_loss(batch, net, tgt_net.target_model,
-                                  GAMMA ** REWARD_STEPS, cuda=args.cuda)
-        loss_v.backward()
-        optimizer.step()
-    print("Pretraining done")
-    tgt_net.sync()
-
     # main training loop
     step_idx = 0
     eval_states = None
