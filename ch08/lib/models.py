@@ -70,7 +70,13 @@ class DQNConv1D(nn.Module):
 
         out_size = self._get_conv_out(shape)
 
-        self.fc = nn.Sequential(
+        self.fc_val = nn.Sequential(
+            nn.Linear(out_size, 512),
+            nn.ReLU(),
+            nn.Linear(512, 1)
+        )
+
+        self.fc_adv = nn.Sequential(
             nn.Linear(out_size, 512),
             nn.ReLU(),
             nn.Linear(512, actions_n)
@@ -81,28 +87,7 @@ class DQNConv1D(nn.Module):
         return int(np.prod(o.size()))
 
     def forward(self, x):
-        conv_out = self.conv(x)
-        return self.fc(conv_out.view(x.size()[0], -1))
-
-
-
-            #     self.fc_val = nn.Sequential(
-    #         nn.Linear(obs_len, 512),
-    #         nn.ReLU(),
-    #         nn.Linear(512, 512),
-    #         nn.ReLU(),
-    #         nn.Linear(512, 1)
-    #     )
-    #
-    #     self.fc_adv = nn.Sequential(
-    #         nn.Linear(obs_len, 512),
-    #         nn.ReLU(),
-    #         nn.Linear(512, 512),
-    #         nn.ReLU(),
-    #         nn.Linear(512, actions_n)
-    #     )
-    #
-    # def forward(self, x):
-    #     val = self.fc_val(x)
-    #     adv = self.fc_adv(x)
-    #     return val + adv - adv.mean()
+        conv_out = self.conv(x).view(x.size()[0], -1)
+        val = self.fc_val(conv_out)
+        adv = self.fc_adv(conv_out)
+        return val + adv - adv.mean()
