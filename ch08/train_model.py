@@ -21,9 +21,6 @@ GAMMA = 0.99
 
 REPLAY_SIZE = 100000
 REPLAY_INITIAL = 10000
-PRIO_REPLAY_ALPHA = 0.6
-BETA_START = 0.4
-BETA_STEPS = 1000000
 
 REWARD_STEPS = 2
 
@@ -35,6 +32,8 @@ EVAL_EVERY_STEP = 1000
 EPSILON_START = 1.0
 EPSILON_STOP = 0.1
 EPSILON_STEPS = 1000000
+
+PRERTRAIN_ITERATIONS = 100000
 
 
 if __name__ == "__main__":
@@ -66,21 +65,33 @@ if __name__ == "__main__":
     buffer = ptan.experience.ExperienceReplayBuffer(exp_source, REPLAY_SIZE)
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
+    # pretrain
+    print("Starting pretrain phase...")
+    pretrain_data = stocks_env.pretrain_data(GAMMA)
+    np.random.shuffle(pretrain_data)
+    for sample in pretrain_data:
+        buffer._add(sample)
+
+    print("Generated %d pretrain data entries" % (len(pretrain_data)))
+    for step in range(PRERTRAIN_ITERATIONS):
+        optimizer.zero_grad()
+        batch = buffer.sample(BATCH_SIZE)
+        loss_v = common.calc_loss(batch, net, tgt_net.target_model,
+                                  GAMMA ** REWARD_STEPS, cuda=args.cuda)
+        loss_v.backward()
+        optimizer.step()
+    print("Pretraining done")
+    tgt_net.sync()
+
+    # main training loop
     step_idx = 0
-    beta = BETA_START
     eval_states = None
     max_reward = None
-
-    # # pretrain
-    # pretrain_data = stocks_env.pretrain_data(GAMMA)
-    # np.random.shuffle(pretrain_data)
-    # print("Generated %d pretrain data entries" % (len(pretrain_data)))
 
     with common.RewardTracker(writer, np.inf, group_rewards=10) as reward_tracker:
         while True:
             step_idx += 1
             buffer.populate(1)
-            beta = min(1.0, BETA_START + step_idx * (1.0 - BETA_START) / BETA_STEPS)
             selector.epsilon = max(EPSILON_STOP, EPSILON_START - step_idx / EPSILON_STEPS)
 
             new_rewards = exp_source.pop_total_rewards()
@@ -105,7 +116,6 @@ if __name__ == "__main__":
             if step_idx % EVAL_EVERY_STEP == 0:
                 mean_val = common.calc_values_of_states(eval_states, net, cuda=args.cuda)
                 writer.add_scalar("values_mean", mean_val, step_idx)
-                writer.add_scalar("beta", beta, step_idx)
 
             optimizer.zero_grad()
             batch = buffer.sample(BATCH_SIZE)
