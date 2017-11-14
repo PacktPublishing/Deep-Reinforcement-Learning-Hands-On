@@ -33,7 +33,7 @@ EPSILON_START = 1.0
 EPSILON_STOP = 0.1
 EPSILON_STEPS = 1000000
 
-PRERTRAIN_ITERATIONS = 100000
+CHECKPOINT_EVERY_STEP = 1000000
 
 
 if __name__ == "__main__":
@@ -116,4 +116,6 @@ if __name__ == "__main__":
             if step_idx % TARGET_NET_SYNC == 0:
                 tgt_net.sync()
 
-    pass
+            if step_idx % CHECKPOINT_EVERY_STEP == 0:
+                idx = step_idx // CHECKPOINT_EVERY_STEP
+                torch.save(net.state_dict(), os.path.join(saves_path, "checkpoint-%3d.data" % idx))

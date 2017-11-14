@@ -54,3 +54,5 @@ Next step will be implement and debug 1D convolution in a separate file.
 Convolution implemented, for beginning, simple arch. Two modes have started:
 1. Nov14_20-29-14_gpu-simple-conv-1: 10 bars in context
 2. Nov14_20-34-00_gpu-simple-conv-bars=50: 50 bars
+
+Nov14_15-30-21_gpu-simple-open-at-cur-bar-2 restarted to have periodical checkpoints.
