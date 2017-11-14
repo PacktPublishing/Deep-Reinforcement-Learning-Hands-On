@@ -39,3 +39,5 @@ Next actions:
 Started run with trading on current bar, name Nov14_12-43-05_gpu-simple-open-at-cur-bar  
 Found a bug with last change, close price was taken not from the current timestamp, but from the next bar.
 Restarted the run, new name Nov14_15-30-21_gpu-simple-open-at-cur-bar-2, af8446566f91a28e643b3d431bfed93ca7d08f6a
+
+Pretrain was implemented, started run Nov14_15-44-23_gpu-simple-pretrain, 717a278cbe156e2423933571a35472d3d1999f81
