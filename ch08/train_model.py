@@ -52,6 +52,7 @@ if __name__ == "__main__":
         env = environ.StocksEnv(stock_data, bars_count=BARS_COUNT, reset_on_close=True)
     elif os.path.isdir(args.data):
         env = environ.StocksEnv.from_dir(args.data, bars_count=BARS_COUNT, reset_on_close=True)
+    stocks_env = env
     env = gym.wrappers.TimeLimit(env, max_episode_steps=1000)
 
     writer = SummaryWriter(comment="-simple-" + args.run)
@@ -69,6 +70,11 @@ if __name__ == "__main__":
     beta = BETA_START
     eval_states = None
     max_reward = None
+
+    # # pretrain
+    # pretrain_data = stocks_env.pretrain_data(GAMMA)
+    # np.random.shuffle(pretrain_data)
+    # print("Generated %d pretrain data entries" % (len(pretrain_data)))
 
     with common.RewardTracker(writer, np.inf, group_rewards=10) as reward_tracker:
         while True:

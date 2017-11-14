@@ -1,3 +1,4 @@
+import ptan
 import gym
 import gym.spaces
 from gym.utils import seeding
@@ -45,38 +46,35 @@ class State:
         """
         Convert current state into numpy array.
         """
-        return self._encode(self._offset, self.have_position, self.open_price)
+        return self._encode(self.have_position, self.open_price)
 
-    def _encode(self, offset, have_position, open_price):
+    def _encode(self, have_position, open_price):
         """
-        Utility function to easily tweak offset and order
+        Utility function to easily tweak order
         """
         res = np.ndarray(shape=(len(self), ), dtype=np.float32)
         shift = 0
         for bar_idx in range(-self.bars_count+1, 1):
-            res[shift] = self._prices.high[offset + bar_idx]
+            res[shift] = self._prices.high[self._offset + bar_idx]
             shift += 1
-            res[shift] = self._prices.low[offset + bar_idx]
+            res[shift] = self._prices.low[self._offset + bar_idx]
             shift += 1
-            res[shift] = self._prices.close[offset + bar_idx]
+            res[shift] = self._prices.close[self._offset + bar_idx]
             shift += 1
         res[shift] = float(have_position)
         shift += 1
         if not have_position:
             res[shift] = 0.0
         else:
-            res[shift] = (self._close(offset) - open_price) / open_price
+            res[shift] = (self._cur_close() - open_price) / open_price
         return res
 
     def _cur_close(self):
-        return self._close(self._offset)
-
-    def _close(self, offset):
         """
         Calculate real close price for the current bar
         """
-        open = self._prices.open[offset]
-        rel_close = self._prices.close[offset]
+        open = self._prices.open[self._offset]
+        rel_close = self._prices.close[self._offset]
         return open * (1.0 + rel_close)
 
     def step(self, action):
@@ -94,6 +92,13 @@ class State:
             close = self._cur_close()
             self.open_price = close
             reward -= close * self.comission
+        elif action == Actions.Close and self.have_position:
+            reward -= self._cur_close() * self.comission
+            done |= self.reset_on_close
+            if self.reward_on_close:
+                reward += self._cur_close() - self.open_price
+            self.have_position = False
+            self.open_price = 0.0
 
         self._offset += 1
         done |= self._offset >= self._prices.close.shape[0]-1
@@ -101,14 +106,6 @@ class State:
         if self.have_position:
             # delta position profit equals cur bar change
             reward += self._prices.open[self._offset] * self._prices.close[self._offset]
-
-        if action == Actions.Close and self.have_position:
-            reward -= self._cur_close() * self.comission
-            done |= self.reset_on_close
-            if self.reward_on_close:
-                reward += self._cur_close() - self.open_price
-            self.have_position = False
-            self.open_price = 0.0
 
         return reward, done
 
@@ -157,14 +154,25 @@ class StocksEnv(gym.Env):
         prices = {name: data.load_relative(file) for name, file in data.price_files(data_dir)}
         return StocksEnv(prices, **kwargs)
 
+    def pretrain_data(self, gamma):
+        result = []
+        bars_count = self._state.bars_count
+        for prices in self._prices.values():
+            offsets = list(range(bars_count, prices.high.shape[0] - bars_count))
+            result.extend(generate_pretrain_one_step_orders(self._state, prices, offsets, gamma))
+        return result
 
-def generate_pretrain_orders(prices, order_steps, reward_steps, gamma):
+
+def generate_pretrain_one_step_orders(state, prices, offsets, gamma):
     """
-    Generates pseudo-transitions for a given prices list
-    :param prices: list of Prices instances with relative prices
-    :param order_steps: how long to hold the order
-    :param reward_steps: how long the Bellman is unrolled
-    :param gamma: RL gamma
-    :return: list of generated transitions
+    Generate transitions for one-step orders
+    :yield: generated transitions
     """
-    pass
+    for ofs in offsets:
+        state.reset(prices, ofs)
+        o_state = state.encode()
+        o_r, _ = state.step(Actions.Buy)
+        c_r, done = state.step(Actions.Close)
+        reward = o_r + gamma * c_r
+        yield ptan.experience.ExperienceFirstLast(o_state, Actions.Buy.value, reward, None)
+

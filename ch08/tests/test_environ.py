@@ -91,5 +91,5 @@ class TestStates(unittest.TestCase):
         self.assertAlmostEqual(s._cur_close(), 1.0)
         r, done = s.step(environ.Actions.Close)
         self.assertTrue(done)
-        self.assertAlmostEqual(r, 1.0)
+        self.assertAlmostEqual(r, -1.0)
         self.assertAlmostEqual(s._cur_close(), 2.0)
