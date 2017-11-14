@@ -1,4 +1,3 @@
-import ptan
 import gym
 import gym.spaces
 from gym.utils import seeding
