@@ -68,7 +68,6 @@ if __name__ == "__main__":
     # main training loop
     step_idx = 0
     eval_states = None
-    max_reward = None
     best_mean_val = None
 
     with common.RewardTracker(writer, np.inf, group_rewards=100) as reward_tracker:
@@ -80,12 +79,6 @@ if __name__ == "__main__":
             new_rewards = exp_source.pop_total_rewards()
             if new_rewards:
                 reward_tracker.reward(new_rewards[0], step_idx, selector.epsilon)
-                if max_reward is None or max_reward < new_rewards[0]:
-                    if max_reward is not None:
-                        print("%d: Max reward updated %.3f -> %.3f" % (step_idx, max_reward, new_rewards[0]))
-                    max_reward = new_rewards[0]
-                    writer.add_scalar("reward_max", max_reward, step_idx)
-                    torch.save(net.state_dict(), os.path.join(saves_path, "best-%.3f.data" % max_reward))
 
             if len(buffer) < REPLAY_INITIAL:
                 continue
@@ -117,4 +110,4 @@ if __name__ == "__main__":
 
             if step_idx % CHECKPOINT_EVERY_STEP == 0:
                 idx = step_idx // CHECKPOINT_EVERY_STEP
-                torch.save(net.state_dict(), os.path.join(saves_path, "checkpoint-%3d.data" % idx))
+                torch.save(net.state_dict(), os.path.join(saves_path, "checkpoint-%03d.data" % idx))
