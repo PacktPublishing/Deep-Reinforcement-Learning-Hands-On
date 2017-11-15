@@ -57,3 +57,7 @@ Convolution implemented, for beginning, simple arch. Two modes have started:
 
 Nov14_15-30-21_gpu-simple-open-at-cur-bar-2 restarted to have periodical checkpoints.
 New name Nov14_21-01-26_gpu-simple-open-at-cur-bar-3
+
+Performance of Nov14_21-09-42_gpu-simple-conv-bars=50 is exceptional, reward_100=9. Need to check.
+
+Started next run with 50 bars and 3 reward steps: Nov15_08-46-07_home-conv-bars=50_steps=3
