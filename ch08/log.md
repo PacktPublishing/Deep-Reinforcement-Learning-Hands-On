@@ -82,5 +82,11 @@ Maybe, mode of testing should be changed. Now I take into account first signal, 
 But training mode was different: we've tried to maximize the profit at some current position. So, maybe I need to take 
 into account all signals and count ratio of successful. 
 
+Stopped all systems. Convergence on Yandex have achieved!
+
 Next runs:
-1. Train on full 2016 data
+1. Train on full 2016 data (without validation)
+
+Next actions:
+1. Improve the testing tool to take into account all orders
+2. Implement validation on some held-out prices pool (2017)
