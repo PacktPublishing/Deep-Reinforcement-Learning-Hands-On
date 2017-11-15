@@ -106,4 +106,6 @@ and exit the market. To get the goal, new set of reward rules was intorduced.
 4. Reward has to be switched to percentage to make it independent to current stock price
 4. Buy and Close actions always returns comission
 5. Skip returns zero reward as there is no comission
-6. KeepOpen returns normal movement reward.  
+6. KeepOpen returns normal movement reward.
+
+This model has started as run Nov15_19-17-03_home-conv-perc-reward  
