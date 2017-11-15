@@ -22,7 +22,7 @@ GAMMA = 0.99
 REPLAY_SIZE = 100000
 REPLAY_INITIAL = 10000
 
-REWARD_STEPS = 2
+REWARD_STEPS = 3
 
 LEARNING_RATE = 0.0001
 
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     stocks_env = env
     env = gym.wrappers.TimeLimit(env, max_episode_steps=1000)
 
-    writer = SummaryWriter(comment="-simple-" + args.run)
+    writer = SummaryWriter(comment="-conv-" + args.run)
     net = models.DQNConv1D(env.observation_space.shape, env.action_space.n)
     print(net)
     if args.cuda:
