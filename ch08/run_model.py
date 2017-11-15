@@ -16,6 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--data", required=True, help="CSV file with quotes to run the model")
     parser.add_argument("-m", "--model", required=True, help="Model file to load")
     parser.add_argument("-b", "--bars", type=int, default=50, help="Count of bars to feed into the model")
+    parser.add_argument("-n", "--name", required=True, help="Name to use in output images")
     parser.add_argument("--conv", default=False, action="store_true", help="Use convolution model instead of FF")
     args = parser.parse_args()
 
@@ -52,6 +53,6 @@ if __name__ == "__main__":
 
     plt.clf()
     plt.plot(rewards)
-    plt.savefig("rewards.png")
+    plt.savefig("rewards-%s.png" % args.name)
 
     pass
