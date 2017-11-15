@@ -94,7 +94,5 @@ Next actions:
 Thing to check: get rid of position information in the state. As our system should just generate signals, 
 it can do it regardless of the current state.
 
-Also it would be nice to try nosy nets again.
 Started two runs (on yandex-2016 quotes):
 1. Nov15_18-28-32_gpu-conv-no-pos-bars=50-steps=3 -- no position in state
-2. Nov15_18-34-58_gpu-conv-noisynet -- noisy networks
