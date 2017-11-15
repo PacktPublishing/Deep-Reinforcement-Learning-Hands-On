@@ -61,3 +61,12 @@ New name Nov14_21-01-26_gpu-simple-open-at-cur-bar-3
 Performance of Nov14_21-09-42_gpu-simple-conv-bars=50 is exceptional, reward_100=9. Need to check.
 
 Started next run with 50 bars and 3 reward steps: Nov15_08-46-07_home-conv-bars=50_steps=3
+
+# 2017-11-15
+
+Need to test the existing model on market simulator.
+Tool needs to:
+1. load prices into the environment
+2. load model
+3. run all prices without resetting the environment
+4. report profits and order stats 

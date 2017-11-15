@@ -129,15 +129,17 @@ class StocksEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, prices, bars_count=DEFAULT_BARS_COUNT,
-                 comission=DEFAULT_COMMISSION_PERC, reset_on_close=True, state_1d=False):
+                 comission=DEFAULT_COMMISSION_PERC, reset_on_close=True, state_1d=False,
+                 random_ofs_on_reset=True, reward_on_close=True):
         assert isinstance(prices, dict)
         self._prices = prices
         if state_1d:
-            self._state = State1D(bars_count, comission, reset_on_close)
+            self._state = State1D(bars_count, comission, reset_on_close, reward_on_close=reward_on_close)
         else:
-            self._state = State(bars_count, comission, reset_on_close)
+            self._state = State(bars_count, comission, reset_on_close, reward_on_close=reward_on_close)
         self.action_space = gym.spaces.Discrete(n=len(Actions))
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=self._state.shape)
+        self.random_ofs_on_reset = random_ofs_on_reset
         self._seed()
 
     def _reset(self):
@@ -145,7 +147,10 @@ class StocksEnv(gym.Env):
         self._instrument = self.np_random.choice(list(self._prices.keys()))
         prices = self._prices[self._instrument]
         bars = self._state.bars_count
-        offset = self.np_random.choice(prices.high.shape[0]-bars*10) + bars
+        if self.random_ofs_on_reset:
+            offset = self.np_random.choice(prices.high.shape[0]-bars*10) + bars
+        else:
+            offset = bars
         self._state.reset(prices, offset)
         return self._state.encode()
 
