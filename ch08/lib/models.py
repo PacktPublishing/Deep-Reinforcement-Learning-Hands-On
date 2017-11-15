@@ -71,15 +71,15 @@ class DQNConv1D(nn.Module):
         out_size = self._get_conv_out(shape)
 
         self.fc_val = nn.Sequential(
-            nn.Linear(out_size, 512),
+            NoisyLinear(out_size, 512),
             nn.ReLU(),
-            nn.Linear(512, 1)
+            NoisyLinear(512, 1)
         )
 
         self.fc_adv = nn.Sequential(
-            nn.Linear(out_size, 512),
+            NoisyLinear(out_size, 512),
             nn.ReLU(),
-            nn.Linear(512, actions_n)
+            NoisyLinear(512, actions_n)
         )
 
     def _get_conv_out(self, shape):
