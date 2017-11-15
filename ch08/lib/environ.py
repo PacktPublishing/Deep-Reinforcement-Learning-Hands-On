@@ -174,5 +174,5 @@ class StocksEnv(gym.Env):
 
     @classmethod
     def from_dir(cls, data_dir, **kwargs):
-        prices = {name: data.load_relative(file) for name, file in data.price_files(data_dir)}
+        prices = {file: data.load_relative(file) for file in data.price_files(data_dir)}
         return StocksEnv(prices, **kwargs)

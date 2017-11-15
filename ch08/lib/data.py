@@ -8,7 +8,7 @@ import collections
 Prices = collections.namedtuple('Prices', field_names=['open', 'high', 'low', 'close'])
 
 
-def read_csv(file_name, sep=','):
+def read_csv(file_name, sep=',', filter_data=False):
     print("Reading", file_name)
     with open(file_name, 'rt', encoding='utf-8') as fd:
         reader = csv.reader(fd, delimiter=sep)
@@ -21,7 +21,7 @@ def read_csv(file_name, sep=','):
         count_filter = 0
         for row in reader:
             vals = list(map(float, [row[idx] for idx in indices]))
-            if all(map(lambda v: abs(v-vals[0]) < 1e-3, vals)):
+            if filter_data and all(map(lambda v: abs(v-vals[0]) < 1e-3, vals)):
                 count_filter += 1
                 continue
 
@@ -41,8 +41,8 @@ def read_csv(file_name, sep=','):
 def prices_to_relative(prices):
     """
     Convert prices to relative in respect to open price
-    :param ochl: tuple with open, close, high, low 
-    :return: tuple with open, rel_close, rel_high, rel_low 
+    :param ochl: tuple with open, close, high, low
+    :return: tuple with open, rel_close, rel_high, rel_low
     """
     assert isinstance(prices, Prices)
     rh = (prices.high - prices.open) / prices.open
@@ -58,6 +58,13 @@ def load_relative(csv_file):
 def price_files(dir_name):
     result = []
     for path in glob.glob(os.path.join(dir_name, "*.csv")):
-        name = os.path.basename(path).split("_", maxsplit=1)[0]
-        result.append((name, path))
+        result.append(path)
+    return result
+
+
+def load_year_data(year, basedir='data'):
+    y = str(year)[-2:]
+    result = {}
+    for path in glob.glob(os.path.join(basedir, "*_%s*.csv" % y)):
+        result[path] = load_relative(path)
     return result

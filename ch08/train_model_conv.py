@@ -40,14 +40,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     parser.add_argument("--data", default=DEFAULT_STOCKS, help="Stocks file or dir to train on, default=" + DEFAULT_STOCKS)
+    parser.add_argument("--year", type=int, help="Year to be used for training, if specified, overrides --data option")
     parser.add_argument("-r", "--run", required=True, help="Run name")
     args = parser.parse_args()
 
     saves_path = os.path.join("saves", args.run)
     os.makedirs(saves_path, exist_ok=True)
 
-    if os.path.isfile(args.data):
-        stock_data = {"YNDX": data.load_relative(args.data)}
+    if args.year is not None or os.path.isfile(args.data):
+        if args.year is not None:
+            stock_data = data.load_year_data(args.year)
+        else:
+            stock_data = {"YNDX": data.load_relative(args.data)}
         env = environ.StocksEnv(stock_data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
     elif os.path.isdir(args.data):
         env = environ.StocksEnv.from_dir(args.data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)

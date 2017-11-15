@@ -70,3 +70,17 @@ Tool needs to:
 2. load model
 3. run all prices without resetting the environment
 4. report profits and order stats 
+
+First runs of the tool shown the facts:
+1. 10-bars model achieves much better results on training data than 50-bars. Basically, 10-bars always wins.
+2. On prices other than training, all models are always looses.
+
+So, we need to have validation dataset to check performance and prevent overfitting. 
+Also, larger datasets have to be used.
+
+Maybe, mode of testing should be changed. Now I take into account first signal, allowing only one order at a time. 
+But training mode was different: we've tried to maximize the profit at some current position. So, maybe I need to take 
+into account all signals and count ratio of successful. 
+
+Next runs:
+1. Train on full 2016 data
