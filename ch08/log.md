@@ -90,3 +90,6 @@ Next runs:
 Next actions:
 1. Improve the testing tool to take into account all orders
 2. Implement validation on some held-out prices pool (2017)
+
+Thing to check: get rid of position information in the state. As our system should just generate signals, 
+it can do it regardless of the current state.

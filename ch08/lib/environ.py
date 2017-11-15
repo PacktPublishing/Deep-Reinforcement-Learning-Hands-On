@@ -39,8 +39,8 @@ class State:
 
     @property
     def shape(self):
-        # [h, l, c] * bars + position_flag + rel_profit (since open)
-        return (3*self.bars_count + 1 + 1, )
+        # [h, l, c] * bars
+        return (3*self.bars_count, )
 
     def encode(self):
         """
@@ -55,12 +55,6 @@ class State:
             shift += 1
             res[shift] = self._prices.close[self._offset + bar_idx]
             shift += 1
-        res[shift] = float(self.have_position)
-        shift += 1
-        if not self.have_position:
-            res[shift] = 0.0
-        else:
-            res[shift] = (self._cur_close() - self.open_price) / self.open_price
         return res
 
     def _cur_close(self):
@@ -111,17 +105,14 @@ class State1D(State):
     """
     @property
     def shape(self):
-        return (5, self.bars_count)
+        return (3, self.bars_count)
 
     def encode(self):
-        res = np.zeros(shape=self.shape, dtype=np.float32)
+        res = np.ndarray(shape=self.shape, dtype=np.float32)
         ofs = self.bars_count-1
         res[0] = self._prices.high[self._offset-ofs:self._offset+1]
         res[1] = self._prices.low[self._offset-ofs:self._offset+1]
         res[2] = self._prices.close[self._offset-ofs:self._offset+1]
-        if self.have_position:
-            res[3] = 1.0
-            res[4] = (self._cur_close() - self.open_price) / self.open_price
         return res
 
 
