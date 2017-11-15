@@ -29,10 +29,6 @@ LEARNING_RATE = 0.0001
 STATES_TO_EVALUATE = 1000
 EVAL_EVERY_STEP = 1000
 
-EPSILON_START = 1.0
-EPSILON_STOP = 0.1
-EPSILON_STEPS = 1000000
-
 CHECKPOINT_EVERY_STEP = 1000000
 
 
@@ -64,7 +60,7 @@ if __name__ == "__main__":
     if args.cuda:
         net.cuda()
     tgt_net = ptan.agent.TargetNet(net)
-    selector = ptan.actions.EpsilonGreedyActionSelector(EPSILON_START)
+    selector = ptan.actions.ArgmaxActionSelector()
     agent = ptan.agent.DQNAgent(net, selector, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
     buffer = ptan.experience.ExperienceReplayBuffer(exp_source, REPLAY_SIZE)
@@ -80,17 +76,10 @@ if __name__ == "__main__":
         while True:
             step_idx += 1
             buffer.populate(1)
-            selector.epsilon = max(EPSILON_STOP, EPSILON_START - step_idx / EPSILON_STEPS)
 
             new_rewards = exp_source.pop_total_rewards()
             if new_rewards:
-                reward_tracker.reward(new_rewards[0], step_idx, selector.epsilon)
-                if max_reward is None or max_reward < new_rewards[0]:
-                    if max_reward is not None:
-                        print("%d: Max reward updated %.3f -> %.3f" % (step_idx, max_reward, new_rewards[0]))
-                    max_reward = new_rewards[0]
-                    writer.add_scalar("reward_max", max_reward, step_idx)
-                    torch.save(net.state_dict(), os.path.join(saves_path, "best-%.3f.data" % max_reward))
+                reward_tracker.reward(new_rewards[0], step_idx)
 
             if len(buffer) < REPLAY_INITIAL:
                 continue
@@ -122,4 +111,4 @@ if __name__ == "__main__":
 
             if step_idx % CHECKPOINT_EVERY_STEP == 0:
                 idx = step_idx // CHECKPOINT_EVERY_STEP
-                torch.save(net.state_dict(), os.path.join(saves_path, "checkpoint-%3d.data" % idx))
+                torch.save(net.state_dict(), os.path.join(saves_path, "checkpoint-%03d.data" % idx))
