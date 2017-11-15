@@ -96,3 +96,14 @@ it can do it regardless of the current state.
 
 Started two runs (on yandex-2016 quotes):
 1. Nov15_18-28-32_gpu-conv-no-pos-bars=50-steps=3 -- no position in state
+
+Upd: with removal of the state, noise was introduced to the reward, as the network doesn't know the presence of the position.
+But our goal is to make its decisions independent on on presence of position. Network has to give us signals to enter 
+and exit the market. To get the goal, new set of reward rules was intorduced.
+1. New state "KeepOpen" has to be added, and its semantic is to keep open long position if we have it.
+2. State doesn't need to track profit anymore
+3. No sum reward should be returned on the position close.
+4. Reward has to be switched to percentage to make it independent to current stock price
+4. Buy and Close actions always returns comission
+5. Skip returns zero reward as there is no comission
+6. KeepOpen returns normal movement reward.  

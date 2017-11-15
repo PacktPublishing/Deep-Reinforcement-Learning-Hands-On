@@ -14,6 +14,7 @@ class Actions(enum.Enum):
     Skip = 0
     Buy = 1
     Close = 2
+    KeepOpen = 3
 
 
 class State:
@@ -27,13 +28,10 @@ class State:
         self.bars_count = bars_count
         self.comission = comission_perc / 100.0
         self.reset_on_close = reset_on_close
-        self.reward_on_close = reward_on_close
 
     def reset(self, prices, offset):
         assert isinstance(prices, data.Prices)
         assert offset >= self.bars_count-1
-        self.have_position = False
-        self.open_price = 0.0
         self._prices = prices
         self._offset = offset
 
@@ -75,26 +73,17 @@ class State:
         assert isinstance(action, Actions)
         reward = 0.0
         done = False
-        if action == Actions.Buy and not self.have_position:
-            self.have_position = True
-            close = self._cur_close()
-            self.open_price = close
-            reward -= close * self.comission
-        elif action == Actions.Close and self.have_position:
-            close = self._cur_close()
-            reward -= close * self.comission
+        if action == Actions.Buy:
+            reward -= self.comission
+        elif action == Actions.Close:
+            reward -= self.comission
             done |= self.reset_on_close
-            if self.reward_on_close:
-                reward += close - self.open_price
-            self.have_position = False
-            self.open_price = 0.0
 
         self._offset += 1
         done |= self._offset >= self._prices.close.shape[0]-1
 
-        if self.have_position:
-            # delta position profit equals cur bar change
-            reward += self._prices.open[self._offset] * self._prices.close[self._offset]
+        if action == Actions.KeepOpen:
+            reward += self._prices.close[self._offset]
 
         return reward, done
 
