@@ -14,3 +14,8 @@ Fixed the bug with extensive filtering on small quotes. 2016 data started Nov16_
 Implemented next adjustment: bar open price tweak. If open price for current bar doesn't match close bar of the previous,
 open price set to close bar. This should make more correct rewards.
 Started as Nov16_16-42-59_gpu-conv-p1-open-fix-YNDX 
+
+Started model with 20 bars context and 1m replay buffer on 2016 prices.
+Started as Nov16_22-17-33_home-conv-p1-bars=20-replay=1m-2016
+
+Need to implement good testing utility + validation test during training.
