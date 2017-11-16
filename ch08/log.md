@@ -109,3 +109,13 @@ and exit the market. To get the goal, new set of reward rules was intorduced.
 6. KeepOpen returns normal movement reward.
 
 This model has started as run Nov15_19-17-03_home-conv-perc-reward  
+
+All started model doesn't converge, and I don't fully understand what went wrong. It was several changes:
+1. filtering of the prices were removed
+2. reward system was changed -- no position information, extra action, etc
+3. reward was turned to percentage.
+
+As percentage reward is the most critical for multy-stocks support, the plan:
+1. Fork a branch from the point of good convergence (a12210ab202304db9b8703eb930759d1172ace8e)
+2. Start a train on Yandex at this point to check that it is converging
+3. Implement percentage of reward on top of this point and run training
