@@ -119,3 +119,5 @@ As percentage reward is the most critical for multy-stocks support, the plan:
 1. Fork a branch from the point of good convergence (a12210ab202304db9b8703eb930759d1172ace8e)
 2. Start a train on Yandex at this point to check that it is converging
 3. Implement percentage of reward on top of this point and run training
+
+On current master branch I'll start a run with filtering returned, as looks like Yandex has lots of empty bars.
