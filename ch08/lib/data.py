@@ -19,6 +19,8 @@ def read_csv(file_name, sep=',', filter_data=True):
         o, c, h, l = [], [], [], []
         count_out = 0
         count_filter = 0
+        count_fixed = 0
+        prev_vals = None
         for row in reader:
             vals = list(map(float, [row[idx] for idx in indices]))
             if filter_data and all(map(lambda v: abs(v-vals[0]) < 1e-8, vals)):
@@ -26,12 +28,23 @@ def read_csv(file_name, sep=',', filter_data=True):
                 continue
 
             po, pc, ph, pl = vals
+
+            # fix open price for current bar to match close price for the previous bar
+            if prev_vals is not None:
+                ppo, ppc, pph, ppl = vals
+                if abs(po - ppc) > 1e-8:
+                    count_fixed += 1
+                    po = ppc
+                    pl = min(pl, po)
+                    ph = max(ph, po)
             count_out += 1
             o.append(po)
             c.append(pc)
             h.append(ph)
             l.append(pl)
-    print("Read done, %d rows filtered from %d total" % (count_filter, count_filter + count_out))
+            prev_vals = vals
+    print("Read done, got %d rows, %d filtered, %d bars' open price adjusted" % (
+        count_filter + count_out, count_filter, count_fixed))
     return Prices(open=np.array(o, dtype=np.float32),
                   high=np.array(h, dtype=np.float32),
                   low=np.array(l, dtype=np.float32),
