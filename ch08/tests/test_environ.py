@@ -25,11 +25,11 @@ class TestStates(unittest.TestCase):
 
 
     def test_basic(self):
-        s = environ.State(bars_count=4, comission_perc=0.0, reset_on_close=False)
+        s = environ.State(bars_count=4, comission_perc=0.0, reset_on_close=False, volumes=False)
         self.assertEqual(s.shape, (4*3+2,))
 
     def test_basic1d(self):
-        s = environ.State1D(bars_count=2, comission_perc=0.0, reset_on_close=False)
+        s = environ.State1D(bars_count=2, comission_perc=0.0, reset_on_close=False, volumes=True)
         self.assertEqual(s.shape, (6, 2))
         s.reset(self.prices['TST'], 1)
         d = s.encode()

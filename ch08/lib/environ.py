@@ -17,7 +17,7 @@ class Actions(enum.Enum):
 
 
 class State:
-    def __init__(self, bars_count, comission_perc, reset_on_close, reward_on_close=True):
+    def __init__(self, bars_count, comission_perc, reset_on_close, reward_on_close=True, volumes=True):
         assert isinstance(bars_count, int)
         assert bars_count > 0
         assert isinstance(comission_perc, float)
@@ -28,6 +28,7 @@ class State:
         self.comission_perc = comission_perc
         self.reset_on_close = reset_on_close
         self.reward_on_close = reward_on_close
+        self.volumes = volumes
 
     def reset(self, prices, offset):
         assert isinstance(prices, data.Prices)
@@ -40,7 +41,10 @@ class State:
     @property
     def shape(self):
         # [h, l, c] * bars + position_flag + rel_profit (since open)
-        return (3*self.bars_count + 1 + 1, )
+        if self.volumes:
+            return (4 * self.bars_count + 1 + 1, )
+        else:
+            return (3*self.bars_count + 1 + 1, )
 
     def encode(self):
         """
@@ -55,6 +59,9 @@ class State:
             shift += 1
             res[shift] = self._prices.close[self._offset + bar_idx]
             shift += 1
+            if self.volumes:
+                res[shift] = self._prices.volume[self._offset + bar_idx]
+                shift += 1
         res[shift] = float(self.have_position)
         shift += 1
         if not self.have_position:
@@ -111,7 +118,10 @@ class State1D(State):
     """
     @property
     def shape(self):
-        return (6, self.bars_count)
+        if self.volumes:
+            return (6, self.bars_count)
+        else:
+            return (5, self.bars_count)
 
     def encode(self):
         res = np.zeros(shape=self.shape, dtype=np.float32)
@@ -119,10 +129,14 @@ class State1D(State):
         res[0] = self._prices.high[self._offset-ofs:self._offset+1]
         res[1] = self._prices.low[self._offset-ofs:self._offset+1]
         res[2] = self._prices.close[self._offset-ofs:self._offset+1]
-        res[3] = self._prices.volume[self._offset-ofs:self._offset+1]
+        if self.volumes:
+            res[3] = self._prices.volume[self._offset-ofs:self._offset+1]
+            dst = 4
+        else:
+            dst = 3
         if self.have_position:
-            res[4] = 1.0
-            res[5] = (self._cur_close() - self.open_price) / self.open_price
+            res[dst] = 1.0
+            res[dst+1] = (self._cur_close() - self.open_price) / self.open_price
         return res
 
 
@@ -131,13 +145,15 @@ class StocksEnv(gym.Env):
 
     def __init__(self, prices, bars_count=DEFAULT_BARS_COUNT,
                  comission=DEFAULT_COMMISSION_PERC, reset_on_close=True, state_1d=False,
-                 random_ofs_on_reset=True, reward_on_close=True):
+                 random_ofs_on_reset=True, reward_on_close=True, volumes=True):
         assert isinstance(prices, dict)
         self._prices = prices
         if state_1d:
-            self._state = State1D(bars_count, comission, reset_on_close, reward_on_close=reward_on_close)
+            self._state = State1D(bars_count, comission, reset_on_close, reward_on_close=reward_on_close,
+                                  volumes=volumes)
         else:
-            self._state = State(bars_count, comission, reset_on_close, reward_on_close=reward_on_close)
+            self._state = State(bars_count, comission, reset_on_close, reward_on_close=reward_on_close,
+                                volumes=volumes)
         self.action_space = gym.spaces.Discrete(n=len(Actions))
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=self._state.shape)
         self.random_ofs_on_reset = random_ofs_on_reset
