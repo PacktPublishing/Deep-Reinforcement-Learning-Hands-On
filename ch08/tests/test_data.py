@@ -20,6 +20,6 @@ class TestMisc(TestCase):
         np.testing.assert_equal(rel.close, np.array([1.0]))  # 100% growth
 
     def test_price_files(self):
-        files = dict(data.price_files("data"))
-        self.assertTrue("YNDX" in files)
+        files = data.price_files("data")
+        self.assertTrue(len(files) > 0)
 

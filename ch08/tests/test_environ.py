@@ -60,15 +60,15 @@ class TestStates(unittest.TestCase):
         r, done = s.step(environ.Actions.Buy)
         self.assertTrue(s.have_position)
         self.assertFalse(done)
-        self.assertAlmostEqual(r, 1.0)
+        self.assertAlmostEqual(r, 50.0)
         self.assertAlmostEqual(s._cur_close(), 3.0)
         r, done = s.step(environ.Actions.Skip)
         self.assertFalse(done)
-        self.assertAlmostEqual(r, -2.0)
+        self.assertAlmostEqual(r, -2/3 * 100.0)
         self.assertAlmostEqual(s._cur_close(), 1.0)
         r, done = s.step(environ.Actions.Skip)
         self.assertTrue(done)
-        self.assertAlmostEqual(r, 1.0)
+        self.assertAlmostEqual(r, 100.0)
         self.assertAlmostEqual(s._cur_close(), 2.0)
 
     def test_comission(self):
@@ -79,7 +79,8 @@ class TestStates(unittest.TestCase):
         r, done = s.step(environ.Actions.Buy)
         self.assertTrue(s.have_position)
         self.assertFalse(done)
-        self.assertAlmostEqual(r, 1.0 - 2.0/100.0)  # execution price is the cur bar close, comission 1%
+        # execution price is the cur bar close, comission 1%, reward in percent
+        self.assertAlmostEqual(r, 100.0 * (3.0 - 2.0) / 2.0 - 1.0)
         self.assertAlmostEqual(s._cur_close(), 3.0)
 
     def test_final_reward(self):
@@ -90,13 +91,13 @@ class TestStates(unittest.TestCase):
         r, done = s.step(environ.Actions.Buy)
         self.assertTrue(s.have_position)
         self.assertFalse(done)
-        self.assertAlmostEqual(r, 1.0)
+        self.assertAlmostEqual(r, 50.0)
         self.assertAlmostEqual(s._cur_close(), 3.0)
         r, done = s.step(environ.Actions.Skip)
         self.assertFalse(done)
-        self.assertAlmostEqual(r, -2.0)
+        self.assertAlmostEqual(r, -2/3 * 100.0)
         self.assertAlmostEqual(s._cur_close(), 1.0)
         r, done = s.step(environ.Actions.Close)
         self.assertTrue(done)
-        self.assertAlmostEqual(r, -1.0)
+        self.assertAlmostEqual(r, -50.0)
         self.assertAlmostEqual(s._cur_close(), 2.0)
