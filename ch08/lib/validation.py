@@ -8,11 +8,11 @@ from lib import environ
 
 def validation_run(env, net, episodes=100, cuda=False, epsilon=0.02, comission=0.1):
     stats = {
-        'total_reward': [],
-        'real_profit_perc': [],
+        'episode_reward': [],
+        'episode_profit': [],
+        'episode_steps': [],
         'order_profits': [],
         'order_steps': [],
-        'episode_steps': [],
     }
 
     for episode in range(episodes):
@@ -64,8 +64,8 @@ def validation_run(env, net, episodes=100, cuda=False, epsilon=0.02, comission=0
                 break
 
         real_profit_perc = 100.0 * real_profit / start_price
-        stats['total_reward'].append(total_reward)
-        stats['real_profit_perc'].append(real_profit_perc)
+        stats['episode_reward'].append(total_reward)
+        stats['episode_profit'].append(real_profit_perc)
         stats['episode_steps'].append(episode_steps)
 
     return { key: np.mean(vals) for key, vals in stats.items() }
