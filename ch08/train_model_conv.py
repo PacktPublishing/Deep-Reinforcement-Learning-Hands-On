@@ -82,15 +82,9 @@ if __name__ == "__main__":
             buffer.populate(1)
             selector.epsilon = max(EPSILON_STOP, EPSILON_START - step_idx / EPSILON_STEPS)
 
-            new_rewards = exp_source.pop_total_rewards()
+            new_rewards = exp_source.pop_rewards_steps()
             if new_rewards:
                 reward_tracker.reward(new_rewards[0], step_idx, selector.epsilon)
-                if max_reward is None or max_reward < new_rewards[0]:
-                    if max_reward is not None:
-                        print("%d: Max reward updated %.3f -> %.3f" % (step_idx, max_reward, new_rewards[0]))
-                    max_reward = new_rewards[0]
-                    writer.add_scalar("reward_max", max_reward, step_idx)
-                    torch.save(net.state_dict(), os.path.join(saves_path, "best-%.3f.data" % max_reward))
 
             if len(buffer) < REPLAY_INITIAL:
                 continue

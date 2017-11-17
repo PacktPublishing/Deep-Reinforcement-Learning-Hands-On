@@ -38,3 +38,10 @@ Need to implement:
 Reward calculation implemented, run Nov17_08-55-51_gpu-conv-fix-reward-YNDX16   
 
 Volumes implemented, run Nov17_10-15-13_gpu-conv-vols-YNDX16
+
+Reward calculation stopped, works good. 
+
+Implemented tracking of average episode length, as testing on YNDX16 has shown that the agent has tendency to open 
+position and keep it (which is logical on growing market).
+
+Started both volumes + average episode len.
