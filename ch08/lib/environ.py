@@ -81,13 +81,12 @@ class State:
         assert isinstance(action, Actions)
         reward = 0.0
         done = False
+        close = self._cur_close()
         if action == Actions.Buy and not self.have_position:
             self.have_position = True
-            close = self._cur_close()
             self.open_price = close
             reward -= self.comission_perc
         elif action == Actions.Close and self.have_position:
-            close = self._cur_close()
             reward -= self.comission_perc
             done |= self.reset_on_close
             if self.reward_on_close:
@@ -96,11 +95,12 @@ class State:
             self.open_price = 0.0
 
         self._offset += 1
+        prev_close = close
+        close = self._cur_close()
         done |= self._offset >= self._prices.close.shape[0]-1
 
         if self.have_position:
-            # delta position profit equals cur bar change
-            reward += 100.0 * self._prices.close[self._offset]
+            reward += 100.0 * (close - prev_close) / prev_close
 
         return reward, done
 
