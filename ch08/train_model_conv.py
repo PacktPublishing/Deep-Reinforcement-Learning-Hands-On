@@ -13,13 +13,13 @@ from lib import environ, data, models, common
 from tensorboardX import SummaryWriter
 
 BATCH_SIZE = 32
-BARS_COUNT = 20
+BARS_COUNT = 50
 TARGET_NET_SYNC = 1000
 DEFAULT_STOCKS = "data/YNDX_160101_161231.csv"
 
 GAMMA = 0.99
 
-REPLAY_SIZE = 1000000
+REPLAY_SIZE = 100000
 REPLAY_INITIAL = 10000
 
 REWARD_STEPS = 3
