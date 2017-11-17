@@ -90,3 +90,6 @@ Next runs:
 Next actions:
 1. Improve the testing tool to take into account all orders
 2. Implement validation on some held-out prices pool (2017)
+
+Run test with longer epsilon decay -- doesn't improve much.
+Started YNDX16 run with 25% final epsilon plus the same, but with 20 bars context.
