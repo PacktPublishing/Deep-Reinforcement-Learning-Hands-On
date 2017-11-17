@@ -19,3 +19,18 @@ Started model with 20 bars context and 1m replay buffer on 2016 prices.
 Started as Nov16_22-17-33_home-conv-p1-bars=20-replay=1m-2016
 
 Need to implement good testing utility + validation test during training.
+
+Results on current run is not very impressive: 2016 runs don't converge, run with fixed open price
+converges much worse than before.
+
+Need to implement:
+1. proper reward calculation which takes in account not only bar's movement, but also gaps. Disable open price fix and test.
+1. Volumes in the data
+2. Testing of system on arbitrary data. Things need to be calculated:
+    1. count of orders done
+    2. ratio of profitable and loosing orders
+    3. mean profitable and loosing order
+    4. final balance
+    5. max drawdown
+    6. balance chart
+    7. profit chart

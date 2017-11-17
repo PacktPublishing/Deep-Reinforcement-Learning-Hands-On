@@ -8,7 +8,7 @@ import collections
 Prices = collections.namedtuple('Prices', field_names=['open', 'high', 'low', 'close'])
 
 
-def read_csv(file_name, sep=',', filter_data=True):
+def read_csv(file_name, sep=',', filter_data=True, fix_open_price=False):
     print("Reading", file_name)
     with open(file_name, 'rt', encoding='utf-8') as fd:
         reader = csv.reader(fd, delimiter=sep)
@@ -30,7 +30,7 @@ def read_csv(file_name, sep=',', filter_data=True):
             po, pc, ph, pl = vals
 
             # fix open price for current bar to match close price for the previous bar
-            if prev_vals is not None:
+            if fix_open_price and prev_vals is not None:
                 ppo, ppc, pph, ppl = vals
                 if abs(po - ppc) > 1e-8:
                     count_fixed += 1
@@ -43,7 +43,7 @@ def read_csv(file_name, sep=',', filter_data=True):
             h.append(ph)
             l.append(pl)
             prev_vals = vals
-    print("Read done, got %d rows, %d filtered, %d bars' open price adjusted" % (
+    print("Read done, got %d rows, %d filtered, %d open prices adjusted" % (
         count_filter + count_out, count_filter, count_fixed))
     return Prices(open=np.array(o, dtype=np.float32),
                   high=np.array(h, dtype=np.float32),
