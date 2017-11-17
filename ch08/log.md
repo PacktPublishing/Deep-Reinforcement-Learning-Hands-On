@@ -92,4 +92,7 @@ Next actions:
 2. Implement validation on some held-out prices pool (2017)
 
 Run test with longer epsilon decay -- doesn't improve much.
+Runs Nov17_13-25-00_gpu-conv-vols-val-YNDX16 and 
+Nov17_13-25-11_gpu-conv-3M-epsilon-YNDX16. They have validation runs on YNDX15.
+
 Started YNDX16 run with 25% final epsilon plus the same, but with 20 bars context.
