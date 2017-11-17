@@ -24,7 +24,7 @@ Results on current run is not very impressive: 2016 runs don't converge, run wit
 converges much worse than before.
 
 Need to implement:
-1. proper reward calculation which takes in account not only bar's movement, but also gaps. Disable open price fix and test.
+1. [x] proper reward calculation which takes in account not only bar's movement, but also gaps. Disable open price fix and test.
 1. Volumes in the data
 2. Testing of system on arbitrary data. Things need to be calculated:
     1. count of orders done
@@ -34,3 +34,5 @@ Need to implement:
     5. max drawdown
     6. balance chart
     7. profit chart
+    
+Reward calculation implemented, run Nov17_08-55-51_gpu-conv-fix-reward-YNDX16   
