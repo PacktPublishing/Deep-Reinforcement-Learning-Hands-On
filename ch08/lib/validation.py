@@ -39,7 +39,9 @@ def validation_run(env, net, episodes=100, cuda=False, epsilon=0.02, comission=0
                 position = close_price
                 position_steps = 0
             elif action == environ.Actions.Close and position is not None:
-                stats['order_profits'].append(close_price - position - (close_price + position) * comission / 100)
+                profit = close_price - position - (close_price + position) * comission / 100
+                profit = 100.0 * profit / position
+                stats['order_profits'].append(profit)
                 stats['order_steps'].append(position_steps)
                 position = None
                 position_steps = None
@@ -51,7 +53,9 @@ def validation_run(env, net, episodes=100, cuda=False, epsilon=0.02, comission=0
                 position_steps += 1
             if done:
                 if position is not None:
-                    stats['order_profits'].append(close_price - position - (close_price + position) * comission / 100)
+                    profit = close_price - position - (close_price + position) * comission / 100
+                    profit = 100.0 * profit / position
+                    stats['order_profits'].append(profit)
                     stats['order_steps'].append(position_steps)
                 break
 
