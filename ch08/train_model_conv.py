@@ -8,7 +8,7 @@ import numpy as np
 import torch
 import torch.optim as optim
 
-from lib import environ, data, models, common
+from lib import environ, data, models, common, validation
 
 from tensorboardX import SummaryWriter
 
@@ -16,6 +16,7 @@ BATCH_SIZE = 32
 BARS_COUNT = 50
 TARGET_NET_SYNC = 1000
 DEFAULT_STOCKS = "data/YNDX_160101_161231.csv"
+DEFAULT_VAL_STOCKS = "data/YNDX_150101_151231.csv"
 
 GAMMA = 0.99
 
@@ -34,6 +35,7 @@ EPSILON_STOP = 0.1
 EPSILON_STEPS = 1000000
 
 CHECKPOINT_EVERY_STEP = 1000000
+VALIDATION_EVERY_STEP = 100000
 
 
 if __name__ == "__main__":
@@ -41,6 +43,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     parser.add_argument("--data", default=DEFAULT_STOCKS, help="Stocks file or dir to train on, default=" + DEFAULT_STOCKS)
     parser.add_argument("--year", type=int, help="Year to be used for training, if specified, overrides --data option")
+    parser.add_argument("--valdata", default=DEFAULT_VAL_STOCKS, help="Stocks data for validation, default=" + DEFAULT_VAL_STOCKS)
     parser.add_argument("-r", "--run", required=True, help="Run name")
     args = parser.parse_args()
 
@@ -53,10 +56,16 @@ if __name__ == "__main__":
         else:
             stock_data = {"YNDX": data.load_relative(args.data)}
         env = environ.StocksEnv(stock_data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
+        env_tst = environ.StocksEnv(stock_data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
     elif os.path.isdir(args.data):
         env = environ.StocksEnv.from_dir(args.data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
-    stocks_env = env
+        env_tst = environ.StocksEnv.from_dir(args.data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
+    else:
+        raise RuntimeError("No doto to train on")
     env = gym.wrappers.TimeLimit(env, max_episode_steps=1000)
+
+    val_data = {"YNDX": data.load_relative(args.valdata)}
+    env_val = environ.StocksEnv(val_data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
 
     writer = SummaryWriter(comment="-conv-" + args.run)
     net = models.DQNConv1D(env.observation_space.shape, env.action_space.n)
@@ -117,3 +126,11 @@ if __name__ == "__main__":
             if step_idx % CHECKPOINT_EVERY_STEP == 0:
                 idx = step_idx // CHECKPOINT_EVERY_STEP
                 torch.save(net.state_dict(), os.path.join(saves_path, "checkpoint-%3d.data" % idx))
+
+            if step_idx % VALIDATION_EVERY_STEP == 0:
+                res = validation.validation_run(env_tst, net, cuda=args.cuda)
+                for key, val in res.items():
+                    writer.add_scalar(key + "_test", val, step_idx)
+                res = validation.validation_run(env_val, net, cuda=args.cuda)
+                for key, val in res.items():
+                    writer.add_scalar(key + "_val", val, step_idx)
