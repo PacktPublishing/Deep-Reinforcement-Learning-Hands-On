@@ -23,7 +23,7 @@ def read_csv(file_name, sep=',', filter_data=True, fix_open_price=False):
         prev_vals = None
         for row in reader:
             vals = list(map(float, [row[idx] for idx in indices]))
-            if filter_data and all(map(lambda v: abs(v-vals[0]) < 1e-8, vals)):
+            if filter_data and all(map(lambda v: abs(v-vals[0]) < 1e-8, vals[:-1])):
                 count_filter += 1
                 continue
 

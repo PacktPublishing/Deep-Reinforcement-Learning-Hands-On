@@ -22,7 +22,7 @@ if __name__ == "__main__":
 
     prices = data.load_relative(args.data)
     env = environ.StocksEnv({"TEST": prices}, bars_count=args.bars, reset_on_close=False,
-                            state_1d=args.conv, random_ofs_on_reset=False, reward_on_close=True)
+                            state_1d=args.conv, random_ofs_on_reset=False, reward_on_close=True, volumes=False)
     if args.conv:
         net = models.DQNConv1D(env.observation_space.shape, env.action_space.n)
     else:
