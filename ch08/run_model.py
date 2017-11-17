@@ -12,6 +12,9 @@ mpl.use("Agg")
 import matplotlib.pyplot as plt
 
 
+EPSILON = 0.02
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--data", required=True, help="CSV file with quotes to run the model")
@@ -41,32 +44,37 @@ if __name__ == "__main__":
 
     real_profit = 0.0
     real_profits = []
-    positions = []
+    position = None
+    position_steps = None
 
     while True:
         step_idx += 1
         obs_v = Variable(torch.from_numpy(np.expand_dims(obs, 0)))
         out_v = net(obs_v)
         action_idx = out_v.max(dim=1)[1].data.cpu().numpy()[0]
+        if np.random.random() < EPSILON:
+            action_idx = env.action_space.sample()
         action = environ.Actions(action_idx)
 
         close_price = env._state._cur_close()
 
-        if action == environ.Actions.Buy:
-            positions.append(close_price)
+        if action == environ.Actions.Buy and position is None:
+            position = close_price
+            position_steps = 0
             real_profit -= close_price * args.comission / 100
-        elif action == environ.Actions.Close and positions:
+        elif action == environ.Actions.Close and position is not None:
             real_profit -= close_price * args.comission / 100
-            for pos_price in positions:
-                real_profit += close_price - pos_price
-            positions.clear()
+            real_profit += close_price - position
+            position = None
         real_profits.append(real_profit)
 
         obs, reward, done, _ = env.step(action_idx)
+        if position_steps is not None:
+            position_steps += 1
         total_reward += reward
         rewards.append(total_reward)
         if step_idx % 100 == 0:
-            print("%d: positions=%d, reward=%.3f, profit=%.3f" % (step_idx, len(positions), total_reward, real_profit))
+            print("%d: position=%s, reward=%.3f, profit=%.3f" % (step_idx, position_steps, total_reward, real_profit))
         if done:
             break
     print(total_reward)
