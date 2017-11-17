@@ -25,7 +25,7 @@ converges much worse than before.
 
 Need to implement:
 1. [x] proper reward calculation which takes in account not only bar's movement, but also gaps. Disable open price fix and test.
-1. Volumes in the data
+1. [x] Volumes in the data
 2. Testing of system on arbitrary data. Things need to be calculated:
     1. count of orders done
     2. ratio of profitable and loosing orders
@@ -36,3 +36,5 @@ Need to implement:
     7. profit chart
     
 Reward calculation implemented, run Nov17_08-55-51_gpu-conv-fix-reward-YNDX16   
+
+Volumes implemented, run Nov17_10-15-13_gpu-conv-vols-YNDX16
