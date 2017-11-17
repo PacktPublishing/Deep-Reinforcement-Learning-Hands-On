@@ -5,7 +5,7 @@ import numpy as np
 import collections
 
 
-Prices = collections.namedtuple('Prices', field_names=['open', 'high', 'low', 'close'])
+Prices = collections.namedtuple('Prices', field_names=['open', 'high', 'low', 'close', 'volume'])
 
 
 def read_csv(file_name, sep=',', filter_data=True, fix_open_price=False):
@@ -15,8 +15,8 @@ def read_csv(file_name, sep=',', filter_data=True, fix_open_price=False):
         h = next(reader)
         if '<OPEN>' not in h and sep == ',':
             return read_csv(file_name, ';')
-        indices = [h.index(s) for s in ('<OPEN>', '<CLOSE>', '<HIGH>', '<LOW>')]
-        o, c, h, l = [], [], [], []
+        indices = [h.index(s) for s in ('<OPEN>', '<HIGH>', '<LOW>', '<CLOSE>', '<VOL>')]
+        o, h, l, c, v = [], [], [], [], []
         count_out = 0
         count_filter = 0
         count_fixed = 0
@@ -27,11 +27,11 @@ def read_csv(file_name, sep=',', filter_data=True, fix_open_price=False):
                 count_filter += 1
                 continue
 
-            po, pc, ph, pl = vals
+            po, ph, pl, pc, pv = vals
 
             # fix open price for current bar to match close price for the previous bar
             if fix_open_price and prev_vals is not None:
-                ppo, ppc, pph, ppl = vals
+                ppo, pph, ppl, ppc, ppv = vals
                 if abs(po - ppc) > 1e-8:
                     count_fixed += 1
                     po = ppc
@@ -42,13 +42,15 @@ def read_csv(file_name, sep=',', filter_data=True, fix_open_price=False):
             c.append(pc)
             h.append(ph)
             l.append(pl)
+            v.append(pv)
             prev_vals = vals
     print("Read done, got %d rows, %d filtered, %d open prices adjusted" % (
         count_filter + count_out, count_filter, count_fixed))
     return Prices(open=np.array(o, dtype=np.float32),
                   high=np.array(h, dtype=np.float32),
                   low=np.array(l, dtype=np.float32),
-                  close=np.array(c, dtype=np.float32))
+                  close=np.array(c, dtype=np.float32),
+                  volume=np.array(v, dtype=np.float32))
 
 
 def prices_to_relative(prices):
@@ -61,7 +63,7 @@ def prices_to_relative(prices):
     rh = (prices.high - prices.open) / prices.open
     rl = (prices.low - prices.open) / prices.open
     rc = (prices.close - prices.open) / prices.open
-    return Prices(open=prices.open, high=rh, low=rl, close=rc)
+    return Prices(open=prices.open, high=rh, low=rl, close=rc, volume=prices.volume)
 
 
 def load_relative(csv_file):

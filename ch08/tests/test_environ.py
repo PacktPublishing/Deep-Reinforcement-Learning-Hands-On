@@ -19,7 +19,8 @@ class TestStates(unittest.TestCase):
         p = data.Prices(open=np.array([1.0, 2.0, 3.0, 1.0]),
                         high=np.array([2.0, 3.0, 4.0, 2.0]),
                         low=np.array([0.0, 1.0, 2.0, 0.0]),
-                        close=np.array([2.0, 3.0, 1.0, 2.0]))
+                        close=np.array([2.0, 3.0, 1.0, 2.0]),
+                        volume=np.array([10.0, 10.0, 10.0, 10.0]))
         cls.prices = {"TST": data.prices_to_relative(p)}
 
 
