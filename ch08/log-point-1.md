@@ -45,3 +45,8 @@ Implemented tracking of average episode length, as testing on YNDX16 has shown t
 position and keep it (which is logical on growing market).
 
 Started both volumes + average episode len.
+
+Implemented validation on train and validation datasets.
+Started as Nov17_13-11-30_gpu-conv-vols-val-YNDX16
+
+Next run uses longer epsilon decay: 10M steps, compare convergence on yandex. Run name longer-epsilon-YNDX16
