@@ -9,7 +9,6 @@ from lib import environ
 def validation_run(env, net, episodes=100, cuda=False, epsilon=0.02, comission=0.1):
     stats = {
         'episode_reward': [],
-        'episode_profit': [],
         'episode_steps': [],
         'order_profits': [],
         'order_steps': [],
@@ -17,10 +16,8 @@ def validation_run(env, net, episodes=100, cuda=False, epsilon=0.02, comission=0
 
     for episode in range(episodes):
         obs = env.reset()
-        start_price = env._state._cur_close()
 
         total_reward = 0.0
-        real_profit = 0.0
         position = None
         position_steps = None
         episode_steps = 0
@@ -41,10 +38,7 @@ def validation_run(env, net, episodes=100, cuda=False, epsilon=0.02, comission=0
             if action == environ.Actions.Buy and position is None:
                 position = close_price
                 position_steps = 0
-                real_profit -= close_price * comission / 100
             elif action == environ.Actions.Close and position is not None:
-                real_profit -= close_price * comission / 100
-                real_profit += close_price - position
                 stats['order_profits'].append(close_price - position - (close_price + position) * comission / 100)
                 stats['order_steps'].append(position_steps)
                 position = None
@@ -57,15 +51,11 @@ def validation_run(env, net, episodes=100, cuda=False, epsilon=0.02, comission=0
                 position_steps += 1
             if done:
                 if position is not None:
-                    real_profit -= close_price * comission / 100
-                    real_profit += close_price - position
                     stats['order_profits'].append(close_price - position - (close_price + position) * comission / 100)
                     stats['order_steps'].append(position_steps)
                 break
 
-        real_profit_perc = 100.0 * real_profit / start_price
         stats['episode_reward'].append(total_reward)
-        stats['episode_profit'].append(real_profit_perc)
         stats['episode_steps'].append(episode_steps)
 
     return { key: np.mean(vals) for key, vals in stats.items() }
