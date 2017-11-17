@@ -111,7 +111,7 @@ class State1D(State):
     """
     @property
     def shape(self):
-        return (5, self.bars_count)
+        return (6, self.bars_count)
 
     def encode(self):
         res = np.zeros(shape=self.shape, dtype=np.float32)
@@ -119,9 +119,10 @@ class State1D(State):
         res[0] = self._prices.high[self._offset-ofs:self._offset+1]
         res[1] = self._prices.low[self._offset-ofs:self._offset+1]
         res[2] = self._prices.close[self._offset-ofs:self._offset+1]
+        res[3] = self._prices.volume[self._offset-ofs:self._offset+1]
         if self.have_position:
-            res[3] = 1.0
-            res[4] = (self._cur_close() - self.open_price) / self.open_price
+            res[4] = 1.0
+            res[5] = (self._cur_close() - self.open_price) / self.open_price
         return res
 
 
