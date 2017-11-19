@@ -55,3 +55,9 @@ Need to figure out why bars=10 doesn't converge anymore. Suspects:
 1. Percentage reward: 373b36fa04344bd5556e06e2954dd6a349e42800 (Nov19_10-46-16_gpu-conv-p2-bars=10-perc-reward)
 2. filtering threshold lowered to 1e-8 ae3a0c8f0534da03f06f8b0f4888b9fa9c608fa1 (Nov19_10-55-54_gpu-conv-p2-bars=10-filtering)
 3. proper reward for bar calculation 3e7b25ed503899745a07acab59f713323e4a9cf9 (Nov19_10-57-25_gpu-conv-p2-bars=10-reward)
+
+All of them are converging.
+
+Do bisect:
+Start 3e7b25ed503899745a07acab59f713323e4a9cf9
+Stop 6c12332edc460f535f78088243f24f1e85e47965
