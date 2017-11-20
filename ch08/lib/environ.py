@@ -145,7 +145,7 @@ class StocksEnv(gym.Env):
 
     def __init__(self, prices, bars_count=DEFAULT_BARS_COUNT,
                  comission=DEFAULT_COMMISSION_PERC, reset_on_close=True, state_1d=False,
-                 random_ofs_on_reset=True, reward_on_close=True, volumes=False):
+                 random_ofs_on_reset=True, reward_on_close=False, volumes=False):
         assert isinstance(prices, dict)
         self._prices = prices
         if state_1d:
