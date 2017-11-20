@@ -106,7 +106,7 @@ class State:
         close = self._cur_close()
         done |= self._offset >= self._prices.close.shape[0]-1
 
-        if self.have_position:
+        if self.have_position and not self.reward_on_close:
             reward += 100.0 * (close - prev_close) / prev_close
 
         return reward, done

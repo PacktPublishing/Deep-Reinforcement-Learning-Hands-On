@@ -106,4 +106,9 @@ Bisect gave weird results, try brute-force check. Full history range
 ```
 
 Looks like the reason is in volumes. Will try to disable volumes in the environment.
-Started run Nov20_12-56-20_gpu-conv-p2-bars=10-no-vols
+Started run Nov20_12-56-20_gpu-conv-p2-bars=10-no-vols. Upd: yes, that was the reason of bad convergence!
+So, volumes are not good for conv version.
+
+Now, next check: compare version with reward on every bar and version with final reward.
+Reward on close run: Nov20_18-03-59_gpu-conv-bars=10-reward-on-close
+Reward on every bar:  
