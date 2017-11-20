@@ -35,7 +35,7 @@ EPSILON_STOP = 0.1
 EPSILON_STEPS = 1000000
 
 CHECKPOINT_EVERY_STEP = 1000000
-VALIDATION_EVERY_STEP = 10000
+VALIDATION_EVERY_STEP = 100000
 
 
 if __name__ == "__main__":
@@ -55,17 +55,17 @@ if __name__ == "__main__":
             stock_data = data.load_year_data(args.year)
         else:
             stock_data = {"YNDX": data.load_relative(args.data)}
-        env = environ.StocksEnv(stock_data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
-        env_tst = environ.StocksEnv(stock_data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
+        env = environ.StocksEnv(stock_data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True, volumes=False)
+        env_tst = environ.StocksEnv(stock_data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True, volumes=False)
     elif os.path.isdir(args.data):
-        env = environ.StocksEnv.from_dir(args.data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
-        env_tst = environ.StocksEnv.from_dir(args.data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
+        env = environ.StocksEnv.from_dir(args.data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True, volumes=False)
+        env_tst = environ.StocksEnv.from_dir(args.data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True, volumes=False)
     else:
         raise RuntimeError("No doto to train on")
     env = gym.wrappers.TimeLimit(env, max_episode_steps=1000)
 
     val_data = {"YNDX": data.load_relative(args.valdata)}
-    env_val = environ.StocksEnv(val_data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
+    env_val = environ.StocksEnv(val_data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True, volumes=False)
 
     writer = SummaryWriter(comment="-conv-" + args.run)
     net = models.DQNConv1D(env.observation_space.shape, env.action_space.n)
