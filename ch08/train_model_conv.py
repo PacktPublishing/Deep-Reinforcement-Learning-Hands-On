@@ -13,7 +13,7 @@ from lib import environ, data, models, common, validation
 from tensorboardX import SummaryWriter
 
 BATCH_SIZE = 32
-BARS_COUNT = 250
+BARS_COUNT = 25
 TARGET_NET_SYNC = 1000
 DEFAULT_STOCKS = "data/YNDX_160101_161231.csv"
 DEFAULT_VAL_STOCKS = "data/YNDX_150101_151231.csv"
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     env_val = environ.StocksEnv(val_data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
 
     writer = SummaryWriter(comment="-conv-" + args.run)
-    net = models.DQNConv1DLarge(env.observation_space.shape, env.action_space.n)
+    net = models.DQNConv1D(env.observation_space.shape, env.action_space.n)
     print(net)
     if args.cuda:
         net.cuda()

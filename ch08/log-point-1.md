@@ -112,3 +112,7 @@ So, volumes are not good for conv version.
 Now, next check: compare version with reward on every bar and version with final reward.
 Reward on close run: Nov20_18-03-59_gpu-conv-bars=10-reward-on-close
 Reward on every bar: Nov20_18-06-06_gpu-conv-bars=10-reward-every-bar 
+
+Larger model converges not very good.
+Trying 25 bars on YNDX and SBER.
+Runs: Nov21_07-13-54_gpu-conv-bars=25-YNDX16 and Nov21_07-15-08_gpu-conv-bars=25-SBER16
