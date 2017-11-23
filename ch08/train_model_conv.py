@@ -61,7 +61,7 @@ if __name__ == "__main__":
         env = environ.StocksEnv.from_dir(args.data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
         env_tst = environ.StocksEnv.from_dir(args.data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
     else:
-        raise RuntimeError("No doto to train on")
+        raise RuntimeError("No dato to train on")
     env = gym.wrappers.TimeLimit(env, max_episode_steps=1000)
 
     val_data = {"YNDX": data.load_relative(args.valdata)}
@@ -82,7 +82,6 @@ if __name__ == "__main__":
     # main training loop
     step_idx = 0
     eval_states = None
-    max_reward = None
     best_mean_val = None
 
     with common.RewardTracker(writer, np.inf, group_rewards=100) as reward_tracker:
