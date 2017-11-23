@@ -89,7 +89,7 @@ if __name__ == "__main__":
             buffer.populate(1)
             selector.epsilon = max(EPSILON_STOP, EPSILON_START - step_idx / EPSILON_STEPS)
 
-            new_rewards = exp_source.pop_total_rewards()
+            new_rewards = exp_source.pop_rewards_steps()
             if new_rewards:
                 reward_tracker.reward(new_rewards[0], step_idx, selector.epsilon)
 
