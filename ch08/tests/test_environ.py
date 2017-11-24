@@ -25,7 +25,7 @@ class TestStates(unittest.TestCase):
 
 
     def test_basic(self):
-        s = environ.State(bars_count=4, comission_perc=0.0, reset_on_close=False, volumes=False)
+        s = environ.State(bars_count=4, commission_perc=0.0, reset_on_close=False, volumes=False)
         self.assertEqual(s.shape, (4*3+2,))
 
     def test_basic1d(self):
@@ -36,7 +36,7 @@ class TestStates(unittest.TestCase):
         self.assertEqual(s.shape, d.shape)
 
     def test_reset(self):
-        s = environ.State(bars_count=1, comission_perc=0.0, reset_on_close=False)
+        s = environ.State(bars_count=1, commission_perc=0.0, reset_on_close=False)
         s.reset(self.prices['TST'], offset=0)
         self.assertFalse(s.have_position)
         self.assertAlmostEqual(s._cur_close(), 2.0)
@@ -54,7 +54,7 @@ class TestStates(unittest.TestCase):
         self.assertTrue(done)
 
     def test_reward(self):
-        s = environ.State(bars_count=1, comission_perc=0.0, reset_on_close=False, reward_on_close=True)
+        s = environ.State(bars_count=1, commission_perc=0.0, reset_on_close=False, reward_on_close=True)
         s.reset(self.prices['TST'], offset=0)
         self.assertFalse(s.have_position)
         self.assertAlmostEqual(s._cur_close(), 2.0)
@@ -73,7 +73,7 @@ class TestStates(unittest.TestCase):
         self.assertAlmostEqual(s._cur_close(), 2.0)
 
     def test_comission(self):
-        s = environ.State(bars_count=1, comission_perc=1.0, reset_on_close=False)
+        s = environ.State(bars_count=1, commission_perc=1.0, reset_on_close=False)
         s.reset(self.prices['TST'], offset=0)
         self.assertFalse(s.have_position)
         self.assertAlmostEqual(s._cur_close(), 2.0)
@@ -85,7 +85,7 @@ class TestStates(unittest.TestCase):
         self.assertAlmostEqual(s._cur_close(), 3.0)
 
     def test_final_reward(self):
-        s = environ.State(bars_count=1, comission_perc=0.0, reset_on_close=False, reward_on_close=True)
+        s = environ.State(bars_count=1, commission_perc=0.0, reset_on_close=False, reward_on_close=True)
         s.reset(self.prices['TST'], offset=0)
         self.assertFalse(s.have_position)
         self.assertAlmostEqual(s._cur_close(), 2.0)

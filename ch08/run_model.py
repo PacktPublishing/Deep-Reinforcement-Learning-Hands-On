@@ -21,12 +21,12 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--model", required=True, help="Model file to load")
     parser.add_argument("-b", "--bars", type=int, default=50, help="Count of bars to feed into the model")
     parser.add_argument("-n", "--name", required=True, help="Name to use in output images")
-    parser.add_argument("--comission", type=float, default=0.1, help="Comission size in percent, default=0.1")
+    parser.add_argument("--commission", type=float, default=0.1, help="Commission size in percent, default=0.1")
     parser.add_argument("--conv", default=False, action="store_true", help="Use convolution model instead of FF")
     args = parser.parse_args()
 
     prices = data.load_relative(args.data)
-    env = environ.StocksEnv({"TEST": prices}, bars_count=args.bars, reset_on_close=False, comission=args.comission,
+    env = environ.StocksEnv({"TEST": prices}, bars_count=args.bars, reset_on_close=False, commission=args.commission,
                             state_1d=args.conv, random_ofs_on_reset=False, reward_on_close=False, volumes=False)
     if args.conv:
         net = models.DQNConv1D(env.observation_space.shape, env.action_space.n)

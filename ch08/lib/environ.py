@@ -17,15 +17,15 @@ class Actions(enum.Enum):
 
 
 class State:
-    def __init__(self, bars_count, comission_perc, reset_on_close, reward_on_close=True, volumes=True):
+    def __init__(self, bars_count, commission_perc, reset_on_close, reward_on_close=True, volumes=True):
         assert isinstance(bars_count, int)
         assert bars_count > 0
-        assert isinstance(comission_perc, float)
-        assert comission_perc >= 0.0
+        assert isinstance(commission_perc, float)
+        assert commission_perc >= 0.0
         assert isinstance(reset_on_close, bool)
         assert isinstance(reward_on_close, bool)
         self.bars_count = bars_count
-        self.comission_perc = comission_perc
+        self.commission_perc = commission_perc
         self.reset_on_close = reset_on_close
         self.reward_on_close = reward_on_close
         self.volumes = volumes
@@ -92,9 +92,9 @@ class State:
         if action == Actions.Buy and not self.have_position:
             self.have_position = True
             self.open_price = close
-            reward -= self.comission_perc
+            reward -= self.commission_perc
         elif action == Actions.Close and self.have_position:
-            reward -= self.comission_perc
+            reward -= self.commission_perc
             done |= self.reset_on_close
             if self.reward_on_close:
                 reward += 100.0 * (close - self.open_price) / self.open_price
@@ -144,15 +144,15 @@ class StocksEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, prices, bars_count=DEFAULT_BARS_COUNT,
-                 comission=DEFAULT_COMMISSION_PERC, reset_on_close=True, state_1d=False,
+                 commission=DEFAULT_COMMISSION_PERC, reset_on_close=True, state_1d=False,
                  random_ofs_on_reset=True, reward_on_close=False, volumes=False):
         assert isinstance(prices, dict)
         self._prices = prices
         if state_1d:
-            self._state = State1D(bars_count, comission, reset_on_close, reward_on_close=reward_on_close,
+            self._state = State1D(bars_count, commission, reset_on_close, reward_on_close=reward_on_close,
                                   volumes=volumes)
         else:
-            self._state = State(bars_count, comission, reset_on_close, reward_on_close=reward_on_close,
+            self._state = State(bars_count, commission, reset_on_close, reward_on_close=reward_on_close,
                                 volumes=volumes)
         self.action_space = gym.spaces.Discrete(n=len(Actions))
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=self._state.shape)
