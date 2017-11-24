@@ -67,7 +67,6 @@ if __name__ == "__main__":
     plt.plot(rewards)
     plt.title("Total reward, data=%s" % args.name)
     plt.ylabel("Reward, %")
-    plt.xlabel("Bar")
     plt.savefig("rewards-%s.png" % args.name)
 
     pass
