@@ -42,9 +42,6 @@ if __name__ == "__main__":
     step_idx = 0
     rewards = []
 
-    real_profit = 0.0
-    real_profits = []
-    position = None
     position_steps = None
 
     while True:
@@ -56,39 +53,21 @@ if __name__ == "__main__":
             action_idx = env.action_space.sample()
         action = environ.Actions(action_idx)
 
-        close_price = env._state._cur_close()
-
-        if action == environ.Actions.Buy and position is None:
-            position = close_price
-            position_steps = 0
-            real_profit -= close_price * args.comission / 100
-        elif action == environ.Actions.Close and position is not None:
-            real_profit -= close_price * args.comission / 100
-            real_profit += close_price - position
-            position = None
-        real_profits.append(real_profit)
-
         obs, reward, done, _ = env.step(action_idx)
         if position_steps is not None:
             position_steps += 1
         total_reward += reward
         rewards.append(total_reward)
         if step_idx % 100 == 0:
-            print("%d: position=%s, reward=%.3f, profit=%.3f" % (step_idx, position_steps, total_reward, real_profit))
+            print("%d: position=%s, reward=%.3f" % (step_idx, position_steps, total_reward))
         if done:
             break
-    print(total_reward)
 
     plt.clf()
     plt.plot(rewards)
+    plt.title("Total reward, data=%s" % args.name)
+    plt.ylabel("Reward, %")
+    plt.xlabel("Bar")
     plt.savefig("rewards-%s.png" % args.name)
-
-    plt.clf()
-    plt.plot(real_profits)
-    plt.savefig("profts-%s.png"  % args.name)
-
-    plt.clf()
-    plt.plot(np.array(real_profits) / start_price)
-    plt.savefig("profts-rel-%s.png"  % args.name)
 
     pass
