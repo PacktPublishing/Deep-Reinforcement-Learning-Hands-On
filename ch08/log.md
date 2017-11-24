@@ -91,33 +91,8 @@ Next actions:
 1. Improve the testing tool to take into account all orders
 2. Implement validation on some held-out prices pool (2017)
 
-Thing to check: get rid of position information in the state. As our system should just generate signals, 
-it can do it regardless of the current state.
+Run test with longer epsilon decay -- doesn't improve much.
+Runs Nov17_13-25-00_gpu-conv-vols-val-YNDX16 and 
+Nov17_13-25-11_gpu-conv-3M-epsilon-YNDX16. They have validation runs on YNDX15.
 
-Started two runs (on yandex-2016 quotes):
-1. Nov15_18-28-32_gpu-conv-no-pos-bars=50-steps=3 -- no position in state
-
-Upd: with removal of the state, noise was introduced to the reward, as the network doesn't know the presence of the position.
-But our goal is to make its decisions independent on on presence of position. Network has to give us signals to enter 
-and exit the market. To get the goal, new set of reward rules was intorduced.
-1. New state "KeepOpen" has to be added, and its semantic is to keep open long position if we have it.
-2. State doesn't need to track profit anymore
-3. No sum reward should be returned on the position close.
-4. Reward has to be switched to percentage to make it independent to current stock price
-4. Buy and Close actions always returns comission
-5. Skip returns zero reward as there is no comission
-6. KeepOpen returns normal movement reward.
-
-This model has started as run Nov15_19-17-03_home-conv-perc-reward  
-
-All started model doesn't converge, and I don't fully understand what went wrong. It was several changes:
-1. filtering of the prices were removed
-2. reward system was changed -- no position information, extra action, etc
-3. reward was turned to percentage.
-
-As percentage reward is the most critical for multy-stocks support, the plan:
-1. Fork a branch from the point of good convergence (a12210ab202304db9b8703eb930759d1172ace8e)
-2. Start a train on Yandex at this point to check that it is converging
-3. Implement percentage of reward on top of this point and run training
-
-On current master branch I'll start a run with filtering returned, as looks like Yandex has lots of empty bars.
+Started YNDX16 run with 25% final epsilon plus the same, but with 20 bars context.
