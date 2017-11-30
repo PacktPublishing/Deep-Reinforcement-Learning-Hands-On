@@ -19,8 +19,6 @@ EPSILON_STEPS = 50000
 
 REPLAY_BUFFER = 10000
 
-TARGET_STEPS = 2000
-
 
 class DQN(nn.Module):
     def __init__(self, input_size, n_actions):
@@ -50,7 +48,6 @@ if __name__ == "__main__":
     writer = SummaryWriter(comment="cartpole-dqn")
 
     net = DQN(env.observation_space.shape[0], env.action_space.n)
-    tgt_net = ptan.agent.TargetNet(net)
     print(net)
 
     selector = ptan.actions.EpsilonGreedyActionSelector(epsilon=EPSILON_START)
@@ -61,30 +58,36 @@ if __name__ == "__main__":
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
     mse_loss = nn.MSELoss()
 
-    batch_states, batch_actions, batch_targets = [], [], []
+
     total_rewards = []
+    step_idx = 0
 
-    for step_idx, exp in enumerate(exp_source):
+    while True:
+        step_idx += 1
         selector.epsilon = max(EPSILON_STOP, EPSILON_START - step_idx / EPSILON_STEPS)
-        batch_states.append(exp.state)
-        batch_actions.append(exp.action)
-        batch_targets.append(calc_target(tgt_net.target_model, exp.reward, exp.last_state))
-        if len(batch_states) == BATCH_SIZE:
-            optimizer.zero_grad()
-            states_v = Variable(torch.from_numpy(np.array(batch_states, dtype=np.float32)))
-            net_q_v = net(states_v)
-            target_q = net_q_v.data.numpy().copy()
-            target_q[range(BATCH_SIZE), batch_actions] = batch_targets
-            target_q_v = Variable(torch.from_numpy(target_q))
-            loss_v = mse_loss(net_q_v, target_q_v)
-            loss_v.backward()
-            optimizer.step()
+        replay_buffer.populate(1)
 
-            # clear batch
-            batch_states.clear()
-            batch_actions.clear()
-            batch_targets.clear()
+        if len(replay_buffer) < BATCH_SIZE:
+            continue
 
+        # sample batch
+        batch = replay_buffer.sample(BATCH_SIZE)
+        batch_states = [exp.state for exp in batch]
+        batch_actions = [exp.action for exp in batch]
+        batch_targets = [calc_target(net, exp.reward, exp.last_state)
+                         for exp in batch]
+        # train
+        optimizer.zero_grad()
+        states_v = Variable(torch.from_numpy(np.array(batch_states, dtype=np.float32)))
+        net_q_v = net(states_v)
+        target_q = net_q_v.data.numpy().copy()
+        target_q[range(BATCH_SIZE), batch_actions] = batch_targets
+        target_q_v = Variable(torch.from_numpy(target_q))
+        loss_v = mse_loss(net_q_v, target_q_v)
+        loss_v.backward()
+        optimizer.step()
+
+        # handle new rewards
         new_rewards = exp_source.pop_total_rewards()
         if new_rewards:
             reward = new_rewards[0]
@@ -97,8 +100,4 @@ if __name__ == "__main__":
             if mean_rewards > 195:
                 print("Solved in %d steps!" % step_idx)
                 break
-
-        if step_idx % TARGET_STEPS == 0:
-            tgt_net.sync()
     writer.close()
-    pass
