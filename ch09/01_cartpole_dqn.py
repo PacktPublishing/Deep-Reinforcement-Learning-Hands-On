@@ -58,7 +58,6 @@ if __name__ == "__main__":
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
     mse_loss = nn.MSELoss()
 
-
     total_rewards = []
     step_idx = 0
 
