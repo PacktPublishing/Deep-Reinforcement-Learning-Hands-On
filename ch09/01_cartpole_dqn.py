@@ -10,14 +10,14 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 GAMMA = 0.99
-LEARNING_RATE = 0.005
+LEARNING_RATE = 0.01
 BATCH_SIZE = 8
 
 EPSILON_START = 1.0
-EPSILON_STOP = 0.1
-EPSILON_STEPS = 50000
+EPSILON_STOP = 0.02
+EPSILON_STEPS = 5000
 
-REPLAY_BUFFER = 10000
+REPLAY_BUFFER = 50000
 
 
 class DQN(nn.Module):
@@ -93,7 +93,7 @@ if __name__ == "__main__":
             reward = new_rewards[0]
             total_rewards.append(reward)
             mean_rewards = float(np.mean(total_rewards[-100:]))
-            print("%d: reward: %6.2f,\tmean_100: %6.2f,\tepsilon: %.2f" % (step_idx, reward, mean_rewards, selector.epsilon))
+            print("%d: reward: %6.2f, mean_100: %6.2f, epsilon: %.2f" % (step_idx, reward, mean_rewards, selector.epsilon))
             writer.add_scalar("reward", reward, step_idx)
             writer.add_scalar("reward_100", mean_rewards, step_idx)
             writer.add_scalar("epsilon", selector.epsilon, step_idx)
