@@ -45,7 +45,7 @@ def calc_target(net, local_reward, next_state):
 
 if __name__ == "__main__":
     env = gym.make("CartPole-v0")
-    writer = SummaryWriter(comment="cartpole-dqn")
+    writer = SummaryWriter(comment="-cartpole-dqn")
 
     net = DQN(env.observation_space.shape[0], env.action_space.n)
     print(net)
