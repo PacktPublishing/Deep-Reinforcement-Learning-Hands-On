@@ -94,12 +94,13 @@ if __name__ == "__main__":
             reward = new_rewards[0]
             total_rewards.append(reward)
             mean_rewards = float(np.mean(total_rewards[-100:]))
-            print("%d: reward: %6.2f, mean_100: %6.2f, epsilon: %.2f" % (step_idx, reward, mean_rewards, selector.epsilon))
+            print("%d: reward: %6.2f, mean_100: %6.2f, epsilon: %.2f, episodes: %d" % (
+                step_idx, reward, mean_rewards, selector.epsilon, done_episodes))
             writer.add_scalar("reward", reward, step_idx)
             writer.add_scalar("reward_100", mean_rewards, step_idx)
             writer.add_scalar("epsilon", selector.epsilon, step_idx)
             writer.add_scalar("episodes", done_episodes, step_idx)
             if mean_rewards > 195:
-                print("Solved in %d steps!" % step_idx)
+                print("Solved in %d steps and %d episodes!" % (step_idx, done_episodes))
                 break
     writer.close()
