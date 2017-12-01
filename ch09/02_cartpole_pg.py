@@ -11,11 +11,10 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 GAMMA = 0.99
-LEARNING_RATE = 0.01
-BATCH_SIZE = 32
+LEARNING_RATE = 0.001
+BATCH_SIZE = 16
 
-ENTROPY_BETA = 0.05
-REWARD_STEPS = 10
+REWARD_STEPS = 50
 
 
 class PGN(nn.Module):
@@ -54,7 +53,7 @@ if __name__ == "__main__":
 
     for step_idx, exp in enumerate(exp_source):
         step_rewards.append(exp.reward)
-        step_rewards = step_rewards[-1000:]
+        step_rewards = step_rewards[-100:]
 
         baseline = np.mean(step_rewards)
         writer.add_scalar("baseline", baseline, step_idx)
@@ -89,12 +88,7 @@ if __name__ == "__main__":
         logits_v = net(states_v)
         log_prob_v = F.log_softmax(logits_v)
         log_prob_actions_v = batch_scale_v * log_prob_v[range(BATCH_SIZE), batch_actions_t]
-        loss_v = log_prob_actions_v.mean()
-
-        prob_v = F.softmax(logits_v)
-        entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum()
-        writer.add_scalar("loss_entropy", entropy_loss_v.data.numpy()[0], step_idx)
-        loss_v += entropy_loss_v
+        loss_v = -log_prob_actions_v.mean()
 
         loss_v.backward()
         optimizer.step()
