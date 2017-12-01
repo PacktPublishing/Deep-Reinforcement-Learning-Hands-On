@@ -6,15 +6,20 @@ from tensorboardX import SummaryWriter
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
 
 GAMMA = 0.99
-LEARNING_RATE = 0.01
-BATCH_SIZE = 8
+LEARNING_RATE = 0.001
+BATCH_SIZE = 32
 
 REPLAY_BUFFER = 100
 MIN_EPISODES_TO_TRAIN = 10
+
+EPSILON_START = 1.0
+EPSILON_STOP = 0.02
+EPSILON_STEPS = 50000
 
 
 class PGN(nn.Module):
@@ -24,8 +29,7 @@ class PGN(nn.Module):
         self.net = nn.Sequential(
             nn.Linear(input_size, 128),
             nn.ReLU(),
-            nn.Linear(128, n_actions),
-            nn.Softmax()
+            nn.Linear(128, n_actions)
         )
 
     def forward(self, x):
@@ -39,8 +43,11 @@ if __name__ == "__main__":
     net = PGN(env.observation_space.shape[0], env.action_space.n)
     print(net)
 
-    agent = ptan.agent.PolicyAgent(net, preprocessor=ptan.agent.float32_preprocessor)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA)
+    selector = ptan.actions.EpsilonGreedyActionSelector(epsilon=EPSILON_START,
+                                                        selector=ptan.actions.ProbabilityActionSelector())
+    agent = ptan.agent.PolicyAgent(net, action_selector=selector, preprocessor=ptan.agent.float32_preprocessor,
+                                   apply_softmax=True)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=2)
     replay_buffer = ptan.experience.ExperienceReplayBuffer(exp_source, REPLAY_BUFFER)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
@@ -51,6 +58,7 @@ if __name__ == "__main__":
     total_step_reward = 0.0
 
     for step_idx, exp in enumerate(exp_source):
+        selector.epsilon = max(EPSILON_STOP, EPSILON_START - step_idx / EPSILON_STEPS)
         total_step_reward += exp.reward
         replay_buffer._add(exp)
 
@@ -61,10 +69,11 @@ if __name__ == "__main__":
             reward = new_rewards[0]
             total_rewards.append(reward)
             mean_rewards = float(np.mean(total_rewards[-100:]))
-            print("%d: reward: %6.2f, mean_100: %6.2f, episodes: %d" % (
-                step_idx, reward, mean_rewards, done_episodes))
+            print("%d: reward: %6.2f, mean_100: %6.2f, epsilon: %.2f, episodes: %d" % (
+                step_idx, reward, mean_rewards, selector.epsilon, done_episodes))
             writer.add_scalar("reward", reward, step_idx)
             writer.add_scalar("reward_100", mean_rewards, step_idx)
+            writer.add_scalar("epsilon", selector.epsilon, step_idx)
             writer.add_scalar("episodes", done_episodes, step_idx)
             if mean_rewards > 195:
                 print("Solved in %d steps and %d episodes!" % (step_idx, done_episodes))
@@ -76,61 +85,15 @@ if __name__ == "__main__":
         batch = replay_buffer.sample(BATCH_SIZE)
         batch_states = [exp.state for exp in batch]
         batch_actions_t = torch.LongTensor([int(exp.action) for exp in batch])
-        mean_step_reward = total_step_reward / step_idx
+        mean_step_reward = total_step_reward / (step_idx + 1)
         batch_scale_t = torch.FloatTensor([exp.reward - mean_step_reward for exp in batch])
 
         optimizer.zero_grad()
         states_v = Variable(torch.from_numpy(np.array(batch_states, dtype=np.float32)))
-        policy_v = net(states_v)
-        prob_actions_v = policy_v[range(BATCH_SIZE), batch_actions_t]
-        log_prob_v = torch.log(prob_actions_v)
-        log_prob_v = Variable(batch_scale_t) * log_prob_v
+        logits_v = net(states_v)
+        log_prob_v = F.log_softmax(logits_v)
+        log_prob_v = Variable(batch_scale_t) * log_prob_v[range(BATCH_SIZE), batch_actions_t]
         loss_v = log_prob_v.mean()
         loss_v.backward()
         optimizer.step()
-
-        break
-
-    #
-    # while True:
-    #     step_idx += 1
-    #     selector.epsilon = max(EPSILON_STOP, EPSILON_START - step_idx / EPSILON_STEPS)
-    #     replay_buffer.populate(1)
-    #
-    #     if len(replay_buffer) < BATCH_SIZE:
-    #         continue
-    #
-    #     # sample batch
-    #     batch = replay_buffer.sample(BATCH_SIZE)
-    #     batch_states = [exp.state for exp in batch]
-    #     batch_actions = [exp.action for exp in batch]
-    #     batch_targets = [calc_target(net, exp.reward, exp.last_state)
-    #                      for exp in batch]
-    #     # train
-    #     optimizer.zero_grad()
-    #     states_v = Variable(torch.from_numpy(np.array(batch_states, dtype=np.float32)))
-    #     net_q_v = net(states_v)
-    #     target_q = net_q_v.data.numpy().copy()
-    #     target_q[range(BATCH_SIZE), batch_actions] = batch_targets
-    #     target_q_v = Variable(torch.from_numpy(target_q))
-    #     loss_v = mse_loss(net_q_v, target_q_v)
-    #     loss_v.backward()
-    #     optimizer.step()
-    #
-    #     # handle new rewards
-    #     new_rewards = exp_source.pop_total_rewards()
-    #     if new_rewards:
-    #         done_episodes += 1
-    #         reward = new_rewards[0]
-    #         total_rewards.append(reward)
-    #         mean_rewards = float(np.mean(total_rewards[-100:]))
-    #         print("%d: reward: %6.2f, mean_100: %6.2f, epsilon: %.2f, episodes: %d" % (
-    #             step_idx, reward, mean_rewards, selector.epsilon, done_episodes))
-    #         writer.add_scalar("reward", reward, step_idx)
-    #         writer.add_scalar("reward_100", mean_rewards, step_idx)
-    #         writer.add_scalar("epsilon", selector.epsilon, step_idx)
-    #         writer.add_scalar("episodes", done_episodes, step_idx)
-    #         if mean_rewards > 195:
-    #             print("Solved in %d steps and %d episodes!" % (step_idx, done_episodes))
-    #             break
-#    writer.close()
+    writer.close()
