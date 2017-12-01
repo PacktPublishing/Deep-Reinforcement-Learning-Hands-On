@@ -12,9 +12,9 @@ from torch.autograd import Variable
 
 GAMMA = 0.99
 LEARNING_RATE = 0.001
-BATCH_SIZE = 16
+BATCH_SIZE = 8
 
-REWARD_STEPS = 50
+REWARD_STEPS = 10
 
 
 class PGN(nn.Module):
@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
     for step_idx, exp in enumerate(exp_source):
         step_rewards.append(exp.reward)
-        step_rewards = step_rewards[-100:]
+        step_rewards = step_rewards[-1000:]
 
         baseline = np.mean(step_rewards)
         writer.add_scalar("baseline", baseline, step_idx)
@@ -68,8 +68,8 @@ if __name__ == "__main__":
             reward = new_rewards[0]
             total_rewards.append(reward)
             mean_rewards = float(np.mean(total_rewards[-100:]))
-            print("%d: reward: %6.2f, mean_100: %6.2f, epsilon: %.2f, episodes: %d" % (
-                step_idx, reward, mean_rewards, 0.0, done_episodes))
+            print("%d: reward: %6.2f, mean_100: %6.2f, episodes: %d" % (
+                step_idx, reward, mean_rewards, done_episodes))
             writer.add_scalar("reward", reward, step_idx)
             writer.add_scalar("reward_100", mean_rewards, step_idx)
             writer.add_scalar("episodes", done_episodes, step_idx)
