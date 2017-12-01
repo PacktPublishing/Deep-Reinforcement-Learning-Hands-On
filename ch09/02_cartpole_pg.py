@@ -11,15 +11,11 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 GAMMA = 0.99
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.01
 BATCH_SIZE = 32
 
-REPLAY_BUFFER = 100
-MIN_EPISODES_TO_TRAIN = 10
-
-EPSILON_START = 1.0
-EPSILON_STOP = 0.02
-EPSILON_STEPS = 50000
+ENTROPY_BETA = 0.05
+REWARD_STEPS = 10
 
 
 class PGN(nn.Module):
@@ -43,24 +39,28 @@ if __name__ == "__main__":
     net = PGN(env.observation_space.shape[0], env.action_space.n)
     print(net)
 
-    selector = ptan.actions.EpsilonGreedyActionSelector(epsilon=EPSILON_START,
-                                                        selector=ptan.actions.ProbabilityActionSelector())
-    agent = ptan.agent.PolicyAgent(net, action_selector=selector, preprocessor=ptan.agent.float32_preprocessor,
+    agent = ptan.agent.PolicyAgent(net, preprocessor=ptan.agent.float32_preprocessor,
                                    apply_softmax=True)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=2)
-    replay_buffer = ptan.experience.ExperienceReplayBuffer(exp_source, REPLAY_BUFFER)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
     total_rewards = []
+    step_rewards = []
     step_idx = 0
     done_episodes = 0
-    total_step_reward = 0.0
+
+    batch_states, batch_actions, batch_scales = [], [], []
 
     for step_idx, exp in enumerate(exp_source):
-        selector.epsilon = max(EPSILON_STOP, EPSILON_START - step_idx / EPSILON_STEPS)
-        total_step_reward += exp.reward
-        replay_buffer._add(exp)
+        step_rewards.append(exp.reward)
+        step_rewards = step_rewards[-1000:]
+
+        baseline = np.mean(step_rewards)
+        writer.add_scalar("baseline", baseline, step_idx)
+        batch_states.append(exp.state)
+        batch_actions.append(int(exp.action))
+        batch_scales.append(exp.reward - baseline)
 
         # handle new rewards
         new_rewards = exp_source.pop_total_rewards()
@@ -70,30 +70,37 @@ if __name__ == "__main__":
             total_rewards.append(reward)
             mean_rewards = float(np.mean(total_rewards[-100:]))
             print("%d: reward: %6.2f, mean_100: %6.2f, epsilon: %.2f, episodes: %d" % (
-                step_idx, reward, mean_rewards, selector.epsilon, done_episodes))
+                step_idx, reward, mean_rewards, 0.0, done_episodes))
             writer.add_scalar("reward", reward, step_idx)
             writer.add_scalar("reward_100", mean_rewards, step_idx)
-            writer.add_scalar("epsilon", selector.epsilon, step_idx)
             writer.add_scalar("episodes", done_episodes, step_idx)
             if mean_rewards > 195:
                 print("Solved in %d steps and %d episodes!" % (step_idx, done_episodes))
                 break
 
-        if len(total_rewards) < MIN_EPISODES_TO_TRAIN:
+        if len(batch_states) < BATCH_SIZE:
             continue
 
-        batch = replay_buffer.sample(BATCH_SIZE)
-        batch_states = [exp.state for exp in batch]
-        batch_actions_t = torch.LongTensor([int(exp.action) for exp in batch])
-        mean_step_reward = total_step_reward / (step_idx + 1)
-        batch_scale_t = torch.FloatTensor([exp.reward - mean_step_reward for exp in batch])
+        states_v = Variable(torch.from_numpy(np.array(batch_states, dtype=np.float32)))
+        batch_actions_t = torch.LongTensor(batch_actions)
+        batch_scale_v = Variable(torch.FloatTensor(batch_scales))
 
         optimizer.zero_grad()
-        states_v = Variable(torch.from_numpy(np.array(batch_states, dtype=np.float32)))
         logits_v = net(states_v)
         log_prob_v = F.log_softmax(logits_v)
-        log_prob_v = Variable(batch_scale_t) * log_prob_v[range(BATCH_SIZE), batch_actions_t]
-        loss_v = log_prob_v.mean()
+        log_prob_actions_v = batch_scale_v * log_prob_v[range(BATCH_SIZE), batch_actions_t]
+        loss_v = log_prob_actions_v.mean()
+
+        prob_v = F.softmax(logits_v)
+        entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum()
+        writer.add_scalar("loss_entropy", entropy_loss_v.data.numpy()[0], step_idx)
+        loss_v += entropy_loss_v
+
         loss_v.backward()
         optimizer.step()
+
+        batch_states.clear()
+        batch_actions.clear()
+        batch_scales.clear()
+
     writer.close()
