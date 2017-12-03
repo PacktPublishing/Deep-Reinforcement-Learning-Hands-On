@@ -58,19 +58,15 @@ if __name__ == "__main__":
 
     batch_episodes = 0
     batch_states, batch_actions, batch_qvals = [], [], []
-    cur_states, cur_actions, cur_rewards = [], [], []
+    cur_rewards = []
 
     for step_idx, exp in enumerate(exp_source):
-        cur_states.append(exp.state)
-        cur_actions.append(int(exp.action))
+        batch_states.append(exp.state)
+        batch_actions.append(int(exp.action))
         cur_rewards.append(exp.reward)
 
         if exp.last_state is None:
-            batch_states.extend(cur_states)
-            batch_actions.extend(cur_actions)
             batch_qvals.extend(calc_qvals(cur_rewards))
-            cur_states.clear()
-            cur_actions.clear()
             cur_rewards.clear()
             batch_episodes += 1
 
@@ -93,11 +89,11 @@ if __name__ == "__main__":
         if batch_episodes < EPISODES_TO_TRAIN:
             continue
 
+        optimizer.zero_grad()
         states_v = Variable(torch.from_numpy(np.array(batch_states, dtype=np.float32)))
         batch_actions_t = torch.LongTensor(batch_actions)
         batch_qvals_v = Variable(torch.FloatTensor(batch_qvals))
 
-        optimizer.zero_grad()
         logits_v = net(states_v)
         log_prob_v = F.log_softmax(logits_v)
         log_prob_actions_v = batch_qvals_v * log_prob_v[range(len(batch_states)), batch_actions_t]
