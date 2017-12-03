@@ -12,9 +12,7 @@ from torch.autograd import Variable
 
 GAMMA = 0.99
 LEARNING_RATE = 0.001
-BATCH_SIZE = 8
-
-REWARD_STEPS = 10
+EPISODES_TO_TRAIN = 4
 
 
 class PGN(nn.Module):
@@ -31,35 +29,50 @@ class PGN(nn.Module):
         return self.net(x)
 
 
+def calc_qvals(rewards):
+    res = []
+    sum_r = 0.0
+    for r in reversed(rewards):
+        sum_r *= GAMMA
+        sum_r += r
+        res.append(sum_r)
+    return list(reversed(res))
+
+
 if __name__ == "__main__":
     env = gym.make("CartPole-v0")
-    writer = SummaryWriter(comment="-cartpole-pg")
+    writer = SummaryWriter(comment="-cartpole-reinforce")
 
     net = PGN(env.observation_space.shape[0], env.action_space.n)
     print(net)
 
     agent = ptan.agent.PolicyAgent(net, preprocessor=ptan.agent.float32_preprocessor,
                                    apply_softmax=True)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
     total_rewards = []
-    step_rewards = []
     step_idx = 0
     done_episodes = 0
 
-    batch_states, batch_actions, batch_scales = [], [], []
+    batch_episodes = 0
+    batch_states, batch_actions, batch_qvals = [], [], []
+    cur_states, cur_actions, cur_rewards = [], [], []
 
     for step_idx, exp in enumerate(exp_source):
-        step_rewards.append(exp.reward)
-        step_rewards = step_rewards[-1000:]
+        cur_states.append(exp.state)
+        cur_actions.append(int(exp.action))
+        cur_rewards.append(exp.reward)
 
-        baseline = np.mean(step_rewards)
-        writer.add_scalar("baseline", baseline, step_idx)
-        batch_states.append(exp.state)
-        batch_actions.append(int(exp.action))
-        batch_scales.append(exp.reward - baseline)
+        if exp.last_state is None:
+            batch_states.extend(cur_states)
+            batch_actions.extend(cur_actions)
+            batch_qvals.extend(calc_qvals(cur_rewards))
+            cur_states.clear()
+            cur_actions.clear()
+            cur_rewards.clear()
+            batch_episodes += 1
 
         # handle new rewards
         new_rewards = exp_source.pop_total_rewards()
@@ -77,24 +90,25 @@ if __name__ == "__main__":
                 print("Solved in %d steps and %d episodes!" % (step_idx, done_episodes))
                 break
 
-        if len(batch_states) < BATCH_SIZE:
+        if batch_episodes < EPISODES_TO_TRAIN:
             continue
 
         states_v = Variable(torch.from_numpy(np.array(batch_states, dtype=np.float32)))
         batch_actions_t = torch.LongTensor(batch_actions)
-        batch_scale_v = Variable(torch.FloatTensor(batch_scales))
+        batch_qvals_v = Variable(torch.FloatTensor(batch_qvals))
 
         optimizer.zero_grad()
         logits_v = net(states_v)
         log_prob_v = F.log_softmax(logits_v)
-        log_prob_actions_v = batch_scale_v * log_prob_v[range(BATCH_SIZE), batch_actions_t]
+        log_prob_actions_v = batch_qvals_v * log_prob_v[range(len(batch_states)), batch_actions_t]
         loss_v = -log_prob_actions_v.mean()
 
         loss_v.backward()
         optimizer.step()
 
+        batch_episodes = 0
         batch_states.clear()
         batch_actions.clear()
-        batch_scales.clear()
+        batch_qvals.clear()
 
     writer.close()
