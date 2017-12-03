@@ -11,7 +11,7 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 GAMMA = 0.99
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.01
 EPISODES_TO_TRAIN = 4
 
 
