@@ -17,7 +17,7 @@ LEARNING_RATE = 0.0001
 ENTROPY_BETA = 0.001
 BATCH_SIZE = 128
 
-REWARD_STEPS = 30
+REWARD_STEPS = 100
 PLAY_NET_SYNC = 1000
 BASELINE_STEPS = 10000
 
@@ -30,7 +30,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
 
-    envs = [make_env() for _ in range(10)]
+    envs = [make_env() for _ in range(5)]
     writer = SummaryWriter(comment="-pong-pg")
 
     net = common.AtariPGN(envs[0].observation_space.shape, envs[0].action_space.n)
@@ -48,6 +48,7 @@ if __name__ == "__main__":
     step_rewards = []
     step_idx = 0
     done_episodes = 0
+    train_step_idx = 0
 
     batch_states, batch_actions, batch_scales = [], [], []
 
@@ -72,6 +73,7 @@ if __name__ == "__main__":
             if len(batch_states) < BATCH_SIZE:
                 continue
 
+            train_step_idx += 1
             states_v = Variable(torch.from_numpy(np.array(batch_states, copy=False)))
             batch_actions_t = torch.LongTensor(batch_actions)
             batch_scale_v = Variable(torch.FloatTensor(batch_scales))
@@ -90,7 +92,7 @@ if __name__ == "__main__":
             entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum()
             loss_v = loss_policy_v + entropy_loss_v
 
-            if step_idx % 100 == 0:
+            if train_step_idx % 100 == 0:
                 writer.add_scalar("baseline", baseline, step_idx)
                 writer.add_scalar("batch_scales", np.mean(batch_scales), step_idx)
                 writer.add_scalar("loss_entropy", entropy_loss_v.data.cpu().numpy()[0], step_idx)
