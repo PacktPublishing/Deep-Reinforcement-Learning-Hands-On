@@ -13,7 +13,7 @@ from torch.autograd import Variable
 from lib import common
 
 GAMMA = 0.99
-LEARNING_RATE = 0.00001
+LEARNING_RATE = 0.0001
 ENTROPY_BETA = 0.001
 BATCH_SIZE = 128
 
@@ -21,23 +21,26 @@ REWARD_STEPS = 30
 PLAY_NET_SYNC = 1000
 BASELINE_STEPS = 10000
 
+def make_env():
+    return ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
 
-    env = ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
+    envs = [make_env() for _ in range(10)]
     writer = SummaryWriter(comment="-pong-pg")
 
-    net = common.AtariPGN(env.observation_space.shape, env.action_space.n)
+    net = common.AtariPGN(envs[0].observation_space.shape, envs[0].action_space.n)
     if args.cuda:
         net.cuda()
     print(net)
 
     tgt_net = ptan.agent.TargetNet(net)
     agent = ptan.agent.PolicyAgent(tgt_net.target_model, apply_softmax=True, cuda=args.cuda)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
@@ -54,7 +57,6 @@ if __name__ == "__main__":
             step_rewards = step_rewards[-BASELINE_STEPS:]
 
             baseline = np.mean(step_rewards)
-            writer.add_scalar("baseline", baseline, step_idx)
             batch_states.append(np.array(exp.state, copy=False))
             batch_actions.append(int(exp.action))
             batch_scales.append(exp.reward - baseline)
@@ -88,10 +90,12 @@ if __name__ == "__main__":
             entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum()
             loss_v = loss_policy_v + entropy_loss_v
 
-            writer.add_scalar("batch_scales", np.mean(batch_scales), step_idx)
-            writer.add_scalar("loss_entropy", entropy_loss_v.data.cpu().numpy()[0], step_idx)
-            writer.add_scalar("loss_policy", loss_policy_v.data.cpu().numpy()[0], step_idx)
-            writer.add_scalar("loss_total", loss_v.data.cpu().numpy()[0], step_idx)
+            if step_idx % 100 == 0:
+                writer.add_scalar("baseline", baseline, step_idx)
+                writer.add_scalar("batch_scales", np.mean(batch_scales), step_idx)
+                writer.add_scalar("loss_entropy", entropy_loss_v.data.cpu().numpy()[0], step_idx)
+                writer.add_scalar("loss_policy", loss_policy_v.data.cpu().numpy()[0], step_idx)
+                writer.add_scalar("loss_total", loss_v.data.cpu().numpy()[0], step_idx)
 
             loss_v.backward()
             optimizer.step()
