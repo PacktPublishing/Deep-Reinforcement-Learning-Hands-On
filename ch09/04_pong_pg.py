@@ -2,6 +2,7 @@
 import gym
 import ptan
 import numpy as np
+import argparse
 from tensorboardX import SummaryWriter
 
 import torch
@@ -11,35 +12,57 @@ import torch.optim as optim
 from torch.autograd import Variable
 
 GAMMA = 0.99
-LEARNING_RATE = 0.001
-BATCH_SIZE = 8
+LEARNING_RATE = 0.0001
+BATCH_SIZE = 32
 
 REWARD_STEPS = 10
 
 
 class PGN(nn.Module):
-    def __init__(self, input_size, n_actions):
+    def __init__(self, input_shape, n_actions):
         super(PGN, self).__init__()
 
-        self.net = nn.Sequential(
-            nn.Linear(input_size, 128),
+        self.conv = nn.Sequential(
+            nn.Conv2d(input_shape[0], 32, kernel_size=8, stride=4),
             nn.ReLU(),
-            nn.Linear(128, n_actions)
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.ReLU()
         )
 
+        conv_out_size = self._get_conv_out(input_shape)
+        self.fc = nn.Sequential(
+            nn.Linear(conv_out_size, 512),
+            nn.ReLU(),
+            nn.Linear(512, n_actions)
+        )
+
+    def _get_conv_out(self, shape):
+        o = self.conv(Variable(torch.zeros(1, *shape)))
+        return int(np.prod(o.size()))
+
     def forward(self, x):
-        return self.net(x)
+        fx = x.float() / 256
+        conv_out = self.conv(fx).view(fx.size()[0], -1)
+        return self.fc(conv_out)
 
 
 if __name__ == "__main__":
-    env = gym.make("CartPole-v0")
-    writer = SummaryWriter(comment="-cartpole-pg")
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
+    args = parser.parse_args()
 
-    net = PGN(env.observation_space.shape[0], env.action_space.n)
+    env = gym.make("PongNoFrameskip-v4")
+    env = ptan.common.wrappers.wrap_dqn(env)
+    writer = SummaryWriter(comment="-pong-pg")
+
+    net = PGN(env.observation_space.shape, env.action_space.n)
+    if args.cuda:
+        net.cuda()
     print(net)
 
-    agent = ptan.agent.PolicyAgent(net, preprocessor=ptan.agent.float32_preprocessor,
-                                   apply_softmax=True)
+    agent = ptan.agent.PolicyAgent(net, apply_softmax=True, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
@@ -57,7 +80,7 @@ if __name__ == "__main__":
 
         baseline = np.mean(step_rewards)
         writer.add_scalar("baseline", baseline, step_idx)
-        batch_states.append(exp.state)
+        batch_states.append(np.array(exp.state, copy=False))
         batch_actions.append(int(exp.action))
         batch_scales.append(exp.reward - baseline)
 
@@ -73,16 +96,20 @@ if __name__ == "__main__":
             writer.add_scalar("reward", reward, step_idx)
             writer.add_scalar("reward_100", mean_rewards, step_idx)
             writer.add_scalar("episodes", done_episodes, step_idx)
-            if mean_rewards > 195:
+            if mean_rewards > 18.0:
                 print("Solved in %d steps and %d episodes!" % (step_idx, done_episodes))
                 break
 
         if len(batch_states) < BATCH_SIZE:
             continue
 
-        states_v = Variable(torch.from_numpy(np.array(batch_states, dtype=np.float32)))
+        states_v = Variable(torch.from_numpy(np.array(batch_states, copy=False)))
         batch_actions_t = torch.LongTensor(batch_actions)
         batch_scale_v = Variable(torch.FloatTensor(batch_scales))
+        if args.cuda:
+            states_v = states_v.cuda()
+            batch_actions_t = batch_actions_t.cuda()
+            batch_scale_v = batch_scale_v.cuda()
 
         optimizer.zero_grad()
         logits_v = net(states_v)
