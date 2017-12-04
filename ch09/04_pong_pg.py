@@ -13,11 +13,13 @@ from torch.autograd import Variable
 from lib import common
 
 GAMMA = 0.99
-LEARNING_RATE = 0.001
-ENTROPY_BETA = 0.01
-BATCH_SIZE = 32
+LEARNING_RATE = 0.00001
+ENTROPY_BETA = 0.001
+BATCH_SIZE = 128
 
-REWARD_STEPS = 10
+REWARD_STEPS = 30
+PLAY_NET_SYNC = 1000
+BASELINE_STEPS = 10000
 
 
 if __name__ == "__main__":
@@ -25,8 +27,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
 
-    env = gym.make("PongNoFrameskip-v4")
-    env = ptan.common.wrappers.wrap_dqn(env)
+    env = ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
     writer = SummaryWriter(comment="-pong-pg")
 
     net = common.AtariPGN(env.observation_space.shape, env.action_space.n)
@@ -34,7 +35,8 @@ if __name__ == "__main__":
         net.cuda()
     print(net)
 
-    agent = ptan.agent.PolicyAgent(net, apply_softmax=True, cuda=args.cuda)
+    tgt_net = ptan.agent.TargetNet(net)
+    agent = ptan.agent.PolicyAgent(tgt_net.target_model, apply_softmax=True, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
@@ -49,7 +51,7 @@ if __name__ == "__main__":
     with common.RewardTracker(writer, stop_reward=18) as tracker:
         for step_idx, exp in enumerate(exp_source):
             step_rewards.append(exp.reward)
-            step_rewards = step_rewards[-1000:]
+            step_rewards = step_rewards[-BASELINE_STEPS:]
 
             baseline = np.mean(step_rewards)
             writer.add_scalar("baseline", baseline, step_idx)
@@ -61,6 +63,9 @@ if __name__ == "__main__":
             new_rewards = exp_source.pop_total_rewards()
             if new_rewards and tracker.reward(new_rewards[0], step_idx):
                 break
+
+            if step_idx % PLAY_NET_SYNC == 0:
+                tgt_net.sync()
 
             if len(batch_states) < BATCH_SIZE:
                 continue
@@ -77,12 +82,16 @@ if __name__ == "__main__":
             logits_v = net(states_v)
             log_prob_v = F.log_softmax(logits_v)
             log_prob_actions_v = batch_scale_v * log_prob_v[range(BATCH_SIZE), batch_actions_t]
-            loss_v = -log_prob_actions_v.mean()
+            loss_policy_v = -log_prob_actions_v.mean()
 
             prob_v = F.softmax(logits_v)
             entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum()
+            loss_v = loss_policy_v + entropy_loss_v
+
+            writer.add_scalar("batch_scales", np.mean(batch_scales), step_idx)
             writer.add_scalar("loss_entropy", entropy_loss_v.data.cpu().numpy()[0], step_idx)
-            loss_v += entropy_loss_v
+            writer.add_scalar("loss_policy", loss_policy_v.data.cpu().numpy()[0], step_idx)
+            writer.add_scalar("loss_total", loss_v.data.cpu().numpy()[0], step_idx)
 
             loss_v.backward()
             optimizer.step()
