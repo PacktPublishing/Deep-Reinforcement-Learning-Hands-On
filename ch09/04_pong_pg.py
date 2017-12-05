@@ -21,6 +21,7 @@ REWARD_STEPS = 100
 PLAY_NET_SYNC = 1000
 BASELINE_STEPS = 10000
 
+
 def make_env():
     return ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
 
@@ -52,6 +53,7 @@ if __name__ == "__main__":
 
     batch_states, batch_actions, batch_scales = [], [], []
     m_baseline, m_batch_scales, m_loss_entropy, m_loss_policy, m_loss_total = [], [], [], [], []
+    m_grad_max, m_grad_mean = [], []
 
     with common.RewardTracker(writer, stop_reward=18) as tracker:
         for step_idx, exp in enumerate(exp_source):
@@ -91,6 +93,8 @@ if __name__ == "__main__":
             prob_v = F.softmax(logits_v)
             entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum()
             loss_v = loss_policy_v + entropy_loss_v
+            loss_v.backward()
+            optimizer.step()
 
             m_baseline.append(baseline)
             m_batch_scales.append(np.mean(batch_scales))
@@ -98,15 +102,26 @@ if __name__ == "__main__":
             m_loss_policy.append(loss_policy_v.data.cpu().numpy()[0])
             m_loss_total.append(loss_v.data.cpu().numpy()[0])
 
+            grad_max = 0.0
+            grad_means = 0.0
+            grad_count = 0
+            for p in net.parameters():
+                grad_max = max(grad_max, p.grad.abs().max().data.cpu().numpy()[0])
+                grad_means += p.grad.mean().data.cpu().numpy()[0]
+                grad_count += 1
+            m_grad_max.append(grad_max)
+            m_grad_mean.append(grad_means / grad_count)
+
             if train_step_idx % 10 == 0:
                 writer.add_scalar("baseline", np.mean(m_baseline), step_idx)
                 writer.add_scalar("batch_scales", np.mean(m_batch_scales), step_idx)
                 writer.add_scalar("loss_entropy", np.mean(m_loss_entropy), step_idx)
                 writer.add_scalar("loss_policy", np.mean(m_loss_policy), step_idx)
                 writer.add_scalar("loss_total", np.mean(m_loss_total), step_idx)
-
-            loss_v.backward()
-            optimizer.step()
+                writer.add_scalar("grad_mean", np.mean(m_grad_mean), step_idx)
+                writer.add_scalar("grad_max", np.mean(m_grad_max), step_idx)
+                m_baseline, m_batch_scales, m_loss_entropy, m_loss_total, m_loss_policy = [], [], [], [], []
+                m_grad_max, m_grad_mean = [], []
 
             batch_states.clear()
             batch_actions.clear()
