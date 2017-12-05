@@ -17,7 +17,7 @@ LEARNING_RATE = 0.001
 ENTROPY_BETA = 0.01
 BATCH_SIZE = 128
 
-REWARD_STEPS = 100
+REWARD_STEPS = 10
 BASELINE_STEPS = 10000
 
 
@@ -41,7 +41,7 @@ if __name__ == "__main__":
     agent = ptan.agent.PolicyAgent(net, apply_softmax=True, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
 
     total_rewards = []
     step_rewards = []
