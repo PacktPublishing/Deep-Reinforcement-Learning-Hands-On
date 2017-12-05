@@ -51,6 +51,7 @@ if __name__ == "__main__":
     train_step_idx = 0
 
     batch_states, batch_actions, batch_scales = [], [], []
+    m_baseline, m_batch_scales, m_loss_entropy, m_loss_policy, m_loss_total = [], [], [], [], []
 
     with common.RewardTracker(writer, stop_reward=18) as tracker:
         for step_idx, exp in enumerate(exp_source):
@@ -61,7 +62,6 @@ if __name__ == "__main__":
             batch_states.append(np.array(exp.state, copy=False))
             batch_actions.append(int(exp.action))
             batch_scales.append(exp.reward - baseline)
-
             # handle new rewards
             new_rewards = exp_source.pop_total_rewards()
             if new_rewards and tracker.reward(new_rewards[0], step_idx):
@@ -92,12 +92,18 @@ if __name__ == "__main__":
             entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum()
             loss_v = loss_policy_v + entropy_loss_v
 
-            if train_step_idx % 100 == 0:
-                writer.add_scalar("baseline", baseline, step_idx)
-                writer.add_scalar("batch_scales", np.mean(batch_scales), step_idx)
-                writer.add_scalar("loss_entropy", entropy_loss_v.data.cpu().numpy()[0], step_idx)
-                writer.add_scalar("loss_policy", loss_policy_v.data.cpu().numpy()[0], step_idx)
-                writer.add_scalar("loss_total", loss_v.data.cpu().numpy()[0], step_idx)
+            m_baseline.append(baseline)
+            m_batch_scales.append(np.mean(batch_scales))
+            m_loss_entropy.append(entropy_loss_v.data.cpu().numpy()[0])
+            m_loss_policy.append(loss_policy_v.data.cpu().numpy()[0])
+            m_loss_total.append(loss_v.data.cpu().numpy()[0])
+
+            if train_step_idx % 10 == 0:
+                writer.add_scalar("baseline", np.mean(m_baseline), step_idx)
+                writer.add_scalar("batch_scales", np.mean(m_batch_scales), step_idx)
+                writer.add_scalar("loss_entropy", np.mean(m_loss_entropy), step_idx)
+                writer.add_scalar("loss_policy", np.mean(m_loss_policy), step_idx)
+                writer.add_scalar("loss_total", np.mean(m_loss_total), step_idx)
 
             loss_v.backward()
             optimizer.step()
