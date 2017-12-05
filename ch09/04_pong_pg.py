@@ -18,7 +18,6 @@ ENTROPY_BETA = 0.01
 BATCH_SIZE = 128
 
 REWARD_STEPS = 100
-PLAY_NET_SYNC = 1000
 BASELINE_STEPS = 10000
 
 
@@ -39,8 +38,7 @@ if __name__ == "__main__":
         net.cuda()
     print(net)
 
-    tgt_net = ptan.agent.TargetNet(net)
-    agent = ptan.agent.PolicyAgent(tgt_net.target_model, apply_softmax=True, cuda=args.cuda)
+    agent = ptan.agent.PolicyAgent(net, apply_softmax=True, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
@@ -68,9 +66,6 @@ if __name__ == "__main__":
             new_rewards = exp_source.pop_total_rewards()
             if new_rewards and tracker.reward(new_rewards[0], step_idx):
                 break
-
-            if step_idx % PLAY_NET_SYNC == 0:
-                tgt_net.sync()
 
             if len(batch_states) < BATCH_SIZE:
                 continue
