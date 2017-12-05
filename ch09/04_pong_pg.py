@@ -13,11 +13,11 @@ from torch.autograd import Variable
 from lib import common
 
 GAMMA = 0.99
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.0001
 ENTROPY_BETA = 0.001
-BATCH_SIZE = 128
+BATCH_SIZE = 512
 
-REWARD_STEPS = 100
+REWARD_STEPS = 200
 BASELINE_STEPS = 100000
 
 
