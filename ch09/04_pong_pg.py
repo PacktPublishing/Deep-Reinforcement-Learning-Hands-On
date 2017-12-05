@@ -13,16 +13,35 @@ from torch.autograd import Variable
 from lib import common
 
 GAMMA = 0.99
-LEARNING_RATE = 0.001
-ENTROPY_BETA = 0.01
+LEARNING_RATE = 0.002
+ENTROPY_BETA = 0.001
 BATCH_SIZE = 128
 
 REWARD_STEPS = 10
-BASELINE_STEPS = 10000
+BASELINE_STEPS = 100000
 
 
 def make_env():
     return ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
+
+
+class MeanRingBuf:
+    def __init__(self, capacity):
+        self.capacity = capacity
+        self.full = False
+        self.pos = 0
+        self._buf = np.zeros((capacity, ), dtype=np.float32)
+
+    def add(self, val):
+        self._buf[self.pos] = val
+        self.pos = (self.pos + 1) % self.capacity
+        self.full |= self.pos == 0
+
+    def mean(self):
+        if self.full:
+            return self._buf.mean()
+        else:
+            return self._buf[:self.pos].mean()
 
 
 if __name__ == "__main__":
@@ -44,7 +63,7 @@ if __name__ == "__main__":
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
 
     total_rewards = []
-    step_rewards = []
+    step_rewards = MeanRingBuf(capacity=BASELINE_STEPS)
     step_idx = 0
     done_episodes = 0
     train_step_idx = 0
@@ -55,10 +74,9 @@ if __name__ == "__main__":
 
     with common.RewardTracker(writer, stop_reward=18) as tracker:
         for step_idx, exp in enumerate(exp_source):
-            step_rewards.append(exp.reward)
-            step_rewards = step_rewards[-BASELINE_STEPS:]
+            step_rewards.add(exp.reward)
 
-            baseline = np.mean(step_rewards)
+            baseline = step_rewards.mean()
             batch_states.append(np.array(exp.state, copy=False))
             batch_actions.append(int(exp.action))
             batch_scales.append(exp.reward - baseline)
@@ -73,7 +91,10 @@ if __name__ == "__main__":
             train_step_idx += 1
             states_v = Variable(torch.from_numpy(np.array(batch_states, copy=False)))
             batch_actions_t = torch.LongTensor(batch_actions)
-            batch_scale_v = Variable(torch.FloatTensor(batch_scales))
+            batch_scales = np.array(batch_scales, dtype=np.float32)
+            batch_scales -= batch_scales.mean()
+            batch_scales /= batch_scales.std()
+            batch_scale_v = Variable(torch.from_numpy(batch_scales))
             if args.cuda:
                 states_v = states_v.cuda()
                 batch_actions_t = batch_actions_t.cuda()
