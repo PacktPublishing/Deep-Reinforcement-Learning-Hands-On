@@ -13,11 +13,11 @@ from torch.autograd import Variable
 from lib import common
 
 GAMMA = 0.99
-LEARNING_RATE = 0.002
-ENTROPY_BETA = 0.001
+LEARNING_RATE = 0.001
+ENTROPY_BETA = 0.0001
 BATCH_SIZE = 128
 
-REWARD_STEPS = 10
+REWARD_STEPS = 100
 BASELINE_STEPS = 100000
 
 
@@ -74,12 +74,12 @@ if __name__ == "__main__":
 
     with common.RewardTracker(writer, stop_reward=18) as tracker:
         for step_idx, exp in enumerate(exp_source):
-            step_rewards.add(exp.reward)
+#            step_rewards.add(exp.reward)
 
-            baseline = step_rewards.mean()
+#            baseline = step_rewards.mean()
             batch_states.append(np.array(exp.state, copy=False))
             batch_actions.append(int(exp.action))
-            batch_scales.append(exp.reward - baseline)
+            batch_scales.append(exp.reward)
             # handle new rewards
             new_rewards = exp_source.pop_total_rewards()
             if new_rewards and tracker.reward(new_rewards[0], step_idx):
@@ -91,10 +91,12 @@ if __name__ == "__main__":
             train_step_idx += 1
             states_v = Variable(torch.from_numpy(np.array(batch_states, copy=False)))
             batch_actions_t = torch.LongTensor(batch_actions)
-            batch_scales = np.array(batch_scales, dtype=np.float32)
-            batch_scales -= batch_scales.mean()
-            batch_scales /= batch_scales.std()
-            batch_scale_v = Variable(torch.from_numpy(batch_scales))
+            bs = np.array(batch_scales, dtype=np.float32)
+            bs -= bs.mean()
+            if abs(bs.std()) > 1e-5:
+                bs /= bs.std()
+
+            batch_scale_v = Variable(torch.from_numpy(bs))
             if args.cuda:
                 states_v = states_v.cuda()
                 batch_actions_t = batch_actions_t.cuda()
@@ -112,7 +114,7 @@ if __name__ == "__main__":
             loss_v.backward()
             optimizer.step()
 
-            m_baseline.append(baseline)
+#            m_baseline.append(baseline)
             m_batch_scales.append(np.mean(batch_scales))
             m_loss_entropy.append(entropy_loss_v.data.cpu().numpy()[0])
             m_loss_policy.append(loss_policy_v.data.cpu().numpy()[0])
@@ -129,7 +131,7 @@ if __name__ == "__main__":
             m_grad_mean.append(grad_means / grad_count)
 
             if train_step_idx % 10 == 0:
-                writer.add_scalar("baseline", np.mean(m_baseline), step_idx)
+#                writer.add_scalar("baseline", np.mean(m_baseline), step_idx)
                 writer.add_scalar("batch_scales", np.mean(m_batch_scales), step_idx)
                 writer.add_scalar("loss_entropy", np.mean(m_loss_entropy), step_idx)
                 writer.add_scalar("loss_policy", np.mean(m_loss_policy), step_idx)
