@@ -14,7 +14,7 @@ from lib import common
 
 GAMMA = 0.99
 LEARNING_RATE = 0.001
-ENTROPY_BETA = 0.0001
+ENTROPY_BETA = 0.001
 BATCH_SIZE = 128
 
 REWARD_STEPS = 100
@@ -49,16 +49,16 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
 
-    envs = [make_env() for _ in range(5)]
+    env = make_env()
     writer = SummaryWriter(comment="-pong-pg")
 
-    net = common.AtariPGN(envs[0].observation_space.shape, envs[0].action_space.n)
+    net = common.AtariPGN(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
     print(net)
 
     agent = ptan.agent.PolicyAgent(net, apply_softmax=True, cuda=args.cuda)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
 
@@ -82,8 +82,9 @@ if __name__ == "__main__":
             batch_scales.append(exp.reward)
             # handle new rewards
             new_rewards = exp_source.pop_total_rewards()
-            if new_rewards and tracker.reward(new_rewards[0], step_idx):
-                break
+            if new_rewards:
+                if tracker.reward(new_rewards[0], step_idx):
+                    break
 
             if len(batch_states) < BATCH_SIZE:
                 continue
@@ -109,7 +110,7 @@ if __name__ == "__main__":
             loss_policy_v = -log_prob_actions_v.mean()
 
             prob_v = F.softmax(logits_v)
-            entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum()
+            entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
             loss_v = loss_policy_v + entropy_loss_v
             loss_v.backward()
             optimizer.step()
