@@ -119,7 +119,7 @@ if __name__ == "__main__":
                 writer.add_scalar("loss_policy", np.mean(m_loss_policy), step_idx)
                 writer.add_scalar("loss_total", np.mean(m_loss_total), step_idx)
                 writer.add_scalar("grad_mean", np.mean(m_grad_mean), step_idx)
-                writer.add_scalar("grad_max", np.mean(m_grad_max), step_idx)
+                writer.add_scalar("grad_max", np.max(m_grad_max), step_idx)
                 m_baseline, m_batch_scales, m_loss_entropy, m_loss_total, m_loss_policy = [], [], [], [], []
                 m_grad_max, m_grad_mean = [], []
 
