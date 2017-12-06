@@ -49,18 +49,21 @@ if __name__ == "__main__":
     step_rewards = []
     step_idx = 0
     done_episodes = 0
+    reward_sum = 0.0
 
     batch_states, batch_actions, batch_scales = [], [], []
 
     for step_idx, exp in enumerate(exp_source):
-        step_rewards.append(exp.reward)
-        step_rewards = step_rewards[-1000:]
+#        step_rewards.append(exp.reward)
+#        step_rewards = step_rewards[-1000:]
 
-        baseline = np.mean(step_rewards)
+#        baseline = np.mean(step_rewards)
+        reward_sum += exp.reward
+        baseline = reward_sum / (step_idx + 1)
         writer.add_scalar("baseline", baseline, step_idx)
         batch_states.append(exp.state)
         batch_actions.append(int(exp.action))
-        batch_scales.append(exp.reward)
+        batch_scales.append(exp.reward - baseline)
 
         # handle new rewards
         new_rewards = exp_source.pop_total_rewards()
