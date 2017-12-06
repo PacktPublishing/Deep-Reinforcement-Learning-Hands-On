@@ -18,7 +18,7 @@ LEARNING_RATE = 0.001
 ENTROPY_BETA = 0.001
 BATCH_SIZE = 32
 
-REWARD_STEPS = 200
+REWARD_STEPS = 4
 BASELINE_STEPS = 100000
 
 
@@ -67,16 +67,16 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
 
-    env = make_env()
+    envs = [make_env() for _ in range(50)]
     writer = SummaryWriter(comment="-pong-a2c")
 
-    net = AtariA2C(env.observation_space.shape, env.action_space.n)
+    net = AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
     if args.cuda:
         net.cuda()
     print(net)
 
     agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], apply_softmax=True, cuda=args.cuda)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
 
@@ -132,12 +132,14 @@ if __name__ == "__main__":
 
             optimizer.zero_grad()
             logits_v, value_v = net(states_v)
+
+            loss_value_v = F.mse_loss(value_v, batch_rewards_v)
+
             log_prob_v = F.log_softmax(logits_v)
             adv_v = batch_rewards_v - value_v.detach()
             log_prob_actions_v = adv_v * log_prob_v[range(BATCH_SIZE), batch_actions_t]
             loss_policy_v = -log_prob_actions_v.mean()
 
-            loss_value_v = F.mse_loss(value_v, batch_rewards_v)
 
             prob_v = F.softmax(logits_v)
             entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()

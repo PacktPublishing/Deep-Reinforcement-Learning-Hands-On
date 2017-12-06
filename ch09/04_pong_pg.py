@@ -13,11 +13,11 @@ from torch.autograd import Variable
 from lib import common
 
 GAMMA = 0.99
-LEARNING_RATE = 0.00001
-ENTROPY_BETA = 0.0001
-BATCH_SIZE = 512
+LEARNING_RATE = 0.01
+ENTROPY_BETA = 0.01
+BATCH_SIZE = 10240
 
-REWARD_STEPS = 500
+REWARD_STEPS = 10
 BASELINE_STEPS = 100000
 
 
@@ -63,7 +63,6 @@ if __name__ == "__main__":
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
 
     total_rewards = []
-    step_rewards = MeanRingBuf(capacity=BASELINE_STEPS)
     step_idx = 0
     done_episodes = 0
     train_step_idx = 0
@@ -71,15 +70,16 @@ if __name__ == "__main__":
     batch_states, batch_actions, batch_scales = [], [], []
     m_baseline, m_batch_scales, m_loss_entropy, m_loss_policy, m_loss_total = [], [], [], [], []
     m_grad_max, m_grad_mean = [], []
+    sum_reward = 0.0
 
     with common.RewardTracker(writer, stop_reward=18) as tracker:
         for step_idx, exp in enumerate(exp_source):
-            step_rewards.add(exp.reward)
-
-            baseline = step_rewards.mean()
+            sum_reward += exp.reward
+            baseline = sum_reward / (step_idx+1)
             batch_states.append(np.array(exp.state, copy=False))
             batch_actions.append(int(exp.action))
-            batch_scales.append(exp.reward - baseline)
+            batch_scales.append(exp.reward)
+
             # handle new rewards
             new_rewards = exp_source.pop_total_rewards()
             if new_rewards:
@@ -92,12 +92,8 @@ if __name__ == "__main__":
             train_step_idx += 1
             states_v = Variable(torch.from_numpy(np.array(batch_states, copy=False)))
             batch_actions_t = torch.LongTensor(batch_actions)
-            bs = np.array(batch_scales, dtype=np.float32)
-            bs -= bs.mean()
-            if abs(bs.std()) > 1e-5:
-                bs /= bs.std()
 
-            batch_scale_v = Variable(torch.from_numpy(bs))
+            batch_scale_v = Variable(torch.FloatTensor(batch_scales))
             if args.cuda:
                 states_v = states_v.cuda()
                 batch_actions_t = batch_actions_t.cuda()
@@ -110,16 +106,17 @@ if __name__ == "__main__":
             loss_policy_v = -log_prob_actions_v.mean()
 
             prob_v = F.softmax(logits_v)
-            entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
+            entropy_v = -(prob_v * log_prob_v).sum(dim=1).mean()
+            entropy_loss_v = -ENTROPY_BETA * entropy_v
             loss_v = loss_policy_v + entropy_loss_v
             loss_v.backward()
             optimizer.step()
 
-            m_baseline.append(baseline)
-            m_batch_scales.append(np.mean(batch_scales))
-            m_loss_entropy.append(entropy_loss_v.data.cpu().numpy()[0])
-            m_loss_policy.append(loss_policy_v.data.cpu().numpy()[0])
-            m_loss_total.append(loss_v.data.cpu().numpy()[0])
+            # calc KL-div
+            new_logits_v = net(states_v)
+            new_prob_v = F.softmax(new_logits_v)
+            kl_div_v = -((new_prob_v / prob_v).log() * prob_v).sum(dim=1).mean()
+            writer.add_scalar("kl", kl_div_v.data.cpu().numpy()[0], step_idx)
 
             grad_max = 0.0
             grad_means = 0.0
@@ -128,19 +125,15 @@ if __name__ == "__main__":
                 grad_max = max(grad_max, p.grad.abs().max().data.cpu().numpy()[0])
                 grad_means += p.grad.mean().data.cpu().numpy()[0]
                 grad_count += 1
-            m_grad_max.append(grad_max)
-            m_grad_mean.append(grad_means / grad_count)
 
-            if train_step_idx % 10 == 0:
-                writer.add_scalar("baseline", np.mean(m_baseline), step_idx)
-                writer.add_scalar("batch_scales", np.mean(m_batch_scales), step_idx)
-                writer.add_scalar("loss_entropy", np.mean(m_loss_entropy), step_idx)
-                writer.add_scalar("loss_policy", np.mean(m_loss_policy), step_idx)
-                writer.add_scalar("loss_total", np.mean(m_loss_total), step_idx)
-                writer.add_scalar("grad_mean", np.mean(m_grad_mean), step_idx)
-                writer.add_scalar("grad_max", np.max(m_grad_max), step_idx)
-                m_baseline, m_batch_scales, m_loss_entropy, m_loss_total, m_loss_policy = [], [], [], [], []
-                m_grad_max, m_grad_mean = [], []
+            writer.add_scalar("baseline", baseline, step_idx)
+            writer.add_scalar("entropy", entropy_v.data.cpu().numpy()[0], step_idx)
+            writer.add_scalar("batch_scales", np.mean(batch_scales), step_idx)
+            writer.add_scalar("loss_entropy", entropy_loss_v.data.cpu().numpy()[0], step_idx)
+            writer.add_scalar("loss_policy", loss_policy_v.data.cpu().numpy()[0], step_idx)
+            writer.add_scalar("loss_total", loss_v.data.cpu().numpy()[0], step_idx)
+            writer.add_scalar("grad_mean", grad_means / grad_count, step_idx)
+            writer.add_scalar("grad_max", grad_max, step_idx)
 
             batch_states.clear()
             batch_actions.clear()
