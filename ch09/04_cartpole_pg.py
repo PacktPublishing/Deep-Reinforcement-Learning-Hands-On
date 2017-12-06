@@ -60,7 +60,7 @@ if __name__ == "__main__":
         writer.add_scalar("baseline", baseline, step_idx)
         batch_states.append(exp.state)
         batch_actions.append(int(exp.action))
-        batch_scales.append(exp.reward - baseline)
+        batch_scales.append(exp.reward)
 
         # handle new rewards
         new_rewards = exp_source.pop_total_rewards()
