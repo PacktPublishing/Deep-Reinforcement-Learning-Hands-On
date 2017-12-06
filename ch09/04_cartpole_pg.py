@@ -12,6 +12,7 @@ from torch.autograd import Variable
 
 GAMMA = 0.99
 LEARNING_RATE = 0.001
+ENTROPY_BETA = 0.01
 BATCH_SIZE = 8
 
 REWARD_STEPS = 10
@@ -88,10 +89,38 @@ if __name__ == "__main__":
         logits_v = net(states_v)
         log_prob_v = F.log_softmax(logits_v)
         log_prob_actions_v = batch_scale_v * log_prob_v[range(BATCH_SIZE), batch_actions_t]
-        loss_v = -log_prob_actions_v.mean()
+        loss_policy_v = -log_prob_actions_v.mean()
+
+        prob_v = F.softmax(logits_v)
+        entropy_v = -(prob_v * log_prob_v).sum(dim=1).mean()
+        entropy_loss_v = -ENTROPY_BETA * entropy_v
+        loss_v = loss_policy_v + entropy_loss_v
 
         loss_v.backward()
         optimizer.step()
+
+        # calc KL-div
+        new_logits_v = net(states_v)
+        new_prob_v = F.softmax(new_logits_v)
+        kl_div_v = -((new_prob_v / prob_v).log() * prob_v).sum(dim=1).mean()
+        writer.add_scalar("kl", kl_div_v.data.cpu().numpy()[0], step_idx)
+
+        grad_max = 0.0
+        grad_means = 0.0
+        grad_count = 0
+        for p in net.parameters():
+            grad_max = max(grad_max, p.grad.abs().max().data.cpu().numpy()[0])
+            grad_means += p.grad.mean().data.cpu().numpy()[0]
+            grad_count += 1
+
+        writer.add_scalar("baseline", baseline, step_idx)
+        writer.add_scalar("entropy", entropy_v.data.cpu().numpy()[0], step_idx)
+        writer.add_scalar("batch_scales", np.mean(batch_scales), step_idx)
+        writer.add_scalar("loss_entropy", entropy_loss_v.data.cpu().numpy()[0], step_idx)
+        writer.add_scalar("loss_policy", loss_policy_v.data.cpu().numpy()[0], step_idx)
+        writer.add_scalar("loss_total", loss_v.data.cpu().numpy()[0], step_idx)
+        writer.add_scalar("grad_mean", grad_means / grad_count, step_idx)
+        writer.add_scalar("grad_max", grad_max, step_idx)
 
         batch_states.clear()
         batch_actions.clear()
