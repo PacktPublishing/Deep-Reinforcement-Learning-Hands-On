@@ -7,18 +7,20 @@ from tensorboardX import SummaryWriter
 
 import torch
 import torch.nn.functional as F
+import torch.nn.utils as nn_utils
 import torch.optim as optim
 from torch.autograd import Variable
 
 from lib import common
 
 GAMMA = 0.99
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.005
 ENTROPY_BETA = 0.01
 BATCH_SIZE = 32
 
 REWARD_STEPS = 20
 BASELINE_STEPS = 100000
+GRAD_L2_CLIP = 0.1
 
 
 def make_env():
@@ -110,6 +112,7 @@ if __name__ == "__main__":
             entropy_loss_v = -ENTROPY_BETA * entropy_v
             loss_v = loss_policy_v + entropy_loss_v
             loss_v.backward()
+            nn_utils.clip_grad_norm(net.parameters(), GRAD_L2_CLIP)
             optimizer.step()
 
             # calc KL-div
