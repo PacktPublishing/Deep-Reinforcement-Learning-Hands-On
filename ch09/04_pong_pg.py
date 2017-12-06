@@ -13,11 +13,11 @@ from torch.autograd import Variable
 from lib import common
 
 GAMMA = 0.99
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.001
 ENTROPY_BETA = 0.01
-BATCH_SIZE = 10240
+BATCH_SIZE = 32
 
-REWARD_STEPS = 10
+REWARD_STEPS = 20
 BASELINE_STEPS = 100000
 
 
@@ -78,7 +78,7 @@ if __name__ == "__main__":
             baseline = sum_reward / (step_idx+1)
             batch_states.append(np.array(exp.state, copy=False))
             batch_actions.append(int(exp.action))
-            batch_scales.append(exp.reward)
+            batch_scales.append(exp.reward - baseline)
 
             # handle new rewards
             new_rewards = exp_source.pop_total_rewards()
