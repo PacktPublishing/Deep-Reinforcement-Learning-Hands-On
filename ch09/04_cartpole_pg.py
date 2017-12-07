@@ -113,7 +113,7 @@ if __name__ == "__main__":
         grad_count = 0
         for p in net.parameters():
             grad_max = max(grad_max, p.grad.abs().max().data.cpu().numpy()[0])
-            grad_means += p.grad.mean().data.cpu().numpy()[0]
+            grad_means += (p.grad ** 2).mean().sqrt().data.cpu().numpy()[0]
             grad_count += 1
 
         writer.add_scalar("baseline", baseline, step_idx)
@@ -122,7 +122,7 @@ if __name__ == "__main__":
         writer.add_scalar("loss_entropy", entropy_loss_v.data.cpu().numpy()[0], step_idx)
         writer.add_scalar("loss_policy", loss_policy_v.data.cpu().numpy()[0], step_idx)
         writer.add_scalar("loss_total", loss_v.data.cpu().numpy()[0], step_idx)
-        writer.add_scalar("grad_mean", grad_means / grad_count, step_idx)
+        writer.add_scalar("grad_l2", grad_means / grad_count, step_idx)
         writer.add_scalar("grad_max", grad_max, step_idx)
 
         batch_states.clear()
