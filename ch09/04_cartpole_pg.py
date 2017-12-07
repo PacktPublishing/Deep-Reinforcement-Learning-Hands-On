@@ -54,10 +54,6 @@ if __name__ == "__main__":
     batch_states, batch_actions, batch_scales = [], [], []
 
     for step_idx, exp in enumerate(exp_source):
-#        step_rewards.append(exp.reward)
-#        step_rewards = step_rewards[-1000:]
-
-#        baseline = np.mean(step_rewards)
         reward_sum += exp.reward
         baseline = reward_sum / (step_idx + 1)
         writer.add_scalar("baseline", baseline, step_idx)
