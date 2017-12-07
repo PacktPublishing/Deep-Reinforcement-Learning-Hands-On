@@ -14,13 +14,15 @@ from torch.autograd import Variable
 from lib import common
 
 GAMMA = 0.99
-LEARNING_RATE = 0.005
-ENTROPY_BETA = 0.001
+LEARNING_RATE = 0.0001
+ENTROPY_BETA = 0.01
 BATCH_SIZE = 32
 
-REWARD_STEPS = 20
+REWARD_STEPS = 100
 BASELINE_STEPS = 100000
-GRAD_L2_CLIP = 0.1
+GRAD_L2_CLIP = 0.01
+
+ENV_COUNT = 32
 
 
 def make_env():
@@ -49,18 +51,19 @@ class MeanRingBuf:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
+    parser.add_argument("-n", '--name', required=True, help="Name of the run")
     args = parser.parse_args()
 
-    env = make_env()
-    writer = SummaryWriter(comment="-pong-pg")
+    envs = [make_env() for _ in range(ENV_COUNT)]
+    writer = SummaryWriter(comment="-pong-pg-" + args.name)
 
-    net = common.AtariPGN(env.observation_space.shape, env.action_space.n)
+    net = common.AtariPGN(envs[0].observation_space.shape, envs[0].action_space.n)
     if args.cuda:
         net.cuda()
     print(net)
 
     agent = ptan.agent.PolicyAgent(net, apply_softmax=True, cuda=args.cuda)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
 
@@ -68,6 +71,7 @@ if __name__ == "__main__":
     step_idx = 0
     done_episodes = 0
     train_step_idx = 0
+    baseline_buf = MeanRingBuf(BASELINE_STEPS)
 
     batch_states, batch_actions, batch_scales = [], [], []
     m_baseline, m_batch_scales, m_loss_entropy, m_loss_policy, m_loss_total = [], [], [], [], []
@@ -76,8 +80,8 @@ if __name__ == "__main__":
 
     with common.RewardTracker(writer, stop_reward=18) as tracker:
         for step_idx, exp in enumerate(exp_source):
-            sum_reward += exp.reward
-            baseline = sum_reward / (step_idx+1)
+            baseline_buf.add(exp.reward)
+            baseline = baseline_buf.mean()
             batch_states.append(np.array(exp.state, copy=False))
             batch_actions.append(int(exp.action))
             batch_scales.append(exp.reward - baseline)
@@ -95,6 +99,7 @@ if __name__ == "__main__":
             states_v = Variable(torch.from_numpy(np.array(batch_states, copy=False)))
             batch_actions_t = torch.LongTensor(batch_actions)
 
+            scale_std = np.std(batch_scales)
             batch_scale_v = Variable(torch.FloatTensor(batch_scales))
             if args.cuda:
                 states_v = states_v.cuda()
@@ -132,6 +137,7 @@ if __name__ == "__main__":
             writer.add_scalar("baseline", baseline, step_idx)
             writer.add_scalar("entropy", entropy_v.data.cpu().numpy()[0], step_idx)
             writer.add_scalar("batch_scales", np.mean(batch_scales), step_idx)
+            writer.add_scalar("batch_scales_std", scale_std, step_idx)
             writer.add_scalar("loss_entropy", entropy_loss_v.data.cpu().numpy()[0], step_idx)
             writer.add_scalar("loss_policy", loss_policy_v.data.cpu().numpy()[0], step_idx)
             writer.add_scalar("loss_total", loss_v.data.cpu().numpy()[0], step_idx)
