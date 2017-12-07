@@ -15,7 +15,7 @@ from lib import common
 
 GAMMA = 0.99
 LEARNING_RATE = 0.005
-ENTROPY_BETA = 0.01
+ENTROPY_BETA = 0.001
 BATCH_SIZE = 32
 
 REWARD_STEPS = 20
@@ -126,7 +126,7 @@ if __name__ == "__main__":
             grad_count = 0
             for p in net.parameters():
                 grad_max = max(grad_max, p.grad.abs().max().data.cpu().numpy()[0])
-                grad_means += p.grad.mean().data.cpu().numpy()[0]
+                grad_means += (p.grad ** 2).mean().sqrt().data.cpu().numpy()[0]
                 grad_count += 1
 
             writer.add_scalar("baseline", baseline, step_idx)
