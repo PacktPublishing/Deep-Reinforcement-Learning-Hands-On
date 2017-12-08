@@ -3,6 +3,7 @@ import gym
 import ptan
 import numpy as np
 import argparse
+import collections
 from tensorboardX import SummaryWriter
 
 import torch
@@ -29,23 +30,22 @@ def make_env():
     return ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
 
 
-class MeanRingBuf:
+class MeanBuffer:
     def __init__(self, capacity):
         self.capacity = capacity
-        self.full = False
-        self.pos = 0
-        self._buf = np.zeros((capacity, ), dtype=np.float32)
+        self.deque = collections.deque(maxlen=capacity)
+        self.sum = 0.0
 
     def add(self, val):
-        self._buf[self.pos] = val
-        self.pos = (self.pos + 1) % self.capacity
-        self.full |= self.pos == 0
+        if len(self.deque) == self.capacity:
+            self.sum -= self.deque[0]
+        self.deque.append(val)
+        self.sum += val
 
     def mean(self):
-        if self.full:
-            return self._buf.mean()
-        else:
-            return self._buf[:self.pos].mean()
+        if not self.deque:
+            return 0.0
+        return self.sum / len(self.deque)
 
 
 if __name__ == "__main__":
@@ -71,7 +71,7 @@ if __name__ == "__main__":
     step_idx = 0
     done_episodes = 0
     train_step_idx = 0
-    baseline_buf = MeanRingBuf(BASELINE_STEPS)
+    baseline_buf = MeanBuffer(BASELINE_STEPS)
 
     batch_states, batch_actions, batch_scales = [], [], []
     m_baseline, m_batch_scales, m_loss_entropy, m_loss_policy, m_loss_total = [], [], [], [], []
