@@ -110,7 +110,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     envs = [make_env() for _ in range(50)]
-    writer = SummaryWriter(comment="-pong-a2c_" + name)
+    writer = SummaryWriter(comment="-pong-a2c_" + args.name)
 
     net = AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
     if args.cuda:
