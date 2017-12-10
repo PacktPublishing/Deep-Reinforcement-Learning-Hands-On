@@ -19,7 +19,6 @@ ENTROPY_BETA = 0.001
 BATCH_SIZE = 32
 
 REWARD_STEPS = 4
-BASELINE_STEPS = 100000
 
 
 def make_env():
@@ -107,10 +106,11 @@ def unpack_batch(batch, net, cuda=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
+    parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
 
     envs = [make_env() for _ in range(50)]
-    writer = SummaryWriter(comment="-pong-a2c")
+    writer = SummaryWriter(comment="-pong-a2c_" + name)
 
     net = AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
     if args.cuda:
@@ -160,7 +160,8 @@ if __name__ == "__main__":
 
             prob_v = F.softmax(logits_v)
             entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
-            loss_v = loss_policy_v + entropy_loss_v + loss_value_v
+#            loss_v = loss_policy_v + entropy_loss_v + loss_value_v
+            loss_v = loss_value_v
             loss_v.backward()
             optimizer.step()
 
