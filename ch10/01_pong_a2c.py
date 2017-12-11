@@ -7,6 +7,7 @@ from tensorboardX import SummaryWriter
 
 import torch
 import torch.nn as nn
+import torch.nn.utils as nn_utils
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
@@ -15,10 +16,11 @@ from lib import common
 
 GAMMA = 0.99
 LEARNING_RATE = 0.001
-ENTROPY_BETA = 0.001
-BATCH_SIZE = 32
+ENTROPY_BETA = 0.01
+BATCH_SIZE = 128
 
 REWARD_STEPS = 4
+CLIP_GRAD = 0.1
 
 
 def make_env():
@@ -160,9 +162,9 @@ if __name__ == "__main__":
 
             prob_v = F.softmax(logits_v)
             entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
-#            loss_v = loss_policy_v + entropy_loss_v + loss_value_v
-            loss_v = loss_value_v
+            loss_v = loss_policy_v + entropy_loss_v + loss_value_v
             loss_v.backward()
+            nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
             optimizer.step()
 
             m_adv.append(adv_v.mean().data.cpu().numpy()[0])
@@ -177,6 +179,8 @@ if __name__ == "__main__":
             grad_means = 0.0
             grad_count = 0
             for p in net.parameters():
+                if p.grad is None:
+                    continue
                 grad_max = max(grad_max, p.grad.abs().max().data.cpu().numpy()[0])
                 grad_means += p.grad.mean().data.cpu().numpy()[0]
                 grad_count += 1
@@ -194,7 +198,7 @@ if __name__ == "__main__":
                 writer.add_scalar("grad_mean", np.mean(m_grad_mean), step_idx)
                 writer.add_scalar("grad_max", np.max(m_grad_max), step_idx)
                 m_values, m_batch_rewards, m_loss_entropy, m_loss_total, m_loss_policy = [], [], [], [], []
-                m_adv = []
+                m_adv, m_loss_value = [], []
                 m_grad_max, m_grad_mean = [], []
 
             batch.clear()
