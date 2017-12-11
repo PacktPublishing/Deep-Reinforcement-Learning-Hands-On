@@ -19,7 +19,6 @@ ENTROPY_BETA = 0.001
 BATCH_SIZE = 32
 
 REWARD_STEPS = 4
-BASELINE_STEPS = 100000
 
 
 def make_env():
@@ -107,10 +106,11 @@ def unpack_batch(batch, net, cuda=False):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
+    parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
 
-    envs = [make_env() for _ in range(50)]
-    writer = SummaryWriter(comment="-pong-a2c")
+    envs = [make_env() for _ in range(1)]
+    writer = SummaryWriter(comment="-pong-a2c_" + args.name)
 
     net = AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
     if args.cuda:
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], apply_softmax=True, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
+    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
     total_rewards = []
     step_idx = 0
@@ -160,7 +160,8 @@ if __name__ == "__main__":
 
             prob_v = F.softmax(logits_v)
             entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
-            loss_v = loss_policy_v + entropy_loss_v + loss_value_v
+#            loss_v = loss_policy_v + entropy_loss_v + loss_value_v
+            loss_v = loss_value_v
             loss_v.backward()
             optimizer.step()
 
@@ -176,6 +177,8 @@ if __name__ == "__main__":
             grad_means = 0.0
             grad_count = 0
             for p in net.parameters():
+                if p.grad is None:
+                    continue
                 grad_max = max(grad_max, p.grad.abs().max().data.cpu().numpy()[0])
                 grad_means += p.grad.mean().data.cpu().numpy()[0]
                 grad_count += 1
@@ -193,7 +196,7 @@ if __name__ == "__main__":
                 writer.add_scalar("grad_mean", np.mean(m_grad_mean), step_idx)
                 writer.add_scalar("grad_max", np.max(m_grad_max), step_idx)
                 m_values, m_batch_rewards, m_loss_entropy, m_loss_total, m_loss_policy = [], [], [], [], []
-                m_adv = []
+                m_adv, m_loss_value = [], []
                 m_grad_max, m_grad_mean = [], []
 
             batch.clear()
