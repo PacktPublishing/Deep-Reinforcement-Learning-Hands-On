@@ -15,9 +15,9 @@ from torch.autograd import Variable
 from lib import common
 
 GAMMA = 0.99
-LEARNING_RATE = 0.005
+LEARNING_RATE = 0.001
 ADAM_EPS = 1e-3
-ENTROPY_BETA = 0.01
+ENTROPY_BETA = 0.02
 BATCH_SIZE = 128
 NUM_ENVS = 50
 

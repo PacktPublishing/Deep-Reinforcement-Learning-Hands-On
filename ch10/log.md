@@ -16,9 +16,20 @@ CLIP_GRAD = 0.1
 Run Dec11_23-46-06_gpu-pong-a2c_t1, 
 9M steps, 3 hours
 
+Tweak one parameter at a time
+
 ## Larger LR
 
 * LR = 0.002: converged in 4.8M, 1.5 hours
 * LR = 0.003: converged in 3.6M, 1 hours
-* LR = 0.004:
-* LR = 0.005:
+* LR = 0.004: no convergence
+* LR = 0.005: no convergence
+
+Good value is something between 0.002 and 0.003
+
+## Entropy Beta
+
+* Beta = 0.02: 
+* Beta = 0.03
+* Beta = 0.04
+* Beta = 0.05
