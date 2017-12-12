@@ -18,4 +18,7 @@ Run Dec11_23-46-06_gpu-pong-a2c_t1,
 
 ## Larger LR
 
-LR = 0.002
+* LR = 0.002
+* LR = 0.003
+* LR = 0.004
+* LR = 0.005
