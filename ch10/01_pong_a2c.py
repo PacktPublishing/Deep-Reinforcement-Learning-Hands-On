@@ -16,8 +16,10 @@ from lib import common
 
 GAMMA = 0.99
 LEARNING_RATE = 0.001
+ADAM_EPS = 1e-3
 ENTROPY_BETA = 0.01
 BATCH_SIZE = 128
+NUM_ENVS = 50
 
 REWARD_STEPS = 4
 CLIP_GRAD = 0.1
@@ -111,7 +113,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
 
-    envs = [make_env() for _ in range(50)]
+    envs = [make_env() for _ in range(NUM_ENVS)]
     writer = SummaryWriter(comment="-pong-a2c_" + args.name)
 
     net = AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
@@ -122,7 +124,7 @@ if __name__ == "__main__":
     agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], apply_softmax=True, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
+    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=ADAM_EPS)
 
     total_rewards = []
     step_idx = 0
