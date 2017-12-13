@@ -29,7 +29,12 @@ Good value is something between 0.002 and 0.003
 
 ## Entropy Beta
 
-* Beta = 0.02: 
-* Beta = 0.03
-* Beta = 0.04
-* Beta = 0.05
+* Beta = 0.02: 6.8M steps, 2 hours (better)
+* Beta = 0.03: 12M, 4 hours (worse)
+
+## Environments count
+
+* Envs = 40
+* Envs = 30
+* Envs = 20
+* Envs = 10 
