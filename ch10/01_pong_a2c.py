@@ -18,7 +18,7 @@ GAMMA = 0.99
 LEARNING_RATE = 0.001
 ADAM_EPS = 1e-3
 ENTROPY_BETA = 0.01
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 NUM_ENVS = 50
 
 REWARD_STEPS = 4
@@ -179,12 +179,14 @@ if __name__ == "__main__":
 
             grad_max = 0.0
             grad_means = 0.0
+            grad_vars = 0.0
             grad_count = 0
             for p in net.parameters():
                 if p.grad is None:
                     continue
                 grad_max = max(grad_max, p.grad.abs().max().data.cpu().numpy()[0])
-                grad_means += p.grad.mean().data.cpu().numpy()[0]
+                grad_means += (p.grad ** 2).mean().sqrt().data.cpu().numpy()[0]
+                grad_vars += torch.var(p.grad).data.cpu().numpy()[0]
                 grad_count += 1
             m_grad_max.append(grad_max)
             m_grad_mean.append(grad_means / grad_count)
@@ -197,8 +199,9 @@ if __name__ == "__main__":
                 writer.add_scalar("loss_policy", np.mean(m_loss_policy), step_idx)
                 writer.add_scalar("loss_value", np.mean(m_loss_value), step_idx)
                 writer.add_scalar("loss_total", np.mean(m_loss_total), step_idx)
-                writer.add_scalar("grad_mean", np.mean(m_grad_mean), step_idx)
+                writer.add_scalar("grad_l2", np.mean(m_grad_mean), step_idx)
                 writer.add_scalar("grad_max", np.max(m_grad_max), step_idx)
+                writer.add_scalar("grad_var", grad_vars / grad_count, step_idx)
                 m_values, m_batch_rewards, m_loss_entropy, m_loss_total, m_loss_policy = [], [], [], [], []
                 m_adv, m_loss_value = [], []
                 m_grad_max, m_grad_mean = [], []
