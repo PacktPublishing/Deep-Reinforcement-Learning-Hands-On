@@ -192,7 +192,7 @@ if __name__ == "__main__":
                 writer.add_scalar("grad_l2", np.sqrt(np.mean(np.square(grads))), step_idx)
                 writer.add_scalar("grad_max", np.max(np.abs(grads)), step_idx)
                 writer.add_scalar("grad_var", np.var(grads), step_idx)
-                
+
                 m_values, m_batch_rewards, m_loss_entropy, m_loss_total, m_loss_policy = [], [], [], [], []
                 m_adv, m_loss_value = [], []
 
