@@ -18,7 +18,7 @@ GAMMA = 0.99
 LEARNING_RATE = 0.001
 ADAM_EPS = 1e-3
 ENTROPY_BETA = 0.01
-BATCH_SIZE = 32
+BATCH_SIZE = 128
 NUM_ENVS = 50
 
 REWARD_STEPS = 4
@@ -186,7 +186,10 @@ if __name__ == "__main__":
                     continue
                 grad_max = max(grad_max, p.grad.abs().max().data.cpu().numpy()[0])
                 grad_means += (p.grad ** 2).mean().sqrt().data.cpu().numpy()[0]
-                grad_vars += torch.var(p.grad).data.cpu().numpy()[0]
+                try:
+                    grad_vars += torch.var(p.grad).data.cpu().numpy()[0]
+                except RuntimeError:
+                    pass
                 grad_count += 1
             m_grad_max.append(grad_max)
             m_grad_mean.append(grad_means / grad_count)

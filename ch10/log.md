@@ -45,5 +45,5 @@ Good value is something between 0.002 and 0.003
 
 * Batch = 64
 * Batch = 32
-* Batch = 256
-* Batch = 512
+* Batch = 16
+* Batch = 8
