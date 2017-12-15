@@ -43,7 +43,7 @@ Good value is something between 0.002 and 0.003
 
 ## Batch size
 
-* Batch = 64
-* Batch = 32
-* Batch = 16
-* Batch = 8
+* Batch = 64: 4.9M, 1.7h
+* Batch = 32: 3.8M, 1.5h (!!!)
+* Batch = 16: Doesn't converge
+* Batch = 8: Doesn't converge
