@@ -34,7 +34,16 @@ Good value is something between 0.002 and 0.003
 
 ## Environments count
 
-* Envs = 40
-* Envs = 30
-* Envs = 20
-* Envs = 10 
+* Envs = 40: 8.6M, 3h
+* Envs = 30: 6.2M, 2h (looks like a lucky seed)
+* Envs = 20: 9.5M, 3h
+* Envs = 10: hasn't converged in 12M frames and 4.5h, stopped
+* Envs = 60: 11.6M, 4H (looks like an unlucky seed)
+* Envs = 70: 7.7M, 2.5H 
+
+## Batch size
+
+* Batch = 64
+* Batch = 32
+* Batch = 256
+* Batch = 512
