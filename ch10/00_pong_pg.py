@@ -25,6 +25,8 @@ GRAD_L2_CLIP = 0.1
 
 ENV_COUNT = 32
 
+USE_MEAN_BASELINE = True
+
 
 def make_env():
     return ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
@@ -75,7 +77,6 @@ if __name__ == "__main__":
 
     batch_states, batch_actions, batch_scales = [], [], []
     m_baseline, m_batch_scales, m_loss_entropy, m_loss_policy, m_loss_total = [], [], [], [], []
-    m_grad_max, m_grad_mean = [], []
     sum_reward = 0.0
 
     with common.RewardTracker(writer, stop_reward=18) as tracker:
@@ -84,7 +85,11 @@ if __name__ == "__main__":
             baseline = baseline_buf.mean()
             batch_states.append(np.array(exp.state, copy=False))
             batch_actions.append(int(exp.action))
-            batch_scales.append(exp.reward - baseline)
+
+            if USE_MEAN_BASELINE:
+                batch_scales.append(exp.reward - baseline)
+            else:
+                batch_scales.append(exp.reward)
 
             # handle new rewards
             new_rewards = exp_source.pop_total_rewards()
@@ -126,15 +131,9 @@ if __name__ == "__main__":
             kl_div_v = -((new_prob_v / prob_v).log() * prob_v).sum(dim=1).mean()
             writer.add_scalar("kl", kl_div_v.data.cpu().numpy()[0], step_idx)
 
-            grad_max = 0.0
-            grad_means = 0.0
-            grad_vars = 0.0
-            grad_count = 0
-            for p in net.parameters():
-                grad_max = max(grad_max, p.grad.abs().max().data.cpu().numpy()[0])
-                grad_means += (p.grad ** 2).mean().sqrt().data.cpu().numpy()[0]
-                grad_vars += torch.var(p.grad).data.cpu().numpy()[0]
-                grad_count += 1
+            grads = np.concatenate([p.grad.data.cpu().numpy().flatten()
+                                    for p in net.parameters()
+                                    if p.grad is not None])
 
             writer.add_scalar("baseline", baseline, step_idx)
             writer.add_scalar("entropy", entropy_v.data.cpu().numpy()[0], step_idx)
@@ -143,9 +142,10 @@ if __name__ == "__main__":
             writer.add_scalar("loss_entropy", entropy_loss_v.data.cpu().numpy()[0], step_idx)
             writer.add_scalar("loss_policy", loss_policy_v.data.cpu().numpy()[0], step_idx)
             writer.add_scalar("loss_total", loss_v.data.cpu().numpy()[0], step_idx)
-            writer.add_scalar("grad_l2", grad_means / grad_count, step_idx)
-            writer.add_scalar("grad_max", grad_max, step_idx)
-            writer.add_scalar("grad_var", grad_vars / grad_count, step_idx)
+
+            writer.add_scalar("grad_l2", np.sqrt(np.mean(np.square(grads))), step_idx)
+            writer.add_scalar("grad_max", np.max(np.abs(grads)), step_idx)
+            writer.add_scalar("grad_var", np.var(grads), step_idx)
 
             batch_states.clear()
             batch_actions.clear()

@@ -134,7 +134,6 @@ if __name__ == "__main__":
     batch = []
     m_values, m_batch_rewards, m_loss_entropy, m_loss_policy, m_loss_total, m_loss_value = [], [], [], [], [], []
     m_adv = []
-    m_grad_max, m_grad_mean = [], []
 
     with common.RewardTracker(writer, stop_reward=18) as tracker:
         for step_idx, exp in enumerate(exp_source):
@@ -177,22 +176,9 @@ if __name__ == "__main__":
             m_loss_total.append(loss_v.data.cpu().numpy()[0])
             m_loss_value.append(loss_value_v.data.cpu().numpy()[0])
 
-            grad_max = 0.0
-            grad_means = 0.0
-            grad_vars = 0.0
-            grad_count = 0
-            for p in net.parameters():
-                if p.grad is None:
-                    continue
-                grad_max = max(grad_max, p.grad.abs().max().data.cpu().numpy()[0])
-                grad_means += (p.grad ** 2).mean().sqrt().data.cpu().numpy()[0]
-                try:
-                    grad_vars += torch.var(p.grad).data.cpu().numpy()[0]
-                except RuntimeError:
-                    pass
-                grad_count += 1
-            m_grad_max.append(grad_max)
-            m_grad_mean.append(grad_means / grad_count)
+            grads = np.concatenate([p.grad.data.cpu().numpy().flatten()
+                                    for p in net.parameters()
+                                    if p.grad is not None])
 
             if train_step_idx % 10 == 0:
                 writer.add_scalar("advantage", np.mean(m_adv), step_idx)
@@ -202,12 +188,13 @@ if __name__ == "__main__":
                 writer.add_scalar("loss_policy", np.mean(m_loss_policy), step_idx)
                 writer.add_scalar("loss_value", np.mean(m_loss_value), step_idx)
                 writer.add_scalar("loss_total", np.mean(m_loss_total), step_idx)
-                writer.add_scalar("grad_l2", np.mean(m_grad_mean), step_idx)
-                writer.add_scalar("grad_max", np.max(m_grad_max), step_idx)
-                writer.add_scalar("grad_var", grad_vars / grad_count, step_idx)
+
+                writer.add_scalar("grad_l2", np.sqrt(np.mean(np.square(grads))), step_idx)
+                writer.add_scalar("grad_max", np.max(np.abs(grads)), step_idx)
+                writer.add_scalar("grad_var", np.var(grads), step_idx)
+                
                 m_values, m_batch_rewards, m_loss_entropy, m_loss_total, m_loss_policy = [], [], [], [], []
                 m_adv, m_loss_value = [], []
-                m_grad_max, m_grad_mean = [], []
 
             batch.clear()
 
