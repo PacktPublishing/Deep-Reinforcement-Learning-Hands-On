@@ -1,0 +1,31 @@
+% C-c C-o to insert the block
+\documentclass{article}
+
+\usepackage{amsmath,amssymb}
+\usepackage[active,tightpage]{preview}
+\PreviewEnvironment{math}
+\PreviewEnvironment{equation*}
+
+\DeclareMathOperator{\E}{\mathbb{E}}
+
+\begin{document}
+
+Page 10, return definition:
+\begin{equation*}
+G_t = R_{t+1}+\gamma R_{t+2}+\ldots = \sum^{\infty}_{k=0}{\gamma^kR_{t+k+1}}  
+\end{equation*}
+
+Page 10, value of state
+\begin{equation*}
+V(s) = \E[G|S_t=s]
+\end{equation*}
+
+% Inline equation \begin{math}\frac{sin(x)}{x}\end{math}
+
+Page 15, policy definition
+\begin{equation*}
+  \pi(a|s)=P[A_t=a|S_t=s]
+\end{equation*}
+
+
+\end{document}
