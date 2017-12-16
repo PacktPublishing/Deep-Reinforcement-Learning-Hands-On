@@ -163,8 +163,7 @@ if __name__ == "__main__":
 
             prob_v = F.softmax(logits_v)
             entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
-#            loss_v = loss_policy_v + entropy_loss_v + loss_value_v
-            loss_v = loss_value_v
+            loss_v = loss_policy_v + entropy_loss_v + loss_value_v
             loss_v.backward()
             nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
             optimizer.step()
