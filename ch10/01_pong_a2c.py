@@ -7,6 +7,7 @@ from tensorboardX import SummaryWriter
 
 import torch
 import torch.nn as nn
+import torch.nn.utils as nn_utils
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.autograd import Variable
@@ -15,10 +16,13 @@ from lib import common
 
 GAMMA = 0.99
 LEARNING_RATE = 0.001
-ENTROPY_BETA = 0.001
-BATCH_SIZE = 32
+ADAM_EPS = 1e-3
+ENTROPY_BETA = 0.01
+BATCH_SIZE = 128
+NUM_ENVS = 50
 
 REWARD_STEPS = 4
+CLIP_GRAD = 0.1
 
 
 def make_env():
@@ -109,7 +113,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
 
-    envs = [make_env() for _ in range(1)]
+    envs = [make_env() for _ in range(NUM_ENVS)]
     writer = SummaryWriter(comment="-pong-a2c_" + args.name)
 
     net = AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
@@ -120,7 +124,7 @@ if __name__ == "__main__":
     agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], apply_softmax=True, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=ADAM_EPS)
 
     total_rewards = []
     step_idx = 0
@@ -130,7 +134,6 @@ if __name__ == "__main__":
     batch = []
     m_values, m_batch_rewards, m_loss_entropy, m_loss_policy, m_loss_total, m_loss_value = [], [], [], [], [], []
     m_adv = []
-    m_grad_max, m_grad_mean = [], []
 
     with common.RewardTracker(writer, stop_reward=18) as tracker:
         for step_idx, exp in enumerate(exp_source):
@@ -163,6 +166,7 @@ if __name__ == "__main__":
 #            loss_v = loss_policy_v + entropy_loss_v + loss_value_v
             loss_v = loss_value_v
             loss_v.backward()
+            nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
             optimizer.step()
 
             m_adv.append(adv_v.mean().data.cpu().numpy()[0])
@@ -173,17 +177,9 @@ if __name__ == "__main__":
             m_loss_total.append(loss_v.data.cpu().numpy()[0])
             m_loss_value.append(loss_value_v.data.cpu().numpy()[0])
 
-            grad_max = 0.0
-            grad_means = 0.0
-            grad_count = 0
-            for p in net.parameters():
-                if p.grad is None:
-                    continue
-                grad_max = max(grad_max, p.grad.abs().max().data.cpu().numpy()[0])
-                grad_means += p.grad.mean().data.cpu().numpy()[0]
-                grad_count += 1
-            m_grad_max.append(grad_max)
-            m_grad_mean.append(grad_means / grad_count)
+            grads = np.concatenate([p.grad.data.cpu().numpy().flatten()
+                                    for p in net.parameters()
+                                    if p.grad is not None])
 
             if train_step_idx % 10 == 0:
                 writer.add_scalar("advantage", np.mean(m_adv), step_idx)
@@ -193,11 +189,13 @@ if __name__ == "__main__":
                 writer.add_scalar("loss_policy", np.mean(m_loss_policy), step_idx)
                 writer.add_scalar("loss_value", np.mean(m_loss_value), step_idx)
                 writer.add_scalar("loss_total", np.mean(m_loss_total), step_idx)
-                writer.add_scalar("grad_mean", np.mean(m_grad_mean), step_idx)
-                writer.add_scalar("grad_max", np.max(m_grad_max), step_idx)
+
+                writer.add_scalar("grad_l2", np.sqrt(np.mean(np.square(grads))), step_idx)
+                writer.add_scalar("grad_max", np.max(np.abs(grads)), step_idx)
+                writer.add_scalar("grad_var", np.var(grads), step_idx)
+
                 m_values, m_batch_rewards, m_loss_entropy, m_loss_total, m_loss_policy = [], [], [], [], []
                 m_adv, m_loss_value = [], []
-                m_grad_max, m_grad_mean = [], []
 
             batch.clear()
 
