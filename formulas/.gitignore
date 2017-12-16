@@ -1,4 +1,4 @@
 *.pdf
 *.log
 *.aux
-!*.png
+*.png
