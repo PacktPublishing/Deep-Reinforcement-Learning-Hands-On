@@ -117,6 +117,11 @@ if __name__ == "__main__":
             log_prob_actions_v = batch_scale_v * log_prob_v[range(BATCH_SIZE), batch_actions_t]
             loss_policy_v = -log_prob_actions_v.mean()
 
+            loss_policy_v.backwards(retain_graph=True)
+            grads = np.concatenate([p.grad.data.cpu().numpy().flatten()
+                                    for p in net.parameters()
+                                    if p.grad is not None])
+
             prob_v = F.softmax(logits_v)
             entropy_v = -(prob_v * log_prob_v).sum(dim=1).mean()
             entropy_loss_v = -ENTROPY_BETA * entropy_v
@@ -124,16 +129,13 @@ if __name__ == "__main__":
             loss_v.backward()
             nn_utils.clip_grad_norm(net.parameters(), GRAD_L2_CLIP)
             optimizer.step()
+            loss_v += loss_policy_v
 
             # calc KL-div
             new_logits_v = net(states_v)
             new_prob_v = F.softmax(new_logits_v)
             kl_div_v = -((new_prob_v / prob_v).log() * prob_v).sum(dim=1).mean()
             writer.add_scalar("kl", kl_div_v.data.cpu().numpy()[0], step_idx)
-
-            grads = np.concatenate([p.grad.data.cpu().numpy().flatten()
-                                    for p in net.parameters()
-                                    if p.grad is not None])
 
             writer.add_scalar("baseline", baseline, step_idx)
             writer.add_scalar("entropy", entropy_v.data.cpu().numpy()[0], step_idx)
