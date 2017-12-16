@@ -117,7 +117,7 @@ if __name__ == "__main__":
             log_prob_actions_v = batch_scale_v * log_prob_v[range(BATCH_SIZE), batch_actions_t]
             loss_policy_v = -log_prob_actions_v.mean()
 
-            loss_policy_v.backwards(retain_graph=True)
+            loss_policy_v.backward(retain_graph=True)
             grads = np.concatenate([p.grad.data.cpu().numpy().flatten()
                                     for p in net.parameters()
                                     if p.grad is not None])
