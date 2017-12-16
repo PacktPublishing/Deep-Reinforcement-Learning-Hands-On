@@ -15,17 +15,17 @@ from torch.autograd import Variable
 from lib import common
 
 GAMMA = 0.99
-LEARNING_RATE = 0.0001
-ENTROPY_BETA = 0.01
-BATCH_SIZE = 128
+LEARNING_RATE = 0.001
+ENTROPY_BETA = 0.02
+BATCH_SIZE = 32
 
 REWARD_STEPS = 10
 BASELINE_STEPS = 1000000
 GRAD_L2_CLIP = 0.1
 
-ENV_COUNT = 32
+ENV_COUNT = 50
 
-USE_MEAN_BASELINE = False
+USE_MEAN_BASELINE = True
 
 
 def make_env():
