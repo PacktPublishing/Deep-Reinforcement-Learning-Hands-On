@@ -163,10 +163,20 @@ if __name__ == "__main__":
 
             prob_v = F.softmax(logits_v)
             entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
-            loss_v = loss_policy_v + entropy_loss_v + loss_value_v
+
+            # calculate policy gradients only
+            loss_policy_v.backward(retain_graph=True)
+            grads = np.concatenate([p.grad.data.cpu().numpy().flatten()
+                                    for p in net.parameters()
+                                    if p.grad is not None])
+
+            # apply entropy and value gradients
+            loss_v = entropy_loss_v + loss_value_v
             loss_v.backward()
             nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
             optimizer.step()
+            # get full loss
+            loss_v += loss_policy_v
 
             m_adv.append(adv_v.mean().data.cpu().numpy()[0])
             m_values.append(value_v.mean().data.cpu().numpy()[0])
@@ -176,9 +186,6 @@ if __name__ == "__main__":
             m_loss_total.append(loss_v.data.cpu().numpy()[0])
             m_loss_value.append(loss_value_v.data.cpu().numpy()[0])
 
-            grads = np.concatenate([p.grad.data.cpu().numpy().flatten()
-                                    for p in net.parameters()
-                                    if p.grad is not None])
 
             if train_step_idx % 10 == 0:
                 writer.add_scalar("advantage", np.mean(m_adv), step_idx)
