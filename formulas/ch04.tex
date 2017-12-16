@@ -1,0 +1,49 @@
+% C-c C-o to insert the block
+
+% Individual equation: equation* block
+% Inline equation \begin{math}\frac{sin(x)}{x}\end{math}
+\documentclass{article}
+
+\usepackage{amsmath,amssymb}
+
+\ifdefined\ispreview
+\usepackage[active,tightpage]{preview}
+\PreviewEnvironment{math}
+\PreviewEnvironment{equation*}
+\fi
+
+\DeclareMathOperator{\E}{\mathbb{E}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\begin{document}
+
+Page 13, importance sampling formula
+\begin{equation*}
+  \E_{x \sim p(x)}[H(x)] = \int_x{p(x)H(x)dx} = \int_x{q(x)\frac{p(x)}{q(x)}H(x)dx}
+  = \E_{x \sim q(x)}[\frac{p(x)}{q(x)}H(x)]
+\end{equation*}
+
+Page 14, Kullback-Leibler divergence
+\begin{equation*}
+  KL(p_1(x)\|p_2(x)) = \E_{x \sim p_1(x)} \log\frac{p_1(x)}{p_2(x)}  = \E_{x \sim
+    p_1(x)}[\log p_1(x)] - \E_{x \sim p_1(x)}[\log p_2(x)]
+\end{equation*}
+
+Page 14, text snippet
+
+The first term in KL is called entropy and doesn't depend on \begin{math}p_2(x)\end{math}, so, could...
+
+Combining both formulas, we can get the following iterative algorithm, which
+starts with \begin{math}q_0(x)=p(x)\end{math}, and on every step improves approximation of \begin{math}p(x)H(x)\end{math} with update
+\begin{equation*}
+  q_{i+1}(x) = \argmin_{q_{i+1}(x)}-\E_{x \sim
+    q_i(x)}\frac{p(x)}{q_i(x)}H(x)\log q_{i+1}(x)
+\end{equation*}
+
+
+Page 14, policy update
+\begin{equation*}
+  \pi_{i+1}(a|s) = \argmin_{\pi_{i+1}}-\E_{z \sim \pi_i(a|s)}[R(z)\geq\psi_i]\log\pi_{i+1}(a|s) 
+\end{equation*}
+
+\end{document}
