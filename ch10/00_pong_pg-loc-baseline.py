@@ -25,7 +25,7 @@ GRAD_L2_CLIP = 0.1
 
 ENV_COUNT = 50
 
-USE_MEAN_BASELINE = True
+USE_MEAN_BASELINE = False
 
 
 def make_env():
