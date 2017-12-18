@@ -25,10 +25,6 @@ REWARD_STEPS = 4
 CLIP_GRAD = 0.1
 
 
-def make_env():
-    return ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
-
-
 class AtariA2C(nn.Module):
     def __init__(self, input_shape, n_actions):
         super(AtariA2C, self).__init__()
@@ -113,6 +109,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
 
+    make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
     envs = [make_env() for _ in range(NUM_ENVS)]
     writer = SummaryWriter(comment="-pong-a2c_" + args.name)
 
