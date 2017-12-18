@@ -132,77 +132,59 @@ if __name__ == "__main__":
     train_step_idx = 0
 
     batch = []
-    m_values, m_batch_rewards, m_loss_entropy, m_loss_policy, m_loss_total, m_loss_value = [], [], [], [], [], []
-    m_adv = []
 
     with common.RewardTracker(writer, stop_reward=18) as tracker:
-        for step_idx, exp in enumerate(exp_source):
-            batch.append(exp)
+        with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
+            for step_idx, exp in enumerate(exp_source):
+                batch.append(exp)
 
-            # handle new rewards
-            new_rewards = exp_source.pop_total_rewards()
-            if new_rewards:
-                if tracker.reward(new_rewards[0], step_idx):
-                    break
+                # handle new rewards
+                new_rewards = exp_source.pop_total_rewards()
+                if new_rewards:
+                    if tracker.reward(new_rewards[0], step_idx):
+                        break
 
-            if len(batch) < BATCH_SIZE:
-                continue
+                if len(batch) < BATCH_SIZE:
+                    continue
 
-            train_step_idx += 1
-            states_v, actions_t, vals_ref_v = unpack_batch(batch, net, cuda=args.cuda)
+                train_step_idx += 1
+                states_v, actions_t, vals_ref_v = unpack_batch(batch, net, cuda=args.cuda)
+                batch.clear()
 
-            optimizer.zero_grad()
-            logits_v, value_v = net(states_v)
+                optimizer.zero_grad()
+                logits_v, value_v = net(states_v)
 
-            loss_value_v = F.mse_loss(value_v, vals_ref_v)
+                loss_value_v = F.mse_loss(value_v, vals_ref_v)
 
-            log_prob_v = F.log_softmax(logits_v)
-            adv_v = vals_ref_v - value_v.detach()
-            log_prob_actions_v = adv_v * log_prob_v[range(BATCH_SIZE), actions_t]
-            loss_policy_v = -log_prob_actions_v.mean()
+                log_prob_v = F.log_softmax(logits_v)
+                adv_v = vals_ref_v - value_v.detach()
+                log_prob_actions_v = adv_v * log_prob_v[range(BATCH_SIZE), actions_t]
+                loss_policy_v = -log_prob_actions_v.mean()
 
-            prob_v = F.softmax(logits_v)
-            entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
+                prob_v = F.softmax(logits_v)
+                entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
 
-            # calculate policy gradients only
-            loss_policy_v.backward(retain_graph=True)
-            grads = np.concatenate([p.grad.data.cpu().numpy().flatten()
-                                    for p in net.parameters()
-                                    if p.grad is not None])
+                # calculate policy gradients only
+                loss_policy_v.backward(retain_graph=True)
+                grads = np.concatenate([p.grad.data.cpu().numpy().flatten()
+                                        for p in net.parameters()
+                                        if p.grad is not None])
 
-            # apply entropy and value gradients
-            loss_v = entropy_loss_v + loss_value_v
-            loss_v.backward()
-            nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
-            optimizer.step()
-            # get full loss
-            loss_v += loss_policy_v
+                # apply entropy and value gradients
+                loss_v = entropy_loss_v + loss_value_v
+                loss_v.backward()
+                nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
+                optimizer.step()
+                # get full loss
+                loss_v += loss_policy_v
 
-            m_adv.append(adv_v.mean().data.cpu().numpy()[0])
-            m_values.append(value_v.mean().data.cpu().numpy()[0])
-            m_batch_rewards.append(vals_ref_v.mean().data.cpu().numpy()[0])
-            m_loss_entropy.append(entropy_loss_v.data.cpu().numpy()[0])
-            m_loss_policy.append(loss_policy_v.data.cpu().numpy()[0])
-            m_loss_total.append(loss_v.data.cpu().numpy()[0])
-            m_loss_value.append(loss_value_v.data.cpu().numpy()[0])
-
-
-            if train_step_idx % 10 == 0:
-                writer.add_scalar("advantage", np.mean(m_adv), step_idx)
-                writer.add_scalar("values", np.mean(m_values), step_idx)
-                writer.add_scalar("batch_rewards", np.mean(m_batch_rewards), step_idx)
-                writer.add_scalar("loss_entropy", np.mean(m_loss_entropy), step_idx)
-                writer.add_scalar("loss_policy", np.mean(m_loss_policy), step_idx)
-                writer.add_scalar("loss_value", np.mean(m_loss_value), step_idx)
-                writer.add_scalar("loss_total", np.mean(m_loss_total), step_idx)
-
-                writer.add_scalar("grad_l2", np.sqrt(np.mean(np.square(grads))), step_idx)
-                writer.add_scalar("grad_max", np.max(np.abs(grads)), step_idx)
-                writer.add_scalar("grad_var", np.var(grads), step_idx)
-
-                m_values, m_batch_rewards, m_loss_entropy, m_loss_total, m_loss_policy = [], [], [], [], []
-                m_adv, m_loss_value = [], []
-
-            batch.clear()
-
-    writer.close()
+                tb_tracker.track("advantage",       adv_v, step_idx)
+                tb_tracker.track("values",          value_v, step_idx)
+                tb_tracker.track("batch_rewards",   vals_ref_v, step_idx)
+                tb_tracker.track("loss_entropy",    entropy_loss_v, step_idx)
+                tb_tracker.track("loss_policy",     loss_policy_v, step_idx)
+                tb_tracker.track("loss_value",      loss_value_v, step_idx)
+                tb_tracker.track("loss_total",      loss_v, step_idx)
+                tb_tracker.track("grad_l2",         np.sqrt(np.mean(np.square(grads))), step_idx)
+                tb_tracker.track("grad_max",        np.max(np.abs(grads)), step_idx)
+                tb_tracker.track("grad_var",        np.var(grads), step_idx)
