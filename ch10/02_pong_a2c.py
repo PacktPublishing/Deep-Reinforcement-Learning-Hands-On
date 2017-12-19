@@ -122,11 +122,6 @@ if __name__ == "__main__":
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
 
-    total_rewards = []
-    step_idx = 0
-    done_episodes = 0
-    train_step_idx = 0
-
     batch = []
 
     with common.RewardTracker(writer, stop_reward=18) as tracker:
@@ -143,7 +138,6 @@ if __name__ == "__main__":
                 if len(batch) < BATCH_SIZE:
                     continue
 
-                train_step_idx += 1
                 states_v, actions_t, vals_ref_v = unpack_batch(batch, net, cuda=args.cuda)
                 batch.clear()
 
