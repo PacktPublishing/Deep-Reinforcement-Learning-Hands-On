@@ -16,7 +16,6 @@ from lib import common
 
 GAMMA = 0.99
 LEARNING_RATE = 0.001
-ADAM_EPS = 1e-3
 ENTROPY_BETA = 0.01
 BATCH_SIZE = 128
 NUM_ENVS = 50
@@ -121,7 +120,7 @@ if __name__ == "__main__":
     agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], apply_softmax=True, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=ADAM_EPS)
+    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
     total_rewards = []
     step_idx = 0
