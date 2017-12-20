@@ -1,11 +1,24 @@
 #!/bin/bash
 
+set -x
+
 for ch in ch01 ch04; do
-    [ -d $ch ] || mkdir $ch
+    [ -d $ch ] && continue
+    mkdir $ch
+#    [ -d $ch ] || mkdir $ch
     # create full doc
     pdflatex -jobname=$ch/$ch $ch.tex
-    # create images
     pdflatex "\def\ispreview{1} \input{$ch.tex}"
-    convert -density 300 $ch.pdf -quality 90 $ch/$ch.png
+
+    # create EPS files
+    pages=`pdfinfo $ch.pdf | grep Pages | sed 's/  */ /g' | cut -d ' ' -f 2-`
+    for page in `seq $pages`; do
+        pdftops -f $page -l $page -eps $ch.pdf $ch/$ch-`printf '%02d' $page`.eps
+    done
+
+    # create images
+#    convert -density 300 $ch.pdf -quality 90 $ch/$ch.png
     rm $ch/*.{aux,log}
 done
+
+./clean.sh
