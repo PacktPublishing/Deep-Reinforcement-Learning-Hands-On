@@ -1,0 +1,162 @@
+% C-c C-o to insert the block
+
+% Individual equation: equation* block
+% Inline equation \begin{math}\frac{sin(x)}{x}\end{math}
+\documentclass{article}
+
+\usepackage{amsmath,amssymb}
+
+\ifdefined\ispreview
+\usepackage[active,tightpage]{preview}
+\PreviewEnvironment{math}
+\PreviewEnvironment{equation*}
+\fi
+
+\DeclareMathOperator{\E}{\mathbb{E}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\begin{document}
+
+Page 2, section ``Bellman equation of optimality''
+
+Let’s start with deterministic case, when all our actions have 100\% guaranteed
+outcome. Imagine our agent observes state \begin{math}s_0\end{math} and has N
+available actions. Every action leads to another state
+\begin{math}s_1 \ldots s_N\end{math} with respective reward
+\begin{math}r_1\ldots r_N\end{math}. Also assume that we know the
+values \begin{math}V_i\end{math} of all states connected to the
+state \begin{math}s_0\end{math}.
+
+If we fix the action and calculate the value given to this action, the value
+will be \begin{math}V_0(a=a_i) = r_i + V_i\end{math}. So, to choose the best possible action, the agent
+needs to calculate resulting values for every action and choose the maximum
+possible outcome. In other words: \begin{math}V_0 = \max_{a \in 1 \ldots N}(r_a + V_a)\end{math}. If we’re using discount
+factor \begin{math}\gamma\end{math}, we need to multiply value of the next state
+  by gamma: \begin{math}V_0 = \max_{a \in 1 \ldots N}(r_a + \gamma V_a)\end{math}.
+
+  
+  
+Page 3
+
+It’s not very complicated to extend it for a stochastic case, when our
+actions can have chance to end up in different states. What we need to do is to
+calculate the expected value for every action instead of just taking the value
+of the next state. To illustrate this, let’s consider one single action
+available from state \begin{math}s_0\end{math} with three possible outcomes.
+
+Here we have one action available from the state \begin{math}s_0\end{math}, which can lead to three
+different states with different probabilities: with probability \begin{math}p_1\end{math} it can end up
+in state \begin{math}s_1\end{math}, \begin{math}p_2\end{math} in state \begin{math}s_2\end{math} and 
+\begin{math}p_3\end{math} in state \begin{math}s_3\end{math} (\begin{math}p_1+p_2+p_3=1\end{math}, of course). Every
+target state has its own reward \begin{math}r_1\end{math}, \begin{math}r_2\end{math} or \begin{math}r_3\end{math}. To calculate the expected value
+after issuing action 1, we need to sum all values multiplied by their probabilities:
+
+
+\begin{equation*}
+  V_0(a=1) = p_1(r_1 + \gamma V_1) + p_2(r_2 + \gamma V_2) + p_3(r_3 + \gamma
+  V_3)
+\end{equation*}
+
+or, more formal
+
+\begin{equation*}
+  V_0(a) = \E_{s \sim S}[r_{s,a} + \gamma V_s] = \sum_{s\in S} p_{a,0 \rightarrow s}(r_{s,a} + \gamma
+  V_s)
+\end{equation*}
+
+By combining the Bellman
+equation for a deterministic case with value for stochastic actions, we get
+Bellman equation for general case:
+
+\begin{equation*}
+V_0 = \max_{a \in A}\E_{s \sim S}[r_{s,a} + \gamma V_s] = \max_{a \in A} \sum_{s \in S}
+p_{a,0 \rightarrow s}(r_{s,a} + \gamma V_s)
+\end{equation*}
+
+(Notation \begin{math}p_{a,i \rightarrow j}\end{math} means probability of action a issued in
+state i to end up in state j)
+
+
+
+Page 4, Value of action
+
+To make our life slightly easier, we can define different quantity in addition
+to value of state \begin{math}V_s\end{math}: value of action \begin{math}Q_{s,a}\end{math}. Basically, it equals total
+reward we can get by executing action a in state s, and could be defined via
+\begin{math}V_s\end{math}. Being much less fundamental entity than \begin{math}V_s\end{math}, this quantity gave a name to
+the whole family of methods “Q-learning”, because it is slightly more convenient
+in practice. In those methods, our primary objective is to get values of Q for
+every pair of state and action.
+
+\begin{equation*}
+  Q_{s,a} = \E_{s' \sim S}[r_{s,a} + \gamma V_{s'}] =
+  \sum_{s' \in S} p_{a,s \rightarrow s'}(r_{s,a} + \gamma V_{s'})
+\end{equation*}
+
+Which means: Q for this state s and action a equals the expected immediate
+reward plus discounted long-term reward of destination state. We also can define
+\begin{math}V_s\end{math} via \begin{math}Q_{s, a}\end{math}:
+
+\begin{equation*}
+  V_s = \max_{a \in A} Q_{s,a}
+\end{equation*}
+
+
+To give you a concrete example, let’s consider a simple environment which is
+similar to FrozenLake, but has much simpler structure: we have one initial state
+\begin{math}s_0\end{math} surrounded by four target states \begin{math}s_1, s_2, s_3, s_4\end{math} with different rewards.
+
+Page 6, Value iteration method
+
+We start from state \begin{math}s_1\end{math} and the only action we can do leads us to state \begin{math}s_2\end{math}. We
+get reward r=1 and the only transition from \begin{math}s_2\end{math} is an action which brings us back
+to the \begin{math}s_1\end{math}. So, the life of our agent is an infinite sequence of states [
+\begin{math}s_1, s_2, s_1, s_2, s_1, s_2, s_1, s_2,\ldots\end{math}]. To deal with this infinity, we can use a discount
+factor \begin{math}\gamma=0.9\end{math}. Now, the question: what’s the values for both states?
+
+The answer is not very complicated, though. Every transition from \begin{math}s_1\end{math} to \begin{math}s_2\end{math} gives
+us reward of 1 and every back transition gives us 2. So, our sequence of rewards
+will be [1, 2, 1, 2, 1, 2, 1, 2, ….]. As there is only one action available in
+every state, our agent has no choice, so, we can omit max operation in formulas
+(there is only one alternative). Value for every state will be equal to the
+infinite sum:
+
+
+\begin{equation*}
+V(s_1) = 1 + \gamma (2 + \gamma(1 + \gamma(2 + \ldots))) = \sum_{i=0}^\infty 1\gamma^{2i}+2\gamma^{2i+1}  
+\end{equation*}
+
+
+\begin{equation*}
+V(s_2) = 2 + \gamma (1 + \gamma(2 + \gamma(1 + \ldots))) = \sum_{i=0}^\infty 2\gamma^{2i}+1\gamma^{2i+1}    
+\end{equation*}
+
+Strictly speaking, we cannot calculate the exact values for our states, but with
+\begin{math}\gamma=0.9\end{math}, contribution of every transition quickly decreases over time. For
+example, after 10 steps, \begin{math}\gamma^{10} = 0.910 = 0.349\end{math}, but after 100 steps it becomes just
+0.0000266. Due to this, we can stop after 50 iterations and still get quite
+precise estimation.
+
+
+
+\begin{enumerate}
+  \item Initialize values of all states \begin{math}V_i\end{math} to some
+    initial value, usually zero.
+    % todo: check
+  \item For every state s in the MDP perform Bellman update: \begin{math}V_s \leftarrow
+    \max_a \sum_{s'}p_{a,s \rightarrow s'}(r_{s,a} + \gamma V_s')\end{math}
+  \item Repeat step 2 for some large amount of steps or until changes become too small.
+\end{enumerate}
+
+Only minor modifications to the above procedure are required in case of action values (i.e. Q):
+
+
+\begin{enumerate}
+  \item Initialize all \begin{math}Q_{s,a}\end{math} to zero
+  \item For every state s and every action a in this state perform
+    update: \begin{math}Q_{s,a} \leftarrow \sum_{s'}p_{a,s \rightarrow
+        s'}(r_{s,a} + \gamma \max_{a'}Q_{s',a'})\end{math}
+  \item Repeat step 2
+\end{enumerate}
+
+\end{document}

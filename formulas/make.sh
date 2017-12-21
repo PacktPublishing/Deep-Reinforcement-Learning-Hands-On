@@ -2,7 +2,7 @@
 
 set -x
 
-for ch in ch01 ch04; do
+for ch in ch01 ch04 ch05; do
     [ -d $ch ] && continue
     mkdir $ch
 #    [ -d $ch ] || mkdir $ch
@@ -13,7 +13,7 @@ for ch in ch01 ch04; do
     # create EPS files
     pages=`pdfinfo $ch.pdf | grep Pages | sed 's/  */ /g' | cut -d ' ' -f 2-`
     for page in `seq $pages`; do
-        pdftops -f $page -l $page -eps $ch.pdf $ch/$ch-`printf '%02d' $page`.eps
+        pdftops -f $page -l $page -eps $ch.pdf $ch/$ch-`printf '%03d' $page`.eps
     done
 
     # create images
