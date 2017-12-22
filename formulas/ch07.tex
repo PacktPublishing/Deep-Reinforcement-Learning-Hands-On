@@ -1,0 +1,102 @@
+% C-c C-o to insert the block
+
+% Individual equation: equation* block
+% Inline equation \begin{math}\frac{sin(x)}{x}\end{math}
+\documentclass{article}
+
+\usepackage{amsmath,amssymb}
+
+\ifdefined\ispreview
+\usepackage[active,tightpage]{preview}
+\PreviewEnvironment{math}
+\PreviewEnvironment{equation*}
+\fi
+
+\DeclareMathOperator{\E}{\mathbb{E}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+\begin{document}
+
+Page 3, Agent's experience
+
+\begin{equation*}
+  Q(s_t,a_t) = \E[r_t+\gamma r_{t+1} + \gamma^2 r_{t+2}+\ldots+\gamma^k \max_aQ(s_{t+k,a}]
+\end{equation*}
+
+To support this situations in a generic way, in PTAN we have class
+ptan.experience.ExperienceSourceFirstLast, which takes the environment and the
+agent and provides us the stream of experience tuples: ($s_t$, $a_t$, $R_t$, $s_{t+k}$), where
+\begin{math}R_t = r_tt + \gamma r_{t+1} + \gamma^2 r_{t+2} + \ldots + \gamma^{k-1}r_{t+k-1}\end{math}. When k=1, $R_t$ is just the $r_t$.
+
+Page 10, N-steps DQN
+
+
+\begin{equation*}
+  Q(s_t, a_t) = r_t + \gamma \max_a Q(s_{t+1},a_{t+1})
+\end{equation*}
+
+
+\begin{equation*}
+  Q(s_t, a_t) = r_t + \gamma \max_a [r_{a,t+1} + \gamma \max_{a'} Q(s_{t+2},a')] 
+\end{equation*}
+
+
+\begin{equation*}
+  Q(s_t, a_t) = r_t + \gamma r_{t+1} + \gamma^2 \max_{a'} Q(s_{t+2},a')
+\end{equation*}
+
+
+Page 13, Double DQN
+
+
+\begin{equation*}
+  Q(s_t, a_t) = r_t + \gamma \max_a Q'(s_{t+1},a_{t+1})
+\end{equation*}
+
+
+\begin{equation*}
+  Q(s_t, a_t) = r_t + \gamma \max_a Q'(s_{t+1},\argmax_a Q(s_{t+1}, a))  
+\end{equation*}
+
+
+Page 23, Prioritized replay buffer
+
+From the mathematical point of view, priority of every sample in the buffer is
+calculated as \begin{math}P(i) = \frac{p_i^\alpha}{\sum_kp_k^\alpha}\end{math}, where $p_i$ is the priority of i-th sample in the buffer and $\alpha$ is
+the number which shows
+
+
+To get this, the authors used sample weights, which need to be multiplied to the
+individual sample loss. The value of weight for each sample is defined as
+\begin{math}w_i=(N \cdot P(i))^{-\beta}\end{math},
+where β is another hyperparameter, which should be between 0 and 1.
+
+Page 29, Dueling DQN
+
+This constraint could be enforced in various ways, for example, via the loss
+function, but in the above paper, the authors proposed a very elegant solution
+by subtracting from the Q expression in the network mean value of the advantage,
+which effectively pulls the mean for advantage to the zero:
+\begin{math}Q(s, a) = V(s) + A(s, a) - \frac{1}{N}\sum_kA(s,k)\end{math}.
+
+Page 32, Categorical DQN
+
+As a next step, the authors have shown that Bellman equation can be generalized for
+distribution case and it will have a form
+\begin{math}Z(x, a)\stackrel{D}{=} R(x, a) + \gamma Z(x', a')\end{math}, which
+is very similar to familiar Bellman equation, but now Z(x, a), R(x, a) are the
+probability distributions and not numbers. The effect of this equation on
+distribution is demonstrated on the plots below, taken from the original paper.
+
+We have original distribution of values shown in upper-left corner. After
+multiplication on \begin{math}\gamma\end{math} (upper-right chart)
+
+Page 39
+
+At the end of the function, we need to compute output of network and calculate
+KL-divergence between projected distribution and network’s output for the taken
+actions. KL divergence shows how much two distributions differ and is defined as
+\begin{math}D_{KL}(P\|Q) = -\sum_i p_i\log q_i\end{math}
+  
+\end{document}
