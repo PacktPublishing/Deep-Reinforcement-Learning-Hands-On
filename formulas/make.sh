@@ -2,7 +2,7 @@
 
 set -x
 
-for ch in ch01 ch04 ch05; do
+for ch in ch01 ch04 ch05 ch06; do
     [ -d $ch ] && continue
     mkdir $ch
 #    [ -d $ch ] || mkdir $ch

@@ -1,0 +1,91 @@
+% C-c C-o to insert the block
+
+% Individual equation: equation* block
+% Inline equation \begin{math}\frac{sin(x)}{x}\end{math}
+\documentclass{article}
+
+\usepackage{amsmath,amssymb}
+
+\ifdefined\ispreview
+\usepackage[active,tightpage]{preview}
+\PreviewEnvironment{math}
+\PreviewEnvironment{equation*}
+\fi
+
+\DeclareMathOperator{\E}{\mathbb{E}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+\begin{document}
+
+Page 2, Tabular Q-Learning
+
+\begin{enumerate}
+  \item Start with empty table mapping states to values of actions,
+  \item
+    By interacting with the environment, obtain tuple (s, a, r, s').
+  \item
+    Update Q(s, a) value using Bellman approximation: \begin{math}Q_{s,a}
+      \leftarrow r + \gamma \max_{a' \in A}Q_{s',a'}\end{math}
+  \item
+    Repeat step 2.
+\end{enumerate}
+
+
+...using learning rate $\alpha$ with value from 0 to 1: 
+
+\begin{equation*}
+  Q_{s,a} \leftarrow (1 - \alpha)Q_{s,a} + \alpha (r + \gamma \max_{a' \in A}Q_{s',a'})
+\end{equation*}
+
+The final version of the algorithm is here:
+
+\begin{enumerate}
+  \item Start with empty table for Q(s, a).
+  \item Obtain (s, a, r, s') from the environment.
+  \item Make Bellman update: \begin{math}Q_{s, a} \leftarrow (1 - \alpha) Q_{s,
+      a} + \alpha (r + \gamma \max_{a' \in A} Q_{s',a'})\end{math} 
+  \item Check convergence conditions, if not met, repeat from step 2.
+\end{enumerate}
+
+
+Page 6, Deep Q-learning
+
+
+\begin{enumerate}
+  \item Initialize Q(s, a) with some initial approximation,
+  \item By interacting with the environment, obtain tuple (s, a, r, s').
+  \item Calculate loss:
+    \begin{math}\mathcal{L} = (Q_{s,a} - r)^2\end{math} if episode has ended or
+      \begin{math}\mathcal{L} = (Q_{s,a} - (r + \gamma \max_{a' \in
+          A}Q_{s',a'}))^2\end{math} otherwise.
+  \item Update Q(s, a) using SGD algorithm by minimizing the loss in respect to model parameters.
+  \item Repeat step 2 until converged.
+\end{enumerate}
+
+Page 8, Final form of DQN training
+\begin{enumerate}
+  \item Initialize parameters for Q(s, a) and \begin{math}\hat{Q}(s, a)\end{math} with random
+    weights, \begin{math}\epsilon \leftarrow 1.0\end{math}, and empty replay buffer
+  \item With probability \begin{math}\epsilon\end{math} select a random action a, otherwise
+    \begin{math}a = \argmax_aQ_{s, a}\end{math}
+  \item Execute action a in emulator and observe reward r and next state s'.
+  \item Store transition (s, a, r, s') in the replay buffer.
+  \item Sample random minibatch of transitions from replay buffer.
+  \item For every transition in the buffer calculate target \begin{math}y = r\end{math} 
+    if episode has ended at this step or
+    \begin{math}y = r + \gamma \max_{a' \in A} \hat{Q}_{s',a'}\end{math}
+  \item Calculate loss: \begin{math}\mathcal{L} = (Q_{s, a} - y)^2\end{math}
+  \item Update Q(s, a) using SGD algorithm by minimizing the loss in respect to model parameters.
+  \item Every N steps copy weights from Q to \begin{math}\hat{Q}\end{math}
+  \item Repeat step 2 until converged.
+\end{enumerate}
+
+
+Page 18
+
+As a reminder, there is the loss expression we need to calculate: \begin{math}\mathcal{L} = (Q_{s, a} -
+(r + \gamma \max_{a' \in A} \hat{Q}_{s',a'}))^2\end{math} for steps which wasn`t
+  at the end of the episode or
+  \begin{math}\mathcal{L} = (Q_{s, a} - r)^2\end{math} for final steps.
+\end{document}
