@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 import gym
 import ptan
-import time
 import numpy as np
 import argparse
 import collections
 from tensorboardX import SummaryWriter
 
 import torch
-import torch.nn as nn
 import torch.nn.utils as nn_utils
 import torch.nn.functional as F
 import torch.optim as optim
@@ -21,12 +19,12 @@ GAMMA = 0.99
 LEARNING_RATE = 0.001
 ENTROPY_BETA = 0.01
 BATCH_SIZE = 128
-NUM_ENVS = 50
 
 REWARD_STEPS = 4
 CLIP_GRAD = 0.1
 
-PROCESSES_COUNT = 20
+PROCESSES_COUNT = 5
+NUM_ENVS = 10
 
 def make_env():
     return ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
@@ -35,44 +33,51 @@ def make_env():
 TrainEntry = collections.namedtuple('TrainEntry', field_names=['state', 'q', 'action'])
 
 
-def sum_reward(exps):
-    Q = 0
-    for idx, e in enumerate(exps):
-        Q += (GAMMA ** idx) * e.reward
-    return Q
+class CachingA2CAgent(ptan.agent.BaseAgent):
+    def __init__(self, model, cuda=False, preprocessor=ptan.agent.default_states_preprocessor):
+        self.model = model
+        self.cuda = cuda
+        self.values_cache = {}
+        self.action_selector = ptan.actions.ProbabilityActionSelector()
+        self.preprocessor = preprocessor
+
+    def __call__(self, states, agent_states=None):
+        if agent_states is None:
+            agent_states = [None] * states.shape[0]
+        if self.preprocessor is not None:
+            prep_states = self.preprocessor(states)
+        v = Variable(torch.from_numpy(prep_states))
+        if self.cuda:
+            v = v.cuda()
+        probs_v, values_v = self.model(v)
+        probs_v = F.softmax(probs_v)
+        probs = probs_v.data.cpu().numpy()
+        actions = self.action_selector(probs)
+
+        values = values_v.data.cpu().numpy().squeeze()
+        for state, value in zip(states, values):
+            self.values_cache[id(state)] = value
+
+        return np.array(actions), agent_states
 
 
 def data_func(net, cuda, train_queue):
-    last_value = None
-    exp_steps = collections.deque(maxlen=REWARD_STEPS)
-
-    def policy_fun(x):
-        nonlocal last_value
-        policy_v, value_v = net(x)
-        last_value = value_v.data.cpu().numpy()[0][0]
-        return policy_v
-
-    env = make_env()
-    agent = ptan.agent.PolicyAgent(policy_fun, apply_softmax=True, cuda=cuda)
-    exp_source = ptan.experience.ExperienceSource(env, agent, steps_count=1)
+    envs = [make_env() for _ in range(NUM_ENVS)]
+    agent = CachingA2CAgent(net, cuda=cuda)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     for exp in exp_source:
-        exp = exp[0]
-        if exp.done:
+        if exp.last_state is None:
             print("Done!")
-            while exp_steps:
-                Q = sum_reward(exp_steps)
-                last_exp = exp_steps.popleft()
-                entry = TrainEntry(state=last_exp.state, q=Q, action=last_exp.action)
-                train_queue.put(entry)
-            continue
-        if len(exp_steps) == REWARD_STEPS:
-            Q = sum_reward(exp_steps)
-            last_exp = exp_steps.popleft()
-            Q += GAMMA ** REWARD_STEPS * last_value
-            entry = TrainEntry(state=last_exp.state, q=Q, action=last_exp.action)
+            entry = TrainEntry(state=exp.state, q=exp.reward, action=exp.action)
             train_queue.put(entry)
-        exp_steps.append(exp)
+            continue
+
+        Q = exp.reward
+        state = exp.state
+        Q += GAMMA ** REWARD_STEPS * agent.values_cache[id(state)]
+        entry = TrainEntry(state=exp.state, q=Q, action=exp.action)
+        train_queue.put(entry)
 
     train_queue.put(None)
 
