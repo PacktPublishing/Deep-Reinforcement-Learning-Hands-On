@@ -26,9 +26,18 @@ CLIP_GRAD = 0.1
 PROCESSES_COUNT = 4
 NUM_ENVS = 12
 
+if True:
+    ENV_NAME = "PongNoFrameskip-v4"
+    NAME = 'pong'
+    REWARD_BOUND = 18
+else:
+    ENV_NAME = "BreakoutNoFrameskip-v4"
+    NAME = "breakout"
+    REWARD_BOUND = 400
+
 
 def make_env():
-    return ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
+    return ptan.common.wrappers.wrap_dqn(gym.make(ENV_NAME))
 
 TotalReward = collections.namedtuple('TotalReward', field_names='reward')
 
@@ -96,7 +105,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
 
-    writer = SummaryWriter(comment="-a3c-data_pong_" + args.name)
+    writer = SummaryWriter(comment="-a3c-data_" + NAME + "_" + args.name)
 
     env = make_env()
     net = common.AtariA2C(env.observation_space.shape, env.action_space.n)
@@ -115,7 +124,7 @@ if __name__ == "__main__":
     batch = []
     step_idx = 0
 
-    with common.RewardTracker(writer, stop_reward=18) as tracker:
+    with common.RewardTracker(writer, stop_reward=REWARD_BOUND) as tracker:
         with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
             while True:
                 train_entry = train_queue.get()
