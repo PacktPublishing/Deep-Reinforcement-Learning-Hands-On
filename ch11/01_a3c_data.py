@@ -3,6 +3,7 @@ import gym
 import ptan
 import numpy as np
 import argparse
+import collections
 from tensorboardX import SummaryWriter
 
 import torch
@@ -29,6 +30,8 @@ NUM_ENVS = 12
 def make_env():
     return ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
 
+TotalReward = collections.namedtuple('TotalReward', field_names='reward')
+
 
 def data_func(net, cuda, train_queue):
     envs = [make_env() for _ in range(NUM_ENVS)]
@@ -36,6 +39,9 @@ def data_func(net, cuda, train_queue):
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     for exp in exp_source:
+        new_rewards = exp_source.pop_total_rewards()
+        if new_rewards:
+            train_queue.put(TotalReward(reward=np.mean(new_rewards)))
         train_queue.put(exp)
 
     train_queue.put(None)
@@ -107,58 +113,65 @@ if __name__ == "__main__":
         data_proc_list.append(data_proc)
 
     batch = []
-    batch_idx = 0
+    step_idx = 0
 
-    with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
-        while True:
-            train_entry = train_queue.get()
-            if train_entry is None:
-                break
-            batch.append(train_entry)
-            if len(batch) < BATCH_SIZE:
-                continue
+    with common.RewardTracker(writer, stop_reward=18) as tracker:
+        with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
+            while True:
+                train_entry = train_queue.get()
+                if train_entry is None:
+                    break
+                if isinstance(train_entry, TotalReward):
+                    if tracker.reward(train_entry.reward, step_idx):
+                        break
+                    continue
 
-            batch_idx += 1
-            states_v, actions_t, vals_ref_v = unpack_batch(batch, net, cuda=args.cuda)
-            batch.clear()
+                step_idx += 1
 
-            optimizer.zero_grad()
-            logits_v, value_v = net(states_v)
+                batch.append(train_entry)
+                if len(batch) < BATCH_SIZE:
+                    continue
 
-            loss_value_v = F.mse_loss(value_v, vals_ref_v)
+                states_v, actions_t, vals_ref_v = unpack_batch(batch, net, cuda=args.cuda)
+                batch.clear()
 
-            log_prob_v = F.log_softmax(logits_v)
-            adv_v = vals_ref_v - value_v.detach()
-            log_prob_actions_v = adv_v * log_prob_v[range(BATCH_SIZE), actions_t]
-            loss_policy_v = -log_prob_actions_v.mean()
+                optimizer.zero_grad()
+                logits_v, value_v = net(states_v)
 
-            prob_v = F.softmax(logits_v)
-            entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
+                loss_value_v = F.mse_loss(value_v, vals_ref_v)
 
-            # calculate policy gradients only
-            loss_policy_v.backward(retain_graph=True)
-            grads = np.concatenate([p.grad.data.cpu().numpy().flatten()
-                                    for p in net.parameters()
-                                    if p.grad is not None])
+                log_prob_v = F.log_softmax(logits_v)
+                adv_v = vals_ref_v - value_v.detach()
+                log_prob_actions_v = adv_v * log_prob_v[range(BATCH_SIZE), actions_t]
+                loss_policy_v = -log_prob_actions_v.mean()
 
-            # apply entropy and value gradients
-            loss_v = entropy_loss_v + loss_value_v
-            loss_v.backward()
-            nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
-            optimizer.step()
-            # get full loss
-            loss_v += loss_policy_v
+                prob_v = F.softmax(logits_v)
+                entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
 
-            tb_tracker.track("advantage", adv_v, batch_idx)
-            tb_tracker.track("values", value_v, batch_idx)
-            tb_tracker.track("batch_rewards", vals_ref_v, batch_idx)
-            tb_tracker.track("loss_entropy", entropy_loss_v, batch_idx)
-            tb_tracker.track("loss_policy", loss_policy_v, batch_idx)
-            tb_tracker.track("loss_value", loss_value_v, batch_idx)
-            tb_tracker.track("loss_total", loss_v, batch_idx)
+                # calculate policy gradients only
+                loss_policy_v.backward(retain_graph=True)
+                grads = np.concatenate([p.grad.data.cpu().numpy().flatten()
+                                        for p in net.parameters()
+                                        if p.grad is not None])
 
-            tb_tracker.track("grad_l2", np.sqrt(np.mean(np.square(grads))), batch_idx)
-            tb_tracker.track("grad_max", np.max(np.abs(grads)), batch_idx)
-            tb_tracker.track("grad_var", np.var(grads), batch_idx)
+                # apply entropy and value gradients
+                loss_v = entropy_loss_v + loss_value_v
+                loss_v.backward()
+                nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
+                optimizer.step()
+                # get full loss
+                loss_v += loss_policy_v
+
+                tb_tracker.track("advantage", adv_v, step_idx)
+                tb_tracker.track("values", value_v, step_idx)
+                tb_tracker.track("batch_rewards", vals_ref_v, step_idx)
+                tb_tracker.track("loss_entropy", entropy_loss_v, step_idx)
+                tb_tracker.track("loss_policy", loss_policy_v, step_idx)
+                tb_tracker.track("loss_value", loss_value_v, step_idx)
+                tb_tracker.track("loss_total", loss_v, step_idx)
+
+                tb_tracker.track("grad_l2", np.sqrt(np.mean(np.square(grads))), step_idx)
+                tb_tracker.track("grad_max", np.max(np.abs(grads)), step_idx)
+                tb_tracker.track("grad_var", np.var(grads), step_idx)
 
 pass
