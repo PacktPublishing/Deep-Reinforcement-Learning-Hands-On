@@ -26,12 +26,13 @@ NUM_ENVS = 50
 REWARD_STEPS = 4
 CLIP_GRAD = 0.1
 
+PROCESSES_COUNT = 20
 
 def make_env():
     return ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
 
 
-TrainEntry = collections.namedtuple('TrainEntry', field_names=['state', 'adv', 'q', 'action'])
+TrainEntry = collections.namedtuple('TrainEntry', field_names=['state', 'q', 'action'])
 
 
 def sum_reward(exps):
@@ -42,12 +43,13 @@ def sum_reward(exps):
 
 
 def data_func(net, cuda, train_queue):
-    values = collections.deque()
-    exp_queue = collections.deque(maxlen=REWARD_STEPS)
+    last_value = None
+    exp_steps = collections.deque(maxlen=REWARD_STEPS)
 
     def policy_fun(x):
+        nonlocal last_value
         policy_v, value_v = net(x)
-        values.append(value_v.data.cpu().numpy()[0][0])
+        last_value = value_v.data.cpu().numpy()[0][0]
         return policy_v
 
     env = make_env()
@@ -58,25 +60,19 @@ def data_func(net, cuda, train_queue):
         exp = exp[0]
         if exp.done:
             print("Done!")
-            while exp_queue:
-                value_1 = values.popleft()
-                Q = sum_reward(exp_queue)
-                last_exp = exp_queue.popleft()
-                entry = TrainEntry(state=last_exp.state, adv=Q - value_1,
-                                   q=Q, action=last_exp.action)
+            while exp_steps:
+                Q = sum_reward(exp_steps)
+                last_exp = exp_steps.popleft()
+                entry = TrainEntry(state=last_exp.state, q=Q, action=last_exp.action)
                 train_queue.put(entry)
-            values.clear()
             continue
-        if len(exp_queue) == REWARD_STEPS:
-            value_1 = values.popleft()
-            value_n = values[-1]
-            Q = sum_reward(exp_queue)
-            last_exp = exp_queue.popleft()
-            Q += GAMMA ** REWARD_STEPS * value_n
-            entry = TrainEntry(state=last_exp.state, adv=Q - value_1,
-                               q=Q, action=last_exp.action)
+        if len(exp_steps) == REWARD_STEPS:
+            Q = sum_reward(exp_steps)
+            last_exp = exp_steps.popleft()
+            Q += GAMMA ** REWARD_STEPS * last_value
+            entry = TrainEntry(state=last_exp.state, q=Q, action=last_exp.action)
             train_queue.put(entry)
-        exp_queue.append(exp)
+        exp_steps.append(exp)
 
     train_queue.put(None)
 
@@ -88,37 +84,89 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
 
+    writer = SummaryWriter(comment="-a3c-data_pong_" + args.name)
+
     env = make_env()
     net = common.AtariA2C(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
 
-    train_queue = mp.Queue(maxsize=10)
-    data_proc = mp.Process(target=data_func, args=(net, args.cuda, train_queue))
-    data_proc.start()
+    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
+
+    train_queue = mp.Queue(maxsize=PROCESSES_COUNT)
+    data_proc_list = []
+    for _ in range(PROCESSES_COUNT):
+        data_proc = mp.Process(target=data_func, args=(net, args.cuda, train_queue))
+        data_proc.start()
+        data_proc_list.append(data_proc)
 
     batch_states = []
-    batch_advs = []
     batch_qs = []
     batch_actions = []
-    while True:
-        train_entry = train_queue.get()
-        if train_entry is None:
-            data_proc.join()
-            break
-        batch_states.append(train_entry.state)
-        batch_advs.append(train_entry.adv)
-        batch_qs.append(train_entry.q)
-        batch_actions.append(train_entry.action)
+    batch_idx = 0
 
-        if len(batch_states) < BATCH_SIZE:
-            continue
+    with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
+        while True:
+            train_entry = train_queue.get()
+            if train_entry is None:
+                break
+            batch_states.append(np.array(train_entry.state, copy=False))
+            batch_qs.append(float(train_entry.q))
+            batch_actions.append(int(train_entry.action))
 
-        print("Train")
+            if len(batch_states) < BATCH_SIZE:
+                continue
 
-        batch_states.clear()
-        batch_advs.clear()
-        batch_qs.clear()
-        batch_actions.clear()
+            batch_idx += 1
+            states_v = Variable(torch.from_numpy(np.array(batch_states, copy=False)))
+            qs_v = Variable(torch.FloatTensor(batch_qs))
+            actions_t = torch.LongTensor(batch_actions)
+            if args.cuda:
+                states_v = states_v.cuda()
+                qs_v = qs_v.cuda()
+                actions_t = actions_t.cuda()
+
+            optimizer.zero_grad()
+            logits_v, value_v = net(states_v)
+
+            loss_value_v = F.mse_loss(value_v, qs_v)
+
+            log_prob_v = F.log_softmax(logits_v)
+            adv_v = qs_v - value_v.detach()
+            log_prob_actions_v = adv_v * log_prob_v[range(BATCH_SIZE), actions_t]
+            loss_policy_v = -log_prob_actions_v.mean()
+
+            prob_v = F.softmax(logits_v)
+            entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
+
+            # calculate policy gradients only
+            loss_policy_v.backward(retain_graph=True)
+            grads = np.concatenate([p.grad.data.cpu().numpy().flatten()
+                                    for p in net.parameters()
+                                    if p.grad is not None])
+
+            # apply entropy and value gradients
+            loss_v = entropy_loss_v + loss_value_v
+            loss_v.backward()
+            nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
+            optimizer.step()
+            # get full loss
+            loss_v += loss_policy_v
+
+            tb_tracker.track("advantage", adv_v, batch_idx)
+            tb_tracker.track("values", value_v, batch_idx)
+            tb_tracker.track("batch_rewards", qs_v, batch_idx)
+            tb_tracker.track("loss_entropy", entropy_loss_v, batch_idx)
+            tb_tracker.track("loss_policy", loss_policy_v, batch_idx)
+            tb_tracker.track("loss_value", loss_value_v, batch_idx)
+            tb_tracker.track("loss_total", loss_v, batch_idx)
+
+            tb_tracker.track("grad_l2", np.sqrt(np.mean(np.square(grads))), batch_idx)
+            tb_tracker.track("grad_max", np.max(np.abs(grads)), batch_idx)
+            tb_tracker.track("grad_var", np.var(grads), batch_idx)
+
+            batch_states.clear()
+            batch_qs.clear()
+            batch_actions.clear()
 
 pass
