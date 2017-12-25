@@ -22,8 +22,8 @@ ENTROPY_BETA = 0.01
 REWARD_STEPS = 4
 CLIP_GRAD = 0.1
 
-PROCESSES_COUNT = 3
-NUM_ENVS = 12
+PROCESSES_COUNT = 1
+NUM_ENVS = 50
 
 GRAD_BATCH = 4
 TRAIN_BATCH = 16
@@ -69,7 +69,7 @@ def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
         batch.clear()
 
         optimizer.zero_grad()
-        logits_v, value_v = net(states_v)
+        logits_v, value_v = tgt_net.target_model(states_v)
 
         loss_value_v = F.mse_loss(value_v, vals_ref_v)
 
@@ -84,7 +84,6 @@ def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
         # apply entropy and value gradients
         loss_v = entropy_loss_v + loss_value_v + loss_policy_v
         loss_v.backward()
-        nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
 
         # gather gradients
         grads = [param.grad for param in tgt_net.target_model.parameters()]
@@ -175,7 +174,6 @@ if __name__ == "__main__":
                 step_idx += GRAD_BATCH
 
                 if step_idx % TRAIN_BATCH == 0:
-                    optimizer.step()
                     optimizer.zero_grad()
 
                 for param, grad in zip(net.parameters(), train_entry):
@@ -185,3 +183,7 @@ if __name__ == "__main__":
                         param.grad = grad
                     else:
                         param.grad += grad
+
+                if step_idx % TRAIN_BATCH == 0:
+                    nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
+                    optimizer.step()
