@@ -1,0 +1,84 @@
+% C-c C-o to insert the block
+
+% Individual equation: equation* block
+% Inline equation \begin{math}\frac{sin(x)}{x}\end{math}
+\documentclass{article}
+
+\usepackage{amsmath,amssymb}
+
+\ifdefined\ispreview
+\usepackage[active,tightpage]{preview}
+\PreviewEnvironment{math}
+\PreviewEnvironment{equation*}
+\fi
+
+\DeclareMathOperator{\E}{\mathbb{E}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\begin{document}
+
+Page 1, Variance reduction
+
+
+\begin{equation*}
+  \mathrm{Var}[x] = \E[(x - \E[x])^2]
+\end{equation*}
+
+On the plot below there is a normal (Gaussian) distribution with the same value
+of mean \begin{math}\mu=10\end{math}
+
+Now let’s return to our policy gradients. It has already been said in the
+previous chapter, the method idea is to increase the probability of good actions
+and decrease the chance for bad actions. In math notation our policy gradient
+was written as \begin{math}\nabla J \approx \E[Q(s, a) \nabla\log \pi(a|s)]\end{math}
+
+Page 5, Actor-Critic
+
+
+\begin{enumerate}
+\item Initialize network parameters \begin{math}\theta\end{math} with random values
+\item
+  Play N steps in the environment using the current
+  policy \begin{math}\pi_\theta\end{math}, saving
+    state $s_t$, action $a_t$, reward $r_t$
+  \item  R = 0 if the end of the episode is reached or \begin{math}V_\theta(s_t)\end{math}
+  \item
+    For \begin{math}i = t-1 \ldots t_{start}\end{math}
+    
+    \begin{enumerate}
+\item \begin{math}R \leftarrow r_i + \gamma R\end{math}
+\item Accumulate the policy gradients \begin{math} \partial\theta_\pi \leftarrow
+  \partial\theta_\pi + \nabla_\theta \log \pi_\theta(a_i|s_i)(R - V_\theta(s_i)) \end{math}
+\item Accumulate the value gradients \begin{math}\partial \theta_v \leftarrow
+  \partial \theta_v + \frac{\partial (R - V_\theta(s_i))^2}{\partial \theta_v}\end{math}
+    \end{enumerate}
+
+\item Update network parameters using the accumulated gradients, moving in the
+  direction of policy gradients \begin{math}\partial\theta_\pi\end{math} and in
+    the opposite direction of the value gradients \begin{math}\partial \theta_v\end{math}.
+\item Repeat from step 2 until convergence
+
+\end{enumerate}
+
+
+Entropy bonus is usually added to improve exploration. It’s usually written as
+an entropy value added to the loss function: \begin{math}\mathcal{L}_H = \beta
+  \sum_i \pi_\theta(s_i) \log \pi_\theta(s_i)\end{math}.
+
+
+Page 7
+
+
+Forward pass through the network returns tuple of two tensors: policy and
+value. Now we have large and important function which takes the batch of
+environment transitions and returns three tensors: batch of states, batch of
+actions taken and batch of Q-values calculated using the
+formula \begin{math}Q(s, a) = \sum_{i=0}^{N-1}\gamma^ir_i + \gamma^NV(s_N)\end{math}
+
+
+Page 10
+
+The last piece of our loss function is entropy loss which equals to the scaled
+entropy of our policy taken with the opposite sign (entropy is calculated
+as \begin{math}H(\pi) = -\sum \pi \log \pi\end{math})
+\end{document}
