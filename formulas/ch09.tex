@@ -1,0 +1,69 @@
+% C-c C-o to insert the block
+
+% Individual equation: equation* block
+% Inline equation \begin{math}\frac{sin(x)}{x}\end{math}
+\documentclass{article}
+
+\usepackage{amsmath,amssymb}
+
+\ifdefined\ispreview
+\usepackage[active,tightpage]{preview}
+\PreviewEnvironment{math}
+\PreviewEnvironment{equation*}
+\fi
+
+\DeclareMathOperator{\E}{\mathbb{E}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+\begin{document}
+
+Page 1, Values and policy
+
+Formally it could be written as \begin{math}\pi(s) = \argmax_a Q(s, a)\end{math}, which means that the
+result of our policy \begin{math}\pi\end{math} at every state s is the action with the largest Q.
+
+In math notation, policy is usually represented as \begin{math}\pi(s)\end{math}, we’ll use this notation as well.
+  
+Page 2, Policy gradients
+
+We define policy gradient as \begin{math}\nabla J \approx \E[Q(s, a) \nabla\log \pi(a|s)]\end{math}. Of course, there is a
+strong proof of this, but it’s not that important. Which is much more important
+is the semantic of this expression.
+
+From the practical point of view, policy gradient methods could be implemented
+as performing optimisation of this loss function: \begin{math}\mathcal{L} = -Q(s, a) \log \pi(a|s)\end{math}.
+
+
+Page 3, REINFORCE
+
+\begin{enumerate}
+\item Initialize the network with random weight.
+\item Play N full episodes, saving their (s, a, r, s’) transitions.
+\item
+  For every step t of every episode k calculate discounted total reward for
+  subsequent steps \begin{math}Q_{k,t} = \sum_{i=0}\gamma^ir_i\end{math}
+\item Calculate loss function for all transitions \begin{math}\mathcal{L} =
+  -\sum_{k,t}Q_{k,t}\log(\pi(s_{k,t}, a_{k,t}))\end{math}
+\item Perform SGD update of weights minimizing the loss.
+\item Repeat from step 2 until converged.  
+\end{enumerate}
+
+
+Page 9, Full episodes are required
+
+When we talked about DQN we’ve seen that in practice it’s fine to replace the
+exact value for discounted reward with our estimation using 1-step Bellman
+equation \begin{math}Q(s, a) = r_a + \gamma V(s')\end{math}.
+
+Page 9, High gradient variance
+
+In policy gradients formula \begin{math}\nabla J \approx \E[Q(s, a) \nabla\log \pi(a|s)]\end{math} we have gradient
+proportional to the discounter reward from the given state.
+
+Page 10, Exploration
+
+In math notation, entropy of the policy is defined as: \begin{math}H(\pi) =
+  -\sum \pi(a|s)\log \pi(a|s)\end{math}
+
+\end{document}
