@@ -18,13 +18,15 @@ from lib import common
 GAMMA = 0.99
 LEARNING_RATE = 0.001
 ENTROPY_BETA = 0.01
-BATCH_SIZE = 128
 
 REWARD_STEPS = 4
 CLIP_GRAD = 0.1
 
-PROCESSES_COUNT = 3
-NUM_ENVS = 12
+PROCESSES_COUNT = 1
+NUM_ENVS = 4
+
+GRAD_BATCH = 10
+TRAIN_BATCH = 16
 
 if True:
     ENV_NAME = "PongNoFrameskip-v4"
@@ -78,7 +80,7 @@ class CachingA2CAgent(ptan.agent.BaseAgent):
         return v[1]
 
 
-def data_func(net, cuda, train_queue):
+def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
     envs = [make_env() for _ in range(NUM_ENVS)]
 
     tgt_net = ptan.agent.TargetNet(net)
@@ -86,34 +88,65 @@ def data_func(net, cuda, train_queue):
     agent = CachingA2CAgent(tgt_net.target_model, cuda=cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
+    batch_values = []
+    batch_logits = []
+    batch_ref_values = []
+    batch_actions = []
+
     for exp in exp_source:
         new_rewards = exp_source.pop_total_rewards()
         if new_rewards:
             train_queue.put(TotalReward(reward=np.mean(new_rewards)))
 
         tgt_net.sync()
-        optimizer.zero_grad()
 
         s = agent.pop(exp.state)
         if s is None:
             print("Warning! No value for state")
             continue
-        policy_v, value_v = s
+        logits_v, value_v = s
         val_ref = exp.reward
         if exp.last_state is not None:
             value_last_v = agent.query_value(exp.last_state)
-            val_ref_v = value_last_v * (GAMMA ** REWARD_STEPS) + val_ref
-        else:
-            val_ref_v = Variable(torch.FloatTensor([val_ref]))
-            if cuda:
-                val_ref_v = val_ref_v.cuda()
+            val_ref += value_last_v.data.cpu().numpy()[0] * (GAMMA ** REWARD_STEPS)
 
-        loss_value_v = F.mse_loss(value_v, val_ref_v)
-        loss_value_v.backward(retain_graph=True)
+        batch_ref_values.append(val_ref)
+        batch_values.append(value_v)
+        batch_logits.append(logits_v)
+        batch_actions.append(int(exp.action))
+
+        if len(batch_values) < batch_size:
+            continue
+
+        optimizer.zero_grad()
+        vals_ref_v = Variable(torch.FloatTensor(batch_ref_values).unsqueeze(-1))
+        logits_v = torch.stack(batch_logits)
+        values_v = torch.stack(batch_values)
+        actions_t = torch.LongTensor([batch_actions])
+        if cuda:
+            vals_ref_v = vals_ref_v.cuda()
+            actions_t = actions_t.cuda()
+
+        loss_value_v = F.mse_loss(values_v, vals_ref_v)
+
+        log_prob_v = F.log_softmax(logits_v)
+        adv_v = vals_ref_v - values_v.detach()
+        log_prob_actions_v = adv_v * log_prob_v[range(batch_size), actions_t]
+        loss_policy_v = -log_prob_actions_v.mean()
+
+        prob_v = F.softmax(logits_v)
+        entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
+        loss_v = loss_value_v + loss_policy_v + entropy_loss_v
+        loss_v.backward(retain_graph=True)
 
         # gather gradients
         grads = [param.grad for param in tgt_net.target_model.parameters()]
         train_queue.put(grads)
+
+        batch_ref_values.clear()
+        batch_values.clear()
+        batch_logits.clear()
+        batch_actions.clear()
 
     train_queue.put(None)
 
@@ -197,9 +230,9 @@ if __name__ == "__main__":
                         break
                     continue
 
-                step_idx += 1
+                step_idx += GRAD_BATCH
 
-                if step_idx % 10 == 0:
+                if step_idx % TRAIN_BATCH == 0:
                     optimizer.step()
                     optimizer.zero_grad()
 
