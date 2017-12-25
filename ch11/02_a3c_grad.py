@@ -22,10 +22,10 @@ ENTROPY_BETA = 0.01
 REWARD_STEPS = 4
 CLIP_GRAD = 0.1
 
-PROCESSES_COUNT = 1
-NUM_ENVS = 4
+PROCESSES_COUNT = 3
+NUM_ENVS = 12
 
-GRAD_BATCH = 10
+GRAD_BATCH = 16
 TRAIN_BATCH = 16
 
 if True:
@@ -44,109 +44,51 @@ def make_env():
 TotalReward = collections.namedtuple('TotalReward', field_names='reward')
 
 
-class CachingA2CAgent(ptan.agent.BaseAgent):
-    def __init__(self, model, cuda=False, preprocessor=ptan.agent.default_states_preprocessor):
-        self.model = model
-        self.cuda = cuda
-        self.cache = {}
-        self.action_selector = ptan.actions.ProbabilityActionSelector()
-        self.preprocessor = preprocessor
-
-    def __call__(self, states, agent_states=None):
-        if agent_states is None:
-            agent_states = [None] * states.shape[0]
-        if self.preprocessor is not None:
-            prep_states = self.preprocessor(states)
-        v = Variable(torch.from_numpy(prep_states))
-        if self.cuda:
-            v = v.cuda()
-        probs_v, values_v = self.model(v)
-        probs_v = F.softmax(probs_v)
-        probs = probs_v.data.cpu().numpy()
-        actions = self.action_selector(probs)
-
-        for idx, state in enumerate(states):
-            self.cache[id(state)] = (probs_v[idx], values_v[idx])
-
-        return np.array(actions), agent_states
-
-    def pop(self, state):
-        return self.cache.pop(id(state), None)
-
-    def query_value(self, state):
-        v = self.cache.get(id(state), None)
-        if v is None:
-            return None
-        return v[1]
-
-
 def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
     envs = [make_env() for _ in range(NUM_ENVS)]
 
-    tgt_net = ptan.agent.TargetNet(net)
-    optimizer = optim.Adam(tgt_net.target_model.parameters())
-    agent = CachingA2CAgent(tgt_net.target_model, cuda=cuda)
+    agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=cuda, apply_softmax=True)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
-    batch_values = []
-    batch_logits = []
-    batch_ref_values = []
-    batch_actions = []
+    tgt_net = ptan.agent.TargetNet(net)
+    optimizer = optim.Adam(tgt_net.target_model.parameters())
+
+    batch = []
 
     for exp in exp_source:
         new_rewards = exp_source.pop_total_rewards()
         if new_rewards:
             train_queue.put(TotalReward(reward=np.mean(new_rewards)))
 
+        batch.append(exp)
+        if len(batch) < batch_size:
+            continue
+
         tgt_net.sync()
-
-        s = agent.pop(exp.state)
-        if s is None:
-            print("Warning! No value for state")
-            continue
-        logits_v, value_v = s
-        val_ref = exp.reward
-        if exp.last_state is not None:
-            value_last_v = agent.query_value(exp.last_state)
-            val_ref += value_last_v.data.cpu().numpy()[0] * (GAMMA ** REWARD_STEPS)
-
-        batch_ref_values.append(val_ref)
-        batch_values.append(value_v)
-        batch_logits.append(logits_v)
-        batch_actions.append(int(exp.action))
-
-        if len(batch_values) < batch_size:
-            continue
+        states_v, actions_t, vals_ref_v = unpack_batch(batch, tgt_net.target_model, cuda=cuda)
+        batch.clear()
 
         optimizer.zero_grad()
-        vals_ref_v = Variable(torch.FloatTensor(batch_ref_values).unsqueeze(-1))
-        logits_v = torch.stack(batch_logits)
-        values_v = torch.stack(batch_values)
-        actions_t = torch.LongTensor([batch_actions])
-        if cuda:
-            vals_ref_v = vals_ref_v.cuda()
-            actions_t = actions_t.cuda()
+        logits_v, value_v = net(states_v)
 
-        loss_value_v = F.mse_loss(values_v, vals_ref_v)
+        loss_value_v = F.mse_loss(value_v, vals_ref_v)
 
         log_prob_v = F.log_softmax(logits_v)
-        adv_v = vals_ref_v - values_v.detach()
+        adv_v = vals_ref_v - value_v.detach()
         log_prob_actions_v = adv_v * log_prob_v[range(batch_size), actions_t]
         loss_policy_v = -log_prob_actions_v.mean()
 
         prob_v = F.softmax(logits_v)
         entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
-        loss_v = loss_value_v + loss_policy_v + entropy_loss_v
-        loss_v.backward(retain_graph=True)
+
+        # apply entropy and value gradients
+        loss_v = entropy_loss_v + loss_value_v + loss_policy_v
+        loss_v.backward()
+        nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
 
         # gather gradients
         grads = [param.grad for param in tgt_net.target_model.parameters()]
         train_queue.put(grads)
-
-        batch_ref_values.clear()
-        batch_values.clear()
-        batch_logits.clear()
-        batch_actions.clear()
 
     train_queue.put(None)
 
