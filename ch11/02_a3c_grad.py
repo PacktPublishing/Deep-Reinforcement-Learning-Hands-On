@@ -22,8 +22,8 @@ ENTROPY_BETA = 0.01
 REWARD_STEPS = 4
 CLIP_GRAD = 0.1
 
-PROCESSES_COUNT = 1
-NUM_ENVS = 20
+PROCESSES_COUNT = 3
+NUM_ENVS = 15
 
 GRAD_BATCH = 4
 TRAIN_BATCH = 16
@@ -84,13 +84,13 @@ def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
 
             loss_value_v = F.mse_loss(value_v, vals_ref_v)
 
-            # log_prob_v = F.log_softmax(logits_v)
+            log_prob_v = F.log_softmax(logits_v)
             adv_v = vals_ref_v - value_v.detach()
-            # log_prob_actions_v = adv_v * log_prob_v[range(batch_size), actions_t]
-            # loss_policy_v = -log_prob_actions_v.mean()
-            #
-            # prob_v = F.softmax(logits_v)
-            # entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
+            log_prob_actions_v = adv_v * log_prob_v[range(batch_size), actions_t]
+            loss_policy_v = -log_prob_actions_v.mean()
+
+            prob_v = F.softmax(logits_v)
+            entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
 
             # apply entropy and value gradients
             loss_v = loss_value_v #entropy_loss_v + loss_value_v + loss_policy_v
@@ -99,8 +99,8 @@ def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
             tb_tracker.track("advantage", adv_v, 0)
             tb_tracker.track("values", value_v, 0)
             tb_tracker.track("batch_rewards", vals_ref_v, 0)
-            # tb_tracker.track("loss_entropy", entropy_loss_v, 0)
-            # tb_tracker.track("loss_policy", loss_policy_v, 0)
+            tb_tracker.track("loss_entropy", entropy_loss_v, 0)
+            tb_tracker.track("loss_policy", loss_policy_v, 0)
             tb_tracker.track("loss_value", loss_value_v, 0)
             tb_tracker.track("loss_total", loss_v, 0)
 
