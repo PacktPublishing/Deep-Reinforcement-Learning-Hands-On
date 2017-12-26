@@ -67,7 +67,7 @@ def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
 
     batch = []
 
-    with ptan.common.utils.TBMeanTracker(TBQueueWriter(train_queue), batch_size=10) as tb_tracker:
+    with ptan.common.utils.TBMeanTracker(TBQueueWriter(train_queue), batch_size=100) as tb_tracker:
         for exp in exp_source:
             new_rewards = exp_source.pop_total_rewards()
             if new_rewards:
