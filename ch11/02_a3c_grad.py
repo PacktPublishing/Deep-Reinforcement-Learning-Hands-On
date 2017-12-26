@@ -22,8 +22,8 @@ ENTROPY_BETA = 0.01
 REWARD_STEPS = 4
 CLIP_GRAD = 0.1
 
-PROCESSES_COUNT = 3
-NUM_ENVS = 15
+PROCESSES_COUNT = 1
+NUM_ENVS = 20
 
 GRAD_BATCH = 4
 TRAIN_BATCH = 16
@@ -62,8 +62,7 @@ def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
     agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=cuda, apply_softmax=True)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
-    tgt_net = ptan.agent.TargetNet(net)
-    optimizer = optim.Adam(tgt_net.target_model.parameters())
+    optimizer = optim.Adam(net.parameters())
 
     batch = []
 
@@ -77,37 +76,36 @@ def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
             if len(batch) < batch_size:
                 continue
 
-            tgt_net.sync()
-            states_v, actions_t, vals_ref_v = unpack_batch(batch, tgt_net.target_model, cuda=cuda)
+            states_v, actions_t, vals_ref_v = unpack_batch(batch, net, cuda=cuda)
             batch.clear()
 
             optimizer.zero_grad()
-            logits_v, value_v = tgt_net.target_model(states_v)
+            logits_v, value_v = net(states_v)
 
             loss_value_v = F.mse_loss(value_v, vals_ref_v)
 
-            log_prob_v = F.log_softmax(logits_v)
+            # log_prob_v = F.log_softmax(logits_v)
             adv_v = vals_ref_v - value_v.detach()
-            log_prob_actions_v = adv_v * log_prob_v[range(batch_size), actions_t]
-            loss_policy_v = -log_prob_actions_v.mean()
-
-            prob_v = F.softmax(logits_v)
-            entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
+            # log_prob_actions_v = adv_v * log_prob_v[range(batch_size), actions_t]
+            # loss_policy_v = -log_prob_actions_v.mean()
+            #
+            # prob_v = F.softmax(logits_v)
+            # entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
 
             # apply entropy and value gradients
-            loss_v = entropy_loss_v + loss_value_v + loss_policy_v
+            loss_v = loss_value_v #entropy_loss_v + loss_value_v + loss_policy_v
             loss_v.backward()
 
             tb_tracker.track("advantage", adv_v, 0)
             tb_tracker.track("values", value_v, 0)
             tb_tracker.track("batch_rewards", vals_ref_v, 0)
-            tb_tracker.track("loss_entropy", entropy_loss_v, 0)
-            tb_tracker.track("loss_policy", loss_policy_v, 0)
+            # tb_tracker.track("loss_entropy", entropy_loss_v, 0)
+            # tb_tracker.track("loss_policy", loss_policy_v, 0)
             tb_tracker.track("loss_value", loss_value_v, 0)
             tb_tracker.track("loss_total", loss_v, 0)
 
             # gather gradients
-            grads = [param.grad for param in tgt_net.target_model.parameters()]
+            grads = [param.grad for param in net.parameters()]
             train_queue.put(grads)
 
     train_queue.put(None)
@@ -173,8 +171,11 @@ if __name__ == "__main__":
 
     train_queue = mp.Queue(maxsize=PROCESSES_COUNT)
     data_proc_list = []
+    tgt_nets = []
     for _ in range(PROCESSES_COUNT):
-        data_proc = mp.Process(target=data_func, args=(net, args.cuda, train_queue))
+        tgt_net = ptan.agent.TargetNet(net)
+        tgt_nets.append(tgt_net)
+        data_proc = mp.Process(target=data_func, args=(tgt_net.target_model, args.cuda, train_queue))
         data_proc.start()
         data_proc_list.append(data_proc)
 
@@ -211,3 +212,5 @@ if __name__ == "__main__":
                 if step_idx % TRAIN_BATCH == 0:
                     nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
                     optimizer.step()
+                    for tgt_net in tgt_nets:
+                        tgt_net.sync()
