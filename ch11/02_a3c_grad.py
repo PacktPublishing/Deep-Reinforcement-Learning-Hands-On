@@ -41,7 +41,19 @@ else:
 def make_env():
     return ptan.common.wrappers.wrap_dqn(gym.make(ENV_NAME))
 
-TotalReward = collections.namedtuple('TotalReward', field_names='reward')
+TotalReward = collections.namedtuple('TotalReward', field_names=['reward'])
+TBValue = collections.namedtuple('TBValue', field_names=['name', 'value'])
+
+
+class TBQueueWriter:
+    def __init__(self, queue):
+        self.queue = queue
+
+    def add_scalar(self, name, value, iter_idx):
+        self.queue.put(TBValue(name=name, value=value))
+
+    def close(self):
+        pass
 
 
 def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
@@ -55,39 +67,48 @@ def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
 
     batch = []
 
-    for exp in exp_source:
-        new_rewards = exp_source.pop_total_rewards()
-        if new_rewards:
-            train_queue.put(TotalReward(reward=np.mean(new_rewards)))
+    with ptan.common.utils.TBMeanTracker(TBQueueWriter(train_queue), batch_size=10) as tb_tracker:
+        for exp in exp_source:
+            new_rewards = exp_source.pop_total_rewards()
+            if new_rewards:
+                train_queue.put(TotalReward(reward=np.mean(new_rewards)))
 
-        batch.append(exp)
-        if len(batch) < batch_size:
-            continue
+            batch.append(exp)
+            if len(batch) < batch_size:
+                continue
 
-        tgt_net.sync()
-        states_v, actions_t, vals_ref_v = unpack_batch(batch, tgt_net.target_model, cuda=cuda)
-        batch.clear()
+            tgt_net.sync()
+            states_v, actions_t, vals_ref_v = unpack_batch(batch, tgt_net.target_model, cuda=cuda)
+            batch.clear()
 
-        optimizer.zero_grad()
-        logits_v, value_v = tgt_net.target_model(states_v)
+            optimizer.zero_grad()
+            logits_v, value_v = tgt_net.target_model(states_v)
 
-        loss_value_v = F.mse_loss(value_v, vals_ref_v)
+            loss_value_v = F.mse_loss(value_v, vals_ref_v)
 
-        log_prob_v = F.log_softmax(logits_v)
-        adv_v = vals_ref_v - value_v.detach()
-        log_prob_actions_v = adv_v * log_prob_v[range(batch_size), actions_t]
-        loss_policy_v = -log_prob_actions_v.mean()
+            log_prob_v = F.log_softmax(logits_v)
+            adv_v = vals_ref_v - value_v.detach()
+            log_prob_actions_v = adv_v * log_prob_v[range(batch_size), actions_t]
+            loss_policy_v = -log_prob_actions_v.mean()
 
-        prob_v = F.softmax(logits_v)
-        entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
+            prob_v = F.softmax(logits_v)
+            entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
 
-        # apply entropy and value gradients
-        loss_v = entropy_loss_v + loss_value_v + loss_policy_v
-        loss_v.backward()
+            # apply entropy and value gradients
+            loss_v = entropy_loss_v + loss_value_v + loss_policy_v
+            loss_v.backward()
 
-        # gather gradients
-        grads = [param.grad for param in tgt_net.target_model.parameters()]
-        train_queue.put(grads)
+            tb_tracker.track("advantage", adv_v, 0)
+            tb_tracker.track("values", value_v, 0)
+            tb_tracker.track("batch_rewards", vals_ref_v, 0)
+            tb_tracker.track("loss_entropy", entropy_loss_v, 0)
+            tb_tracker.track("loss_policy", loss_policy_v, 0)
+            tb_tracker.track("loss_value", loss_value_v, 0)
+            tb_tracker.track("loss_total", loss_v, 0)
+
+            # gather gradients
+            grads = [param.grad for param in tgt_net.target_model.parameters()]
+            train_queue.put(grads)
 
     train_queue.put(None)
 
@@ -169,6 +190,9 @@ if __name__ == "__main__":
                 if isinstance(train_entry, TotalReward):
                     if tracker.reward(train_entry.reward, step_idx):
                         break
+                    continue
+                elif isinstance(train_entry, TBValue):
+                    writer.add_scalar(train_entry.name, train_entry.value, step_idx)
                     continue
 
                 step_idx += GRAD_BATCH
