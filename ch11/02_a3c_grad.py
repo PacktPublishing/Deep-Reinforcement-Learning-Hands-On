@@ -62,8 +62,6 @@ def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
     agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=cuda, apply_softmax=True)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
-    optimizer = optim.Adam(net.parameters())
-
     batch = []
 
     with ptan.common.utils.TBMeanTracker(TBQueueWriter(train_queue), batch_size=100) as tb_tracker:
@@ -79,7 +77,7 @@ def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
             states_v, actions_t, vals_ref_v = unpack_batch(batch, net, cuda=cuda)
             batch.clear()
 
-            optimizer.zero_grad()
+            net.zero_grad()
             logits_v, value_v = net(states_v)
 
             loss_value_v = F.mse_loss(value_v, vals_ref_v)
@@ -93,7 +91,7 @@ def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
             entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
 
             # apply entropy and value gradients
-            loss_v = loss_value_v #entropy_loss_v + loss_value_v + loss_policy_v
+            loss_v = entropy_loss_v + loss_value_v + loss_policy_v
             loss_v.backward()
 
             tb_tracker.track("advantage", adv_v, 0)
@@ -182,6 +180,7 @@ if __name__ == "__main__":
 
     batch = []
     step_idx = 0
+    grad_buffer = None
 
     with common.RewardTracker(writer, stop_reward=REWARD_BOUND) as tracker:
         with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
@@ -194,27 +193,26 @@ if __name__ == "__main__":
                         break
                     continue
                 elif isinstance(train_entry, TBValue):
-                    writer.add_scalar(train_entry.name, train_entry.value, step_idx)
+                    writer.add_scalar(train_entry.name, train_entry.value, step_idx * GRAD_BATCH)
                     continue
 
-                step_idx += GRAD_BATCH
+                step_idx += 1
+
+                if grad_buffer is None:
+                    grad_buffer = train_entry
+                else:
+                    for tgt_grad, grad in zip(grad_buffer, train_entry):
+                        tgt_grad += grad
 
                 if step_idx % TRAIN_BATCH == 0:
-                    optimizer.zero_grad()
-
-                for param, grad in zip(net.parameters(), train_entry):
-                    if grad is None:
-                        continue
-                    grad_v = Variable(torch.from_numpy(grad))
-                    if args.cuda:
-                        grad_v = grad_v.cuda()
-                    if param.grad is None:
+                    for param, grad in zip(net.parameters(), grad_buffer):
+                        grad_v = Variable(torch.from_numpy(grad))
+                        if args.cuda:
+                            grad_v = grad_v.cuda()
                         param.grad = grad_v
-                    else:
-                        param.grad += grad_v
 
-                if step_idx % TRAIN_BATCH == 0:
                     nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
                     optimizer.step()
                     for tgt_net in tgt_nets:
                         tgt_net.sync()
+                    grad_buffer = None
