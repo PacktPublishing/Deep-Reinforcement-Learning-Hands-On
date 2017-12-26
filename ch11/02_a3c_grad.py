@@ -16,7 +16,7 @@ from torch.autograd import Variable
 from lib import common
 
 GAMMA = 0.99
-LEARNING_RATE = 0.002
+LEARNING_RATE = 0.001
 ENTROPY_BETA = 0.01
 
 REWARD_STEPS = 4
@@ -105,7 +105,8 @@ def data_func(net, cuda, train_queue, batch_size=GRAD_BATCH):
             tb_tracker.track("loss_total", loss_v, 0)
 
             # gather gradients
-            grads = [param.grad for param in net.parameters()]
+            grads = [param.grad.data.cpu().numpy() if param.grad is not None else None
+                     for param in net.parameters()]
             train_queue.put(grads)
 
     train_queue.put(None)
@@ -204,10 +205,13 @@ if __name__ == "__main__":
                 for param, grad in zip(net.parameters(), train_entry):
                     if grad is None:
                         continue
+                    grad_v = Variable(torch.from_numpy(grad))
+                    if args.cuda:
+                        grad_v = grad_v.cuda()
                     if param.grad is None:
-                        param.grad = grad
+                        param.grad = grad_v
                     else:
-                        param.grad += grad
+                        param.grad += grad_v
 
                 if step_idx % TRAIN_BATCH == 0:
                     nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
