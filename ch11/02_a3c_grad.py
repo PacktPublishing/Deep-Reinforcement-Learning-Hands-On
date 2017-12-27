@@ -42,10 +42,39 @@ def make_env():
     return ptan.common.wrappers.wrap_dqn(gym.make(ENV_NAME))
 
 
+class CachingA2CAgent(ptan.agent.BaseAgent):
+    def __init__(self, model, cuda=False, preprocessor=ptan.agent.default_states_preprocessor):
+        self.model = model
+        self.cuda = cuda
+        self.values_cache = {}
+        self.action_selector = ptan.actions.ProbabilityActionSelector()
+        self.preprocessor = preprocessor
+
+    def __call__(self, states, agent_states=None):
+        if agent_states is None:
+            agent_states = [None] * states.shape[0]
+        if self.preprocessor is not None:
+            prep_states = self.preprocessor(states)
+        v = Variable(torch.from_numpy(prep_states))
+        if self.cuda:
+            v = v.cuda()
+        probs_v, values_v = self.model(v)
+        probs_v = F.softmax(probs_v)
+        probs = probs_v.data.cpu().numpy()
+        actions = self.action_selector(probs)
+
+        values = values_v.data.cpu().numpy().squeeze()
+        for state, value in zip(states, values):
+            self.values_cache[id(state)] = value
+
+        return np.array(actions), agent_states
+
+
 def data_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
     envs = [make_env() for _ in range(NUM_ENVS)]
 
-    agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=cuda, apply_softmax=True)
+#    agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=cuda, apply_softmax=True)
+    agent = CachingA2CAgent(net, cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     batch = []
@@ -59,6 +88,10 @@ def data_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
                 new_rewards = exp_source.pop_total_rewards()
                 if new_rewards and tracker.reward(new_rewards[0], frame_idx):
                     break
+
+                if exp.last_state is not None:
+                    reward = exp.reward + (GAMMA ** REWARD_STEPS) * agent.values_cache[id(exp.last_state)]
+                    exp = ptan.experience.ExperienceFirstLast(state=exp.state, action=exp.action, reward=reward, last_state=None)
 
                 batch.append(exp)
                 if len(batch) < batch_size:
@@ -127,13 +160,13 @@ def unpack_batch(batch, net, cuda=False):
 
     # handle rewards
     rewards_np = np.array(rewards, dtype=np.float32)
-    if not_done_idx:
-        last_states_v = Variable(torch.from_numpy(np.array(last_states, copy=False)), volatile=True)
-        if cuda:
-            last_states_v = last_states_v.cuda()
-        last_vals_v = net(last_states_v)[1]
-        last_vals_np = last_vals_v.data.cpu().numpy()[:, 0]
-        rewards_np[not_done_idx] += GAMMA ** REWARD_STEPS * last_vals_np
+    # if not_done_idx:
+    #     last_states_v = Variable(torch.from_numpy(np.array(last_states, copy=False)), volatile=True)
+    #     if cuda:
+    #         last_states_v = last_states_v.cuda()
+    #     last_vals_v = net(last_states_v)[1]
+    #     last_vals_np = last_vals_v.data.cpu().numpy()[:, 0]
+    #     rewards_np[not_done_idx] += GAMMA ** REWARD_STEPS * last_vals_np
 
     ref_vals_v = Variable(torch.from_numpy(rewards_np))
     if cuda:
