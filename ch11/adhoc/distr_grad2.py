@@ -12,6 +12,7 @@ import ptan
 
 
 TRAIN_DATA = [1, 2, 3, 4, 5, 6]
+CUDA = True
 
 
 def get_y(x):
@@ -26,6 +27,9 @@ def grad_fun(net, queue):
         for v in TRAIN_DATA:
             x_v = Variable(torch.from_numpy(np.array([v], dtype=np.float32)))
             y_v = Variable(torch.from_numpy(np.array([get_y(v)], dtype=np.float32)))
+            if CUDA:
+                x_v = x_v.cuda()
+                y_v = y_v.cuda()
 
             net.zero_grad()
             out_v = net(x_v)
@@ -33,7 +37,7 @@ def grad_fun(net, queue):
             loss_v.backward()
 
             grads = [param.grad.data.cpu().numpy() if param.grad is not None else None
-                     for param in tgt_net.target_model.parameters()]
+                     for param in net.parameters()]
 
             queue.put(grads)
             sum_loss += loss_v.data.cpu().numpy()
@@ -44,7 +48,10 @@ def grad_fun(net, queue):
 
 
 if __name__ == "__main__":
+    mp.set_start_method('spawn')
     net = nn.Linear(in_features=1, out_features=1)
+    if CUDA:
+        net.cuda()
     tgt_net = ptan.agent.TargetNet(net)
     tgt_net.target_model.share_memory()
     print(net)
@@ -67,7 +74,10 @@ if __name__ == "__main__":
         if grads is None:
             break
         for grad, param in zip(grads, net.parameters()):
-            param.grad = Variable(torch.from_numpy(grad))
+            v = Variable(torch.from_numpy(grad))
+            if CUDA:
+                v = v.cuda()
+            param.grad = v
         optimizer.step()
         tgt_net.sync()
     pass
