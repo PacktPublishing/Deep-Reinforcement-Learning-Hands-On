@@ -36,7 +36,7 @@ def grad_fun(net, queue):
             loss_v = F.mse_loss(out_v, y_v)
             loss_v.backward()
 
-            grads = [param.grad.data.cpu().numpy() if param.grad is not None else None
+            grads = [param.grad.clone() if param.grad is not None else None
                      for param in net.parameters()]
 
             queue.put(grads)
@@ -74,10 +74,10 @@ if __name__ == "__main__":
         if grads is None:
             break
         for grad, param in zip(grads, net.parameters()):
-            v = Variable(torch.from_numpy(grad))
-            if CUDA:
-                v = v.cuda()
-            param.grad = v
+            # v = Variable(torch.from_numpy(grad))
+            # if CUDA:
+            #     v = v.cuda()
+            param.grad = grad
         optimizer.step()
         tgt_net.sync()
     pass
