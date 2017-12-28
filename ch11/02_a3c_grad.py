@@ -160,7 +160,6 @@ def unpack_batch(batch, net, cuda=False):
         states_v = states_v.cuda()
         actions_t = actions_t.cuda()
 
-    # handle rewards
     rewards_np = np.array(rewards, dtype=np.float32)
     # if not_done_idx:
     #     last_states_v = Variable(torch.from_numpy(np.array(last_states, copy=False)), volatile=True)
@@ -193,12 +192,9 @@ if __name__ == "__main__":
 
     train_queue = mp.Queue(maxsize=PROCESSES_COUNT*10)
     data_proc_list = []
-    tgt_nets = []
     for proc_idx in range(PROCESSES_COUNT):
-        tgt_net = ptan.agent.TargetNet(net)
-        tgt_nets.append(tgt_net)
         proc_name = "-a3c-grad_" + NAME + "_" + args.name + "#%d" % proc_idx
-        data_proc = mp.Process(target=data_func, args=(proc_name, tgt_net.target_model, args.cuda, train_queue))
+        data_proc = mp.Process(target=data_func, args=(proc_name, net, args.cuda, train_queue))
         data_proc.start()
         data_proc_list.append(data_proc)
 
@@ -228,6 +224,4 @@ if __name__ == "__main__":
 
             nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
             optimizer.step()
-            for tgt_net in tgt_nets:
-                tgt_net.sync()
             grad_buffer = None
