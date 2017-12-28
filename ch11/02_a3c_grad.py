@@ -190,7 +190,7 @@ if __name__ == "__main__":
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
 
-    train_queue = mp.Queue(maxsize=PROCESSES_COUNT*10)
+    train_queue = mp.Queue(maxsize=PROCESSES_COUNT)
     data_proc_list = []
     for proc_idx in range(PROCESSES_COUNT):
         proc_name = "-a3c-grad_" + NAME + "_" + args.name + "#%d" % proc_idx
