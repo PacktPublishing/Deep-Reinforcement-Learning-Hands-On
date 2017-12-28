@@ -47,6 +47,7 @@ class CachingA2CAgent(ptan.agent.BaseAgent):
         self.model = model
         self.cuda = cuda
         self.values_cache = {}
+        self.cache = {}
         self.action_selector = ptan.actions.ProbabilityActionSelector()
         self.preprocessor = preprocessor
 
@@ -58,14 +59,15 @@ class CachingA2CAgent(ptan.agent.BaseAgent):
         v = Variable(torch.from_numpy(prep_states))
         if self.cuda:
             v = v.cuda()
-        probs_v, values_v = self.model(v)
-        probs_v = F.softmax(probs_v)
+        logits_v, values_v = self.model(v)
+        probs_v = F.softmax(logits_v)
         probs = probs_v.data.cpu().numpy()
         actions = self.action_selector(probs)
 
         values = values_v.data.cpu().numpy().squeeze()
-        for state, value in zip(states, values):
+        for ofs, (state, value) in enumerate(zip(states, values)):
             self.values_cache[id(state)] = value
+            self.cache[id(state)] = logits_v[ofs], values_v[ofs]
 
         return np.array(actions), agent_states
 
