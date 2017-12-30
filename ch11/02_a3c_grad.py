@@ -24,8 +24,8 @@ CLIP_GRAD = 0.1
 PROCESSES_COUNT = 3
 NUM_ENVS = 15
 
-GRAD_BATCH = 4
-TRAIN_BATCH = 16
+GRAD_BATCH = 64
+TRAIN_BATCH = 2
 
 
 if True:
@@ -47,7 +47,6 @@ class CachingA2CAgent(ptan.agent.BaseAgent):
         self.model = model
         self.cuda = cuda
         self.values_cache = {}
-        self.cache = {}
         self.action_selector = ptan.actions.ProbabilityActionSelector()
         self.preprocessor = preprocessor
 
@@ -67,7 +66,6 @@ class CachingA2CAgent(ptan.agent.BaseAgent):
         values = values_v.data.cpu().numpy().squeeze()
         for ofs, (state, value) in enumerate(zip(states, values)):
             self.values_cache[id(state)] = value
-            self.cache[id(state)] = logits_v[ofs], values_v[ofs]
 
         return np.array(actions), agent_states
 
@@ -75,11 +73,11 @@ class CachingA2CAgent(ptan.agent.BaseAgent):
 def data_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
     envs = [make_env() for _ in range(NUM_ENVS)]
 
-#    agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=cuda, apply_softmax=True)
     agent = CachingA2CAgent(net, cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     batch = []
+    batch_rewards = []
     frame_idx = 0
     writer = SummaryWriter(comment=proc_name)
 
@@ -91,20 +89,22 @@ def data_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
                 if new_rewards and tracker.reward(new_rewards[0], frame_idx):
                     break
 
+                batch.append(exp)
                 if exp.last_state is not None:
                     reward = exp.reward + (GAMMA ** REWARD_STEPS) * agent.values_cache[id(exp.last_state)]
-                    exp = ptan.experience.ExperienceFirstLast(state=exp.state, action=exp.action, reward=reward, last_state=None)
+                    batch_rewards.append(reward)
+                else:
+                    batch_rewards.append(exp.reward)
 
-                batch.append(exp)
                 if len(batch) < batch_size:
                     continue
 
-                states_v, actions_t, vals_ref_v = unpack_batch(batch, net, cuda=cuda)
+                states_v, actions_t, vals_ref_v = unpack_batch(batch, cuda=cuda)
                 batch.clear()
+                batch_rewards.clear()
 
                 net.zero_grad()
                 logits_v, value_v = net(states_v)
-
                 loss_value_v = F.mse_loss(value_v, vals_ref_v)
 
                 log_prob_v = F.log_softmax(logits_v)
@@ -135,42 +135,22 @@ def data_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
     train_queue.put(None)
 
 
-def unpack_batch(batch, net, cuda=False):
+def unpack_batch(batch, rewards, cuda=False):
     """
     Convert batch into training tensors
-    :param batch:
-    :param net:
     :return: states variable, actions tensor, reference values variable
     """
     states = []
     actions = []
-    rewards = []
-    not_done_idx = []
-    last_states = []
     for idx, exp in enumerate(batch):
         states.append(np.array(exp.state, copy=False))
         actions.append(int(exp.action))
-        rewards.append(exp.reward)
-        if exp.last_state is not None:
-            not_done_idx.append(idx)
-            last_states.append(np.array(exp.last_state, copy=False))
     states_v = Variable(torch.from_numpy(np.array(states, copy=False)))
     actions_t = torch.LongTensor(actions)
+    ref_vals_v = Variable(torch.FloatTensor(rewards))
     if cuda:
         states_v = states_v.cuda()
         actions_t = actions_t.cuda()
-
-    rewards_np = np.array(rewards, dtype=np.float32)
-    # if not_done_idx:
-    #     last_states_v = Variable(torch.from_numpy(np.array(last_states, copy=False)), volatile=True)
-    #     if cuda:
-    #         last_states_v = last_states_v.cuda()
-    #     last_vals_v = net(last_states_v)[1]
-    #     last_vals_np = last_vals_v.data.cpu().numpy()[:, 0]
-    #     rewards_np[not_done_idx] += GAMMA ** REWARD_STEPS * last_vals_np
-
-    ref_vals_v = Variable(torch.from_numpy(rewards_np))
-    if cuda:
         ref_vals_v = ref_vals_v.cuda()
 
     return states_v, actions_t, ref_vals_v
