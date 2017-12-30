@@ -99,7 +99,7 @@ def data_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
                 if len(batch) < batch_size:
                     continue
 
-                states_v, actions_t, vals_ref_v = unpack_batch(batch, cuda=cuda)
+                states_v, actions_t, vals_ref_v = unpack_batch(batch, batch_rewards, cuda=cuda)
                 batch.clear()
                 batch_rewards.clear()
 
