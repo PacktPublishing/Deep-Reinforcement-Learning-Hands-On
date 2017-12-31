@@ -149,3 +149,7 @@ if __name__ == "__main__":
             nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
             optimizer.step()
             grad_buffer = None
+
+    for p in data_proc_list:
+        p.terminate()
+        p.join()
