@@ -126,30 +126,31 @@ if __name__ == "__main__":
     step_idx = 0
     grad_buffer = None
 
-    while True:
-        train_entry = train_queue.get()
-        if train_entry is None:
-            break
+    try:
+        while True:
+            train_entry = train_queue.get()
+            if train_entry is None:
+                break
 
-        step_idx += 1
+            step_idx += 1
 
-        if grad_buffer is None:
-            grad_buffer = train_entry
-        else:
-            for tgt_grad, grad in zip(grad_buffer, train_entry):
-                tgt_grad += grad
+            if grad_buffer is None:
+                grad_buffer = train_entry
+            else:
+                for tgt_grad, grad in zip(grad_buffer, train_entry):
+                    tgt_grad += grad
 
-        if step_idx % TRAIN_BATCH == 0:
-            for param, grad in zip(net.parameters(), grad_buffer):
-                grad_v = Variable(torch.from_numpy(grad))
-                if args.cuda:
-                    grad_v = grad_v.cuda()
-                param.grad = grad_v
+            if step_idx % TRAIN_BATCH == 0:
+                for param, grad in zip(net.parameters(), grad_buffer):
+                    grad_v = Variable(torch.from_numpy(grad))
+                    if args.cuda:
+                        grad_v = grad_v.cuda()
+                    param.grad = grad_v
 
-            nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
-            optimizer.step()
-            grad_buffer = None
-
-    for p in data_proc_list:
-        p.terminate()
-        p.join()
+                nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
+                optimizer.step()
+                grad_buffer = None
+    finally:
+        for p in data_proc_list:
+            p.terminate()
+            p.join()
