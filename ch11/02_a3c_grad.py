@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import gym
 import ptan
-import numpy as np
 import argparse
 from tensorboardX import SummaryWriter
 
@@ -28,7 +27,7 @@ GRAD_BATCH = 64
 TRAIN_BATCH = 2
 
 
-if False:
+if True:
     ENV_NAME = "PongNoFrameskip-v4"
     NAME = 'pong'
     REWARD_BOUND = 18
@@ -43,42 +42,13 @@ def make_env():
     return ptan.common.wrappers.wrap_dqn(gym.make(ENV_NAME))
 
 
-class CachingA2CAgent(ptan.agent.BaseAgent):
-    def __init__(self, model, cuda=False, preprocessor=ptan.agent.default_states_preprocessor):
-        self.model = model
-        self.cuda = cuda
-        self.values_cache = {}
-        self.action_selector = ptan.actions.ProbabilityActionSelector()
-        self.preprocessor = preprocessor
-
-    def __call__(self, states, agent_states=None):
-        if agent_states is None:
-            agent_states = [None] * states.shape[0]
-        if self.preprocessor is not None:
-            prep_states = self.preprocessor(states)
-        v = Variable(torch.from_numpy(prep_states))
-        if self.cuda:
-            v = v.cuda()
-        logits_v, values_v = self.model(v)
-        probs_v = F.softmax(logits_v)
-        probs = probs_v.data.cpu().numpy()
-        actions = self.action_selector(probs)
-
-        values = values_v.data.cpu().numpy().squeeze()
-        for ofs, (state, value) in enumerate(zip(states, values)):
-            self.values_cache[id(state)] = value
-
-        return np.array(actions), agent_states
-
-
 def data_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
     envs = [make_env() for _ in range(NUM_ENVS)]
 
-    agent = CachingA2CAgent(net, cuda)
+    agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=cuda, apply_softmax=True)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     batch = []
-    batch_rewards = []
     frame_idx = 0
     writer = SummaryWriter(comment=proc_name)
 
@@ -91,18 +61,12 @@ def data_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
                     break
 
                 batch.append(exp)
-                if exp.last_state is not None:
-                    reward = exp.reward + (GAMMA ** REWARD_STEPS) * agent.values_cache[id(exp.last_state)]
-                    batch_rewards.append(reward)
-                else:
-                    batch_rewards.append(exp.reward)
-
                 if len(batch) < batch_size:
                     continue
 
-                states_v, actions_t, vals_ref_v = unpack_batch(batch, batch_rewards, cuda=cuda)
+                states_v, actions_t, vals_ref_v = \
+                    common.unpack_batch(batch, net, last_val_gamma=GAMMA**REWARD_STEPS, cuda=cuda)
                 batch.clear()
-                batch_rewards.clear()
 
                 net.zero_grad()
                 logits_v, value_v = net(states_v)
@@ -116,7 +80,6 @@ def data_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
                 prob_v = F.softmax(logits_v)
                 entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
 
-                # apply entropy and value gradients
                 loss_v = entropy_loss_v + loss_value_v + loss_policy_v
                 loss_v.backward()
 
@@ -135,27 +98,6 @@ def data_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
                 train_queue.put(grads)
 
     train_queue.put(None)
-
-
-def unpack_batch(batch, rewards, cuda=False):
-    """
-    Convert batch into training tensors
-    :return: states variable, actions tensor, reference values variable
-    """
-    states = []
-    actions = []
-    for idx, exp in enumerate(batch):
-        states.append(np.array(exp.state, copy=False))
-        actions.append(int(exp.action))
-    states_v = Variable(torch.from_numpy(np.array(states, copy=False)))
-    actions_t = torch.LongTensor(actions)
-    ref_vals_v = Variable(torch.FloatTensor(rewards))
-    if cuda:
-        states_v = states_v.cuda()
-        actions_t = actions_t.cuda()
-        ref_vals_v = ref_vals_v.cuda()
-
-    return states_v, actions_t, ref_vals_v
 
 
 if __name__ == "__main__":
