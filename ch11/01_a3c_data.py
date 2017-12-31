@@ -21,8 +21,8 @@ BATCH_SIZE = 128
 REWARD_STEPS = 4
 CLIP_GRAD = 0.1
 
-PROCESSES_COUNT = 4
-NUM_ENVS = 12
+PROCESSES_COUNT = 3
+NUM_ENVS = 15
 
 if True:
     ENV_NAME = "PongNoFrameskip-v4"
@@ -40,7 +40,7 @@ def make_env():
 TotalReward = collections.namedtuple('TotalReward', field_names='reward')
 
 
-def data_func(net, cuda, train_queue, stop_flag):
+def data_func(net, cuda, train_queue):
     envs = [make_env() for _ in range(NUM_ENVS)]
     agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=cuda, apply_softmax=True)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
@@ -50,8 +50,6 @@ def data_func(net, cuda, train_queue, stop_flag):
         if new_rewards:
             train_queue.put(TotalReward(reward=np.mean(new_rewards)))
         train_queue.put(exp)
-        if stop_flag.value:
-            break
 
 
 if __name__ == "__main__":
@@ -67,14 +65,14 @@ if __name__ == "__main__":
     net = common.AtariA2C(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
+    net.share_memory()
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
 
     train_queue = mp.Queue(maxsize=PROCESSES_COUNT)
-    stop_flag = mp.Value('b', False)
     data_proc_list = []
     for _ in range(PROCESSES_COUNT):
-        data_proc = mp.Process(target=data_func, args=(net, args.cuda, train_queue, stop_flag))
+        data_proc = mp.Process(target=data_func, args=(net, args.cuda, train_queue))
         data_proc.start()
         data_proc_list.append(data_proc)
 
@@ -91,7 +89,6 @@ if __name__ == "__main__":
                     continue
 
                 step_idx += 1
-
                 batch.append(train_entry)
                 if len(batch) < BATCH_SIZE:
                     continue
@@ -126,6 +123,6 @@ if __name__ == "__main__":
                 tb_tracker.track("loss_value", loss_value_v, step_idx)
                 tb_tracker.track("loss_total", loss_v, step_idx)
 
-    stop_flag.value = True
     for p in data_proc_list:
+        p.terminate()
         p.join()
