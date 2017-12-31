@@ -6,12 +6,10 @@ import argparse
 import collections
 from tensorboardX import SummaryWriter
 
-import torch
 import torch.nn.utils as nn_utils
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.multiprocessing as mp
-from torch.autograd import Variable
 
 from lib import common
 
@@ -42,7 +40,7 @@ def make_env():
 TotalReward = collections.namedtuple('TotalReward', field_names='reward')
 
 
-def data_func(net, cuda, train_queue):
+def data_func(net, cuda, train_queue, stop_flag):
     envs = [make_env() for _ in range(NUM_ENVS)]
     agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=cuda, apply_softmax=True)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
@@ -52,50 +50,8 @@ def data_func(net, cuda, train_queue):
         if new_rewards:
             train_queue.put(TotalReward(reward=np.mean(new_rewards)))
         train_queue.put(exp)
-
-    train_queue.put(None)
-
-
-def unpack_batch(batch, net, cuda=False):
-    """
-    Convert batch into training tensors
-    :param batch:
-    :param net:
-    :return: states variable, actions tensor, reference values variable
-    """
-    states = []
-    actions = []
-    rewards = []
-    not_done_idx = []
-    last_states = []
-    for idx, exp in enumerate(batch):
-        states.append(np.array(exp.state, copy=False))
-        actions.append(int(exp.action))
-        rewards.append(exp.reward)
-        if exp.last_state is not None:
-            not_done_idx.append(idx)
-            last_states.append(np.array(exp.last_state, copy=False))
-    states_v = Variable(torch.from_numpy(np.array(states, copy=False)))
-    actions_t = torch.LongTensor(actions)
-    if cuda:
-        states_v = states_v.cuda()
-        actions_t = actions_t.cuda()
-
-    # handle rewards
-    rewards_np = np.array(rewards, dtype=np.float32)
-    if not_done_idx:
-        last_states_v = Variable(torch.from_numpy(np.array(last_states, copy=False)), volatile=True)
-        if cuda:
-            last_states_v = last_states_v.cuda()
-        last_vals_v = net(last_states_v)[1]
-        last_vals_np = last_vals_v.data.cpu().numpy()[:, 0]
-        rewards_np[not_done_idx] += GAMMA ** REWARD_STEPS * last_vals_np
-
-    ref_vals_v = Variable(torch.from_numpy(rewards_np))
-    if cuda:
-        ref_vals_v = ref_vals_v.cuda()
-
-    return states_v, actions_t, ref_vals_v
+        if stop_flag.value:
+            break
 
 
 if __name__ == "__main__":
@@ -115,9 +71,10 @@ if __name__ == "__main__":
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
 
     train_queue = mp.Queue(maxsize=PROCESSES_COUNT)
+    stop_flag = mp.Value('b', False)
     data_proc_list = []
     for _ in range(PROCESSES_COUNT):
-        data_proc = mp.Process(target=data_func, args=(net, args.cuda, train_queue))
+        data_proc = mp.Process(target=data_func, args=(net, args.cuda, train_queue, stop_flag))
         data_proc.start()
         data_proc_list.append(data_proc)
 
@@ -128,8 +85,6 @@ if __name__ == "__main__":
         with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
             while True:
                 train_entry = train_queue.get()
-                if train_entry is None:
-                    break
                 if isinstance(train_entry, TotalReward):
                     if tracker.reward(train_entry.reward, step_idx):
                         break
@@ -141,7 +96,8 @@ if __name__ == "__main__":
                 if len(batch) < BATCH_SIZE:
                     continue
 
-                states_v, actions_t, vals_ref_v = unpack_batch(batch, net, cuda=args.cuda)
+                states_v, actions_t, vals_ref_v = \
+                    common.unpack_batch(batch, net, last_val_gamma=GAMMA**REWARD_STEPS, cuda=args.cuda)
                 batch.clear()
 
                 optimizer.zero_grad()
@@ -157,7 +113,6 @@ if __name__ == "__main__":
                 prob_v = F.softmax(logits_v)
                 entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
 
-                # apply entropy and value gradients
                 loss_v = entropy_loss_v + loss_value_v + loss_policy_v
                 loss_v.backward()
                 nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
@@ -170,3 +125,7 @@ if __name__ == "__main__":
                 tb_tracker.track("loss_policy", loss_policy_v, step_idx)
                 tb_tracker.track("loss_value", loss_value_v, step_idx)
                 tb_tracker.track("loss_total", loss_v, step_idx)
+
+    stop_flag.value = True
+    for p in data_proc_list:
+        p.join()
