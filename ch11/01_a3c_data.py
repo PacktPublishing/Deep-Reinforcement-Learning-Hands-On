@@ -80,7 +80,7 @@ if __name__ == "__main__":
     step_idx = 0
 
     with common.RewardTracker(writer, stop_reward=REWARD_BOUND) as tracker:
-        with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
+        with ptan.common.utils.TBMeanTracker(writer, batch_size=100) as tb_tracker:
             while True:
                 train_entry = train_queue.get()
                 if isinstance(train_entry, TotalReward):
