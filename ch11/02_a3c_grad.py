@@ -28,7 +28,7 @@ GRAD_BATCH = 64
 TRAIN_BATCH = 2
 
 
-if True:
+if False:
     ENV_NAME = "PongNoFrameskip-v4"
     NAME = 'pong'
     REWARD_BOUND = 18
@@ -36,6 +36,7 @@ else:
     ENV_NAME = "BreakoutNoFrameskip-v4"
     NAME = "breakout"
     REWARD_BOUND = 400
+    TRAIN_BATCH = 4
 
 
 def make_env():
@@ -128,6 +129,7 @@ def data_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
                 tb_tracker.track("loss_total", loss_v, frame_idx)
 
                 # gather gradients
+                nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
                 grads = [param.grad.data.cpu().numpy() if param.grad is not None else None
                          for param in net.parameters()]
                 train_queue.put(grads)
