@@ -111,6 +111,7 @@ if __name__ == "__main__":
     net = common.AtariA2C(env.observation_space.shape, env.action_space.n)
     if args.cuda:
         net.cuda()
+    net.share_memory()
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
 
