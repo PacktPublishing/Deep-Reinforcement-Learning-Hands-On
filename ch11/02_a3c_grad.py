@@ -42,7 +42,7 @@ def make_env():
     return ptan.common.wrappers.wrap_dqn(gym.make(ENV_NAME))
 
 
-def grads_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
+def grads_func(proc_name, net, cuda, train_queue):
     envs = [make_env() for _ in range(NUM_ENVS)]
 
     agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=cuda, apply_softmax=True)
@@ -61,7 +61,7 @@ def grads_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
                     break
 
                 batch.append(exp)
-                if len(batch) < batch_size:
+                if len(batch) < GRAD_BATCH:
                     continue
 
                 states_v, actions_t, vals_ref_v = \
@@ -74,7 +74,7 @@ def grads_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
 
                 log_prob_v = F.log_softmax(logits_v)
                 adv_v = vals_ref_v - value_v.detach()
-                log_prob_actions_v = adv_v * log_prob_v[range(batch_size), actions_t]
+                log_prob_actions_v = adv_v * log_prob_v[range(GRAD_BATCH), actions_t]
                 loss_policy_v = -log_prob_actions_v.mean()
 
                 prob_v = F.softmax(logits_v)
