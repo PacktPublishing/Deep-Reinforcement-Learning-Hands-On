@@ -42,7 +42,7 @@ def make_env():
     return ptan.common.wrappers.wrap_dqn(gym.make(ENV_NAME))
 
 
-def data_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
+def grads_func(proc_name, net, cuda, train_queue, batch_size=GRAD_BATCH):
     envs = [make_env() for _ in range(NUM_ENVS)]
 
     agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=cuda, apply_softmax=True)
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     data_proc_list = []
     for proc_idx in range(PROCESSES_COUNT):
         proc_name = "-a3c-grad_" + NAME + "_" + args.name + "#%d" % proc_idx
-        data_proc = mp.Process(target=data_func, args=(proc_name, net, args.cuda, train_queue))
+        data_proc = mp.Process(target=grads_func, args=(proc_name, net, args.cuda, train_queue))
         data_proc.start()
         data_proc_list.append(data_proc)
 
