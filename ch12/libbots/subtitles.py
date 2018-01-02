@@ -1,6 +1,16 @@
+import gzip
 import datetime
 import collections
 import xml.etree.ElementTree as ET
+
+
+def read_file(file_name, **kwargs):
+    if file_name.endswith('.gz'):
+        with gzip.open(file_name) as fd:
+            tree = ET.parse(fd)
+    else:
+        tree = ET.parse(file_name)
+    return parse_dialogues(tree, **kwargs)
 
 
 def parse_dialogues(tree, dialog_seconds=10):

@@ -1,3 +1,5 @@
 OpenSubtitles
 *.txt
 *.zip
+*.dic
+*.npy
