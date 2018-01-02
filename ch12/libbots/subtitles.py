@@ -31,12 +31,12 @@ def parse_dialogues(tree, dialog_seconds=10):
         cur_dialogue.extend(split_phrase(prev_phrase))
         delta = phrase.time_start - prev_phrase.time_stop
         if delta.total_seconds() > dialog_seconds:
-            res.append(cur_dialogue)
+            res.append(preprocess_dialogue(cur_dialogue))
             cur_dialogue = []
         prev_phrase = phrase
 
     cur_dialogue.extend(split_phrase(prev_phrase))
-    res.append(cur_dialogue)
+    res.append(preprocess_dialogue(cur_dialogue))
     return res
 
 
@@ -121,3 +121,43 @@ def split_phrase(phrase):
         result.append(Phrase(words=part, time_start=phrase.time_start + idx*delta,
                              time_stop=phrase.time_start + (idx+1)*delta))
     return result
+
+
+def phrase_expand_abbrevs(phrase):
+    """
+    Expand abbreviations in-place
+    """
+    for idx, w in enumerate(phrase.words):
+        if w.endswith("'"):
+            lw = w.lower()
+            lww = phrase.words[idx + 1].lower()
+
+            if w.endswith("n'"):
+                phrase.words[idx] = w[:-2]
+                phrase.words[idx+1] = 'not'
+            elif lww == 're':
+                phrase.words[idx] = w[:-1]
+                phrase.words[idx+1] = 'are'
+            elif lww == 've':
+                phrase.words[idx] = w[:-1]
+                phrase.words[idx+1] = 'have'
+            elif lww == 's':    # horrible thing to do
+                phrase.words[idx] = w[:-1]
+                phrase.words[idx + 1] = 'is'
+            elif lww == 'll' or lww == 'il':
+                phrase.words[idx] = w[:-1]
+                phrase.words[idx + 1] = 'will'
+            elif lw == "i'":
+                if lww == "m":
+                    phrase.words[idx] = 'I'
+                    phrase.words[idx+1] = 'am'
+
+
+def preprocess_dialogue(dialogue):
+    """
+    :param dialogue: list of phrases 
+    :return: list of phrases
+    """
+    for phrase in dialogue:
+        phrase_expand_abbrevs(phrase)
+    return dialogue
