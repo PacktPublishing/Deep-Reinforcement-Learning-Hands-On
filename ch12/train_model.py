@@ -6,6 +6,9 @@ from libbots import subtitles, data, model
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torch.autograd import Variable
+
 
 DATA_FILE = "data/OpenSubtitles/en/Action/2005/365_100029_136606_sin_city.xml.gz"
 HIDDEN_STATE_SIZE = 32
@@ -40,6 +43,20 @@ if __name__ == "__main__":
     log.info("Model: %s", net)
 
     batch = train_data[:BATCH_SIZE]
-    input_seq, out_idx = model.pack_batch(batch, embeddings, cuda=args.cuda)
-    r = net(input_seq)
+    input_seq, out_seq_list, out_idx = model.pack_batch(batch, embeddings, cuda=args.cuda)
+    enc = net.encode(input_seq)
+
+    net_results = []
+    net_targets = []
+    for idx, out_seq in enumerate(out_seq_list):
+        r = net.decode_teacher(enc[:, idx:idx+1], out_seq)
+        net_results.append(r)
+        net_targets.extend(out_idx[idx][1:])
+    results_v = torch.cat(net_results)
+    targets_v = Variable(torch.LongTensor(net_targets))
+    if args.cuda:
+        targets_v = targets_v.cuda()
+    loss_v = F.cross_entropy(results_v, targets_v)
+    loss_v.backward()
+
     pass

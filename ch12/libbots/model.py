@@ -16,9 +16,15 @@ class PhraseModel(nn.Module):
             nn.Linear(hid_size, dict_size)
         )
 
-    def forward(self, x):
+    def encode(self, x):
         _, hid = self.encoder(x)
         return hid
+
+    def decode_teacher(self, hid, input_seq):
+        # Method assumes batch of size=1
+        out, _ = self.decoder(input_seq, hid)
+        out = self.output(out.data)
+        return out
 
 
 def pack_batch(batch, embeddings, cuda=False):
@@ -37,5 +43,16 @@ def pack_batch(batch, embeddings, cuda=False):
     input_seq = rnn_utils.pack_padded_sequence(input_v, lens, batch_first=True)
     # lookup embeddings
     r = embeddings(input_seq.data)
-    emb_input_seq = rnn_utils.PackedSequence(data=r, batch_sizes=lens)
-    return emb_input_seq, output_idx
+    emb_input_seq = rnn_utils.PackedSequence(data=r, batch_sizes=input_seq.batch_sizes)
+
+    # prepare output sequences, with end token stripped
+    output_seq_list = []
+    for out in output_idx:
+        seq = out[:-1]
+        out_v = Variable(torch.LongTensor([seq]))
+        if cuda:
+            out_v = out_v.cuda()
+        emb_out_v = embeddings(out_v)
+        out_seq = rnn_utils.pack_padded_sequence(emb_out_v, [len(seq)], batch_first=True)
+        output_seq_list.append(out_seq)
+    return emb_input_seq, output_seq_list, output_idx
