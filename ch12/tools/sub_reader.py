@@ -21,7 +21,7 @@ if __name__ == "__main__":
     parser.add_argument("file", help="File to parse")
     args = parser.parse_args()
 
-    dialogues = subtitles.read_file(args.file, dialog_seconds=3)
+    dialogues = subtitles.read_file(args.file, dialog_seconds=5)
     log.info("Got %d dialogues", len(dialogues))
 
     if args.dialogues:

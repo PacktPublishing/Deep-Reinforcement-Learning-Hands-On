@@ -13,7 +13,7 @@ def read_file(file_name, **kwargs):
     return parse_dialogues(tree, **kwargs)
 
 
-def parse_dialogues(tree, dialog_seconds=10):
+def parse_dialogues(tree, dialog_seconds=5):
     """
     Convert XML tree into list of dialogues
     :param tree:
@@ -155,7 +155,7 @@ def phrase_expand_abbrevs(phrase):
 
 def preprocess_dialogue(dialogue):
     """
-    :param dialogue: list of phrases 
+    :param dialogue: list of phrases
     :return: list of phrases
     """
     for phrase in dialogue:
