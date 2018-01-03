@@ -10,8 +10,8 @@ class PhraseModel(nn.Module):
     def __init__(self, emb_size, dict_size, hid_size):
         super(PhraseModel, self).__init__()
 
-        self.encoder = nn.RNN(input_size=emb_size, hidden_size=hid_size, num_layers=1, batch_first=True)
-        self.decoder = nn.RNN(input_size=emb_size, hidden_size=hid_size, num_layers=1, batch_first=True)
+        self.encoder = nn.LSTM(input_size=emb_size, hidden_size=hid_size, num_layers=1, batch_first=True)
+        self.decoder = nn.LSTM(input_size=emb_size, hidden_size=hid_size, num_layers=1, batch_first=True)
         self.output = nn.Sequential(
             nn.Linear(hid_size, dict_size)
         )
@@ -19,6 +19,12 @@ class PhraseModel(nn.Module):
     def encode(self, x):
         _, hid = self.encoder(x)
         return hid
+
+    def get_encoded_item(self, encoded, index):
+        # For RNN
+        # return encoded[:, index:index+1]
+        # For LSTM
+        return encoded[0][:, index:index+1], encoded[1][:, index:index+1]
 
     def decode_teacher(self, hid, input_seq):
         # Method assumes batch of size=1

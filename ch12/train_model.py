@@ -53,7 +53,7 @@ if __name__ == "__main__":
         net.cuda()
     log.info("Model: %s", net)
 
-    writer = SummaryWriter(comment=args.name)
+    writer = SummaryWriter(comment="-" + args.name)
     optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
     for epoch in range(MAX_EPOCHES):
@@ -66,7 +66,7 @@ if __name__ == "__main__":
             net_results = []
             net_targets = []
             for idx, out_seq in enumerate(out_seq_list):
-                r = net.decode_teacher(enc[:, idx:idx+1], out_seq)
+                r = net.decode_teacher(net.get_encoded_item(enc, idx), out_seq)
                 net_results.append(r)
                 net_targets.extend(out_idx[idx][1:])
             results_v = torch.cat(net_results)
