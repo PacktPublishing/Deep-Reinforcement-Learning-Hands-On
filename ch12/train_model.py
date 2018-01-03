@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+import os
 import random
 import argparse
 import logging
 import numpy as np
+from tensorboardX import SummaryWriter
 
 from libbots import subtitles, data, model
 
@@ -13,6 +15,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 
+SAVES_DIR = "saves"
 DATA_FILE = "data/OpenSubtitles/en/Action/2005/365_100029_136606_sin_city.xml.gz"
 HIDDEN_STATE_SIZE = 32
 BATCH_SIZE = 16
@@ -28,6 +31,9 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", action='store_true', default=False, help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
+
+    saves_path = os.path.join(SAVES_DIR, args.name)
+    os.makedirs(saves_path, exist_ok=True)
 
     dialogues = subtitles.read_file(DATA_FILE, dialog_seconds=5)
     log.info("Loaded %d dialogues with %d phrases", len(dialogues), sum(map(len, dialogues)))
@@ -47,6 +53,7 @@ if __name__ == "__main__":
         net.cuda()
     log.info("Model: %s", net)
 
+    writer = SummaryWriter(comment=args.name)
     optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
     for epoch in range(MAX_EPOCHES):
@@ -72,5 +79,6 @@ if __name__ == "__main__":
 
             losses.append(loss_v.data.cpu().numpy()[0])
         log.info("Epoch %d: mean loss %.3f", epoch, np.mean(losses))
-
-    pass
+        writer.add_scalar("loss", np.mean(losses), epoch)
+        torch.save(net.state_dict(), os.path.join(saves_path, "pre_%02d.dat" % epoch))
+    writer.close()
