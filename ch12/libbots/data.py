@@ -88,3 +88,15 @@ def dialogues_to_train(dialogues, emb_dict):
             prev_phrase = enc_phrase
     return result
 
+
+def iterate_batches(data, batch_size):
+    assert isinstance(data, list)
+    assert isinstance(batch_size, int)
+
+    ofs = 0
+    while True:
+        batch = data[ofs*batch_size:(ofs+1)*batch_size]
+        if len(batch) <= 1:
+            break
+        yield batch
+        ofs += 1
