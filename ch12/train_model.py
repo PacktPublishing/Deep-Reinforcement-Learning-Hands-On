@@ -17,7 +17,7 @@ from torch.autograd import Variable
 
 SAVES_DIR = "saves"
 DATA_FILE = "data/OpenSubtitles/en/Action/2005/365_100029_136606_sin_city.xml.gz"
-HIDDEN_STATE_SIZE = 512
+HIDDEN_STATE_SIZE = 128
 BATCH_SIZE = 16
 LEARNING_RATE = 1e-3
 MAX_EPOCHES = 100
