@@ -84,6 +84,6 @@ if __name__ == "__main__":
             losses.append(loss_v.data.cpu().numpy()[0])
         log.info("Epoch %d: mean loss %.3f, mean BLEU %.3f", epoch, np.mean(losses), bleu_sum / bleu_count)
         writer.add_scalar("loss", np.mean(losses), epoch)
-        writer.add_scalar("bleu", bleu_sum / bleu_count)
+        writer.add_scalar("bleu", bleu_sum / bleu_count, epoch)
         torch.save(net.state_dict(), os.path.join(saves_path, "pre_%02d.dat" % epoch))
     writer.close()
