@@ -17,10 +17,10 @@ from torch.autograd import Variable
 
 SAVES_DIR = "saves"
 DATA_FILE = "data/OpenSubtitles/en/Action/2005/365_100029_136606_sin_city.xml.gz"
-HIDDEN_STATE_SIZE = 128
-BATCH_SIZE = 16
+HIDDEN_STATE_SIZE = 512
+BATCH_SIZE = 128
 LEARNING_RATE = 1e-4
-MAX_EPOCHES = 100
+MAX_EPOCHES = 1000
 
 log = logging.getLogger("train")
 
@@ -87,5 +87,5 @@ if __name__ == "__main__":
         log.info("Epoch %d: mean loss %.3f, mean BLEU %.3f", epoch, np.mean(losses), bleu_sum / bleu_count)
         writer.add_scalar("loss", np.mean(losses), epoch)
         writer.add_scalar("bleu", bleu_sum / bleu_count, epoch)
-        torch.save(net.state_dict(), os.path.join(saves_path, "pre_%02d.dat" % epoch))
+#        torch.save(net.state_dict(), os.path.join(saves_path, "pre_%02d.dat" % epoch))
     writer.close()
