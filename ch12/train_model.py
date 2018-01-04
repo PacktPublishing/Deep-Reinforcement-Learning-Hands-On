@@ -43,7 +43,7 @@ if __name__ == "__main__":
     elif len(args.data) == 0:
         dialogues = subtitles.read_dir(DATA_DIR)
     else:
-        data_path = os.path.join(DATA_DIR, args.category)
+        data_path = os.path.join(DATA_DIR, args.data)
         dialogues = subtitles.read_dir(data_path)
     if not dialogues:
         log.error("No data found in %s!", args.data)
