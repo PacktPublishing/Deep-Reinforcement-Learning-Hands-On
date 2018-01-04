@@ -1,7 +1,16 @@
+import os
 import gzip
+import glob
 import datetime
 import collections
 import xml.etree.ElementTree as ET
+
+
+def read_dir(dir_name):
+    result = []
+    for file_name in glob.glob(os.path.join(dir_name, "**/*.xml.gz"), recursive=True):
+        result.extend(read_file(file_name))
+    return result
 
 
 def read_file(file_name, **kwargs):
@@ -69,6 +78,8 @@ def iterate_phrases(elem_iter):
 def parse_time(time_str):
     h_str, m_str, sec_str = time_str.split(':')
     sec_str, msec_str = sec_str.split(',')
+    if not msec_str:
+        msec_str = '0'
     return datetime.timedelta(hours=int(h_str), minutes=int(m_str), seconds=int(sec_str), milliseconds=int(msec_str))
 
 
@@ -128,7 +139,7 @@ def phrase_expand_abbrevs(phrase):
     Expand abbreviations in-place
     """
     for idx, w in enumerate(phrase.words):
-        if w.endswith("'"):
+        if w.endswith("'") and idx < len(phrase.words)-1:
             lw = w.lower()
             lww = phrase.words[idx + 1].lower()
 
