@@ -17,7 +17,7 @@ EMB_EXTRA = {
 log = logging.getLogger("data")
 
 
-def read_embeddings(word_set=None, file_name=EMBEDDINGS_FILE):
+def read_embeddings(word_set=None, file_name=EMBEDDINGS_FILE, cache_embeddings=False):
     """
     Read embeddings from text file: http://nlp.stanford.edu/data/glove.6B.zip
     :param word_set: set used to filter embeddings' dictionary
@@ -26,7 +26,7 @@ def read_embeddings(word_set=None, file_name=EMBEDDINGS_FILE):
     """
     emb_file_name = file_name + ".emb.npy"
     dic_file_name = file_name + ".dic"
-    if os.path.exists(emb_file_name) and os.path.exists(dic_file_name):
+    if os.path.exists(emb_file_name) and os.path.exists(dic_file_name) and cache_embeddings:
         log.info("Loading cached embeddings from %s and %s", emb_file_name, dic_file_name)
         with open(dic_file_name, 'rb') as fd:
             words = pickle.load(fd)
@@ -53,9 +53,10 @@ def read_embeddings(word_set=None, file_name=EMBEDDINGS_FILE):
             vec.append(val)
             weights.append(vec)
         emb = np.array(weights, dtype=np.float32)
-        with open(dic_file_name, "wb") as fd:
-            pickle.dump(words, fd)
-        np.save(emb_file_name, emb)
+        if cache_embeddings:
+            with open(dic_file_name, "wb") as fd:
+                pickle.dump(words, fd)
+            np.save(emb_file_name, emb)
     log.info("Embeddings loaded, shape=%s", emb.shape)
     return words, emb
 
