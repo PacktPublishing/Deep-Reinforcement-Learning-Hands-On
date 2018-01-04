@@ -20,7 +20,7 @@ DATA_DIR = "data/OpenSubtitles/en/"
 SAVES_DIR = "saves"
 HIDDEN_STATE_SIZE = 512
 BATCH_SIZE = 128
-LEARNING_RATE = 5e-5
+LEARNING_RATE = 1e-5
 MAX_EPOCHES = 1000
 
 log = logging.getLogger("train")
