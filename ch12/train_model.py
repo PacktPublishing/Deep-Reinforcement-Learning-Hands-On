@@ -16,10 +16,11 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 
+DEFAULT_FILE = "data/OpenSubtitles/en/Crime/1994/60_101020_138057_pulp_fiction.xml.gz"
 DATA_DIR = "data/OpenSubtitles/en/"
 SAVES_DIR = "saves"
 HIDDEN_STATE_SIZE = 512
-BATCH_SIZE = 128
+BATCH_SIZE = 32
 LEARNING_RATE = 1e-5
 MAX_EPOCHES = 1000
 
@@ -29,7 +30,7 @@ log = logging.getLogger("train")
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)-15s %(levelname)s %(message)s", level=logging.INFO)
     parser = argparse.ArgumentParser()
-    parser.add_argument("--category", help="Load training data from the given category (subdir under data/en/)")
+    parser.add_argument("--data", default=DEFAULT_FILE, help="Could be file name to load or category dir")
     parser.add_argument("--cuda", action='store_true', default=False, help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
@@ -37,13 +38,15 @@ if __name__ == "__main__":
     saves_path = os.path.join(SAVES_DIR, args.name)
     os.makedirs(saves_path, exist_ok=True)
 
-    if args.category is not None:
-        data_path = os.path.join(DATA_DIR, args.category)
+    if args.data.endswith(".xml.gz"):
+        dialogues = subtitles.read_file(args.data)
+    elif len(args.data) == 0:
+        dialogues = subtitles.read_dir(DATA_DIR)
     else:
-        data_path = DATA_DIR
-    dialogues = subtitles.read_dir(data_path)
+        data_path = os.path.join(DATA_DIR, args.category)
+        dialogues = subtitles.read_dir(data_path)
     if not dialogues:
-        log.error("No data found in %s!", data_path)
+        log.error("No data found in %s!", args.data)
         sys.exit()
 
     dial_dict = subtitles.dialogues_dict(dialogues)

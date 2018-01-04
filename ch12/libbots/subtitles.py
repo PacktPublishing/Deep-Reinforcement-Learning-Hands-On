@@ -1,5 +1,4 @@
 import os
-import re
 import gzip
 import glob
 import datetime
@@ -9,19 +8,9 @@ import xml.etree.ElementTree as ET
 
 def read_dir(dir_name):
     result = []
-    processed = set()
     for file_name in glob.glob(os.path.join(dir_name, "**/*.xml.gz"), recursive=True):
-        fp = file_fingerprint(file_name)
-        if fp in processed:
-            continue
-        processed.add(fp)
         result.extend(read_file(file_name))
     return result
-
-
-def file_fingerprint(file_name):
-    n = file_name.split('/')[-1]
-    return re.sub(r'\d+', '', n)
 
 
 def read_file(file_name, **kwargs):
