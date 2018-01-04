@@ -7,6 +7,8 @@ from torch.autograd import Variable
 
 from . import utils
 
+HIDDEN_STATE_SIZE = 512
+
 
 class PhraseModel(nn.Module):
     def __init__(self, emb_size, dict_size, hid_size):
@@ -33,6 +35,11 @@ class PhraseModel(nn.Module):
         out, _ = self.decoder(input_seq, hid)
         out = self.output(out.data)
         return out
+
+    def decode_one(self, hid, input_x):
+        out, new_hid = self.decoder(input_x.unsqueeze(0), hid)
+        out = self.output(out)
+        return out.squeeze(dim=0), new_hid
 
 
 def pack_batch(batch, embeddings, cuda=False):
@@ -64,6 +71,14 @@ def pack_batch(batch, embeddings, cuda=False):
         out_seq = rnn_utils.pack_padded_sequence(emb_out_v, [len(seq)], batch_first=True)
         output_seq_list.append(out_seq)
     return emb_input_seq, output_seq_list, output_idx
+
+
+def pack_input(input_data, embeddings):
+    input_v = Variable(torch.LongTensor([input_data]))
+    input_seq = rnn_utils.pack_padded_sequence(input_v, [len(input_data)], batch_first=True)
+    r = embeddings(input_seq.data)
+    emb_input_seq = rnn_utils.PackedSequence(data=r, batch_sizes=input_seq.batch_sizes)
+    return emb_input_seq
 
 
 def seq_bleu(model_out, ref_seq):

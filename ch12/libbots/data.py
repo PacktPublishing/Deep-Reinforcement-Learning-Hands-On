@@ -58,6 +58,14 @@ def save_embeddings(dir_name, emb_dict, emb):
     np.save(os.path.join(dir_name, EMB_NAME), emb)
 
 
+def load_embeddings(dir_name):
+    with open(os.path.join(dir_name, EMB_DICT_NAME), "rb") as fd:
+        emb_dict = pickle.load(fd)
+    emb = np.load(os.path.join(dir_name, EMB_NAME))
+    return emb_dict, emb
+
+
+
 def encode_words(words, emb_dict):
     """
     Convert list of words into list of embeddings indices, adding our tokens

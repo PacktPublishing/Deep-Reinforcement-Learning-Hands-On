@@ -2,7 +2,6 @@
 import os
 import sys
 import random
-import pickle
 import argparse
 import logging
 import numpy as np
@@ -21,7 +20,7 @@ from torch.autograd import Variable
 DEFAULT_FILE = "data/OpenSubtitles/en/Crime/1994/60_101020_138057_pulp_fiction.xml.gz"
 DATA_DIR = "data/OpenSubtitles/en/"
 SAVES_DIR = "saves"
-HIDDEN_STATE_SIZE = 512
+
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-4
 MAX_EPOCHES = 1000
@@ -70,7 +69,7 @@ if __name__ == "__main__":
     if args.cuda:
         embeddings.cuda()
 
-    net = model.PhraseModel(emb_size=emb.shape[1], dict_size=emb.shape[0], hid_size=HIDDEN_STATE_SIZE)
+    net = model.PhraseModel(emb_size=emb.shape[1], dict_size=emb.shape[0], hid_size=model.HIDDEN_STATE_SIZE)
     if args.cuda:
         net.cuda()
     log.info("Model: %s", net)
