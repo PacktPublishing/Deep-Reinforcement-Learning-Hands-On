@@ -67,6 +67,7 @@ if __name__ == "__main__":
 
     writer = SummaryWriter(comment="-" + args.name)
     optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    best_bleu = None
 
     for epoch in range(MAX_EPOCHES):
         random.shuffle(train_data)
@@ -94,8 +95,13 @@ if __name__ == "__main__":
             optimiser.step()
 
             losses.append(loss_v.data.cpu().numpy()[0])
-        log.info("Epoch %d: mean loss %.3f, mean BLEU %.3f", epoch, np.mean(losses), bleu_sum / bleu_count)
+        bleu = bleu_sum / bleu_count
+        log.info("Epoch %d: mean loss %.3f, mean BLEU %.3f", epoch, np.mean(losses), bleu)
         writer.add_scalar("loss", np.mean(losses), epoch)
-        writer.add_scalar("bleu", bleu_sum / bleu_count, epoch)
-#        torch.save(net.state_dict(), os.path.join(saves_path, "pre_%02d.dat" % epoch))
+        writer.add_scalar("bleu", bleu, epoch)
+        if best_bleu is None or best_bleu < bleu:
+            if best_bleu is not None:
+                torch.save(net.state_dict(), os.path.join(saves_path, "pre_bleu_%.3f_%02d.dat" % (epoch, bleu)))
+                log.info("Best BLEU updated %.3f", bleu)
+            best_bleu = bleu
     writer.close()
