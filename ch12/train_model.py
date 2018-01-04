@@ -2,6 +2,7 @@
 import os
 import sys
 import random
+import pickle
 import argparse
 import logging
 import numpy as np
@@ -57,6 +58,8 @@ if __name__ == "__main__":
     emb_dict, emb = data.read_embeddings(phrase_pairs_dict)
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
     log.info("Training data converted, got %d samples", len(train_data))
+
+    data.save_embeddings(saves_path, emb_dict, emb)
 
     # initialize embedding lookup table
     embeddings = nn.Embedding(num_embeddings=emb.shape[0], embedding_dim=emb.shape[1])

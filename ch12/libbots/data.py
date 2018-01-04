@@ -8,6 +8,9 @@ UNKNOWN_TOKEN = '#UNK'
 BEGIN_TOKEN = "#BEG"
 END_TOKEN = "#END"
 
+EMB_DICT_NAME = "emb_dict.dat"
+EMB_NAME = "emb.npy"
+
 EMB_EXTRA = {
     UNKNOWN_TOKEN: 0.0,
     BEGIN_TOKEN: 1.0,
@@ -59,6 +62,12 @@ def read_embeddings(word_set=None, file_name=EMBEDDINGS_FILE, cache_embeddings=F
             np.save(emb_file_name, emb)
     log.info("Embeddings loaded, shape=%s", emb.shape)
     return words, emb
+
+
+def save_embeddings(dir_name, emb_dict, emb):
+    with open(os.path.join(dir_name, EMB_DICT_NAME), "wb") as fd:
+        pickle.dump(emb_dict, fd)
+    np.save(os.path.join(dir_name, EMB_NAME), emb)
 
 
 def encode_words(words, emb_dict):
