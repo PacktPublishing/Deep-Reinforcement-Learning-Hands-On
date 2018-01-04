@@ -23,6 +23,7 @@ HIDDEN_STATE_SIZE = 512
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-5
 MAX_EPOCHES = 1000
+MAX_TOKENS = 10
 
 log = logging.getLogger("train")
 
@@ -48,12 +49,13 @@ if __name__ == "__main__":
     if not dialogues:
         log.error("No data found in %s!", args.data)
         sys.exit()
-
-    dial_dict = subtitles.dialogues_dict(dialogues)
-    log.info("Loaded %d dialogues with %d phrases and %d uniq words",
-             len(dialogues), sum(map(len, dialogues)), len(dial_dict))
-    emb_dict, emb = data.read_embeddings(dial_dict)
-    train_data = data.dialogues_to_train(dialogues, emb_dict)
+    log.info("Loaded %d dialogues with %d phrases, generating training pairs",
+             len(dialogues), sum(map(len, dialogues)))
+    phrase_pairs = subtitles.dialogues_to_pairs(dialogues, max_tokens=MAX_TOKENS)
+    phrase_pairs_dict = subtitles.phrase_pairs_dict(phrase_pairs)
+    log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(phrase_pairs_dict))
+    emb_dict, emb = data.read_embeddings(phrase_pairs_dict)
+    train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
     log.info("Training data converted, got %d samples", len(train_data))
 
     # initialize embedding lookup table

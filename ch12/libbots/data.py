@@ -76,21 +76,17 @@ def encode_words(words, emb_dict):
     return res
 
 
-def dialogues_to_train(dialogues, emb_dict):
+def encode_phrase_pairs(phrase_pairs, emb_dict):
     """
-    Convert list of dialogues to training data
-    :param dialogues: list of list of Phrase objects
+    Convert list of phrase pairs to training data
+    :param phrase_pairs: list of (phrase, phrase)
     :param emb_dict: embeddings dictionary (word -> id)
     :return: list of tuples ([input_id_seq], [output_id_seq])
     """
     result = []
-    for dial in dialogues:
-        prev_phrase = None
-        for phrase in dial:
-            enc_phrase = encode_words(phrase.words, emb_dict)
-            if prev_phrase is not None:
-                result.append((prev_phrase, enc_phrase))
-            prev_phrase = enc_phrase
+    for p1, p2 in phrase_pairs:
+        p = encode_words(p1.words, emb_dict), encode_words(p2.words, emb_dict)
+        result.append(p)
     return result
 
 

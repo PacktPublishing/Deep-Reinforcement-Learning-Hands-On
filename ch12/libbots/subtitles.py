@@ -174,14 +174,31 @@ def preprocess_dialogue(dialogue):
     return dialogue
 
 
-def dialogues_dict(dialogues):
+def phrase_pairs_dict(phrase_pairs):
     """
     Return set of words in the dialogues
-    :param dialogues:
+    :param phrase_pairs: list of (phrase, phrase) pairs
     :return: set
     """
     res = set()
-    for dial in dialogues:
-        for phrase in dial:
-            res |= set(map(str.lower, phrase.words))
+    for p1, p2 in phrase_pairs:
+        res |= set(map(str.lower, p1.words)) | set(map(str.lower, p2.words))
     return res
+
+
+def dialogues_to_pairs(dialogues, max_tokens=None):
+    """
+    Convert dialogues to training pairs of phrases
+    :param dialogues:
+    :param max_tokens: limit of tokens in both question and reply
+    :return: list of (phrase, phrase) pairs
+    """
+    result = []
+    for dial in dialogues:
+        prev_phrase = None
+        for phrase in dial:
+            if prev_phrase is not None:
+                if max_tokens is None or (len(prev_phrase.words) <= max_tokens and len(phrase.words) <= max_tokens):
+                    result.append((prev_phrase, phrase))
+            prev_phrase = phrase
+    return result
