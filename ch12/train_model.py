@@ -12,6 +12,7 @@ from libbots import subtitles, data, model
 
 import torch
 import torch.nn as nn
+import torch.nn.utils as nn_utils
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -25,6 +26,7 @@ BATCH_SIZE = 32
 LEARNING_RATE = 1e-4
 MAX_EPOCHES = 1000
 MAX_TOKENS = 10
+GRAD_CLIP = 0.1
 
 log = logging.getLogger("train")
 
@@ -100,6 +102,7 @@ if __name__ == "__main__":
                 targets_v = targets_v.cuda()
             loss_v = F.cross_entropy(results_v, targets_v)
             loss_v.backward()
+            nn_utils.clip_grad_norm(net.parameters(), GRAD_CLIP)
             optimiser.step()
 
             losses.append(loss_v.data.cpu().numpy()[0])
