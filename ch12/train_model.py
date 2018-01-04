@@ -36,8 +36,10 @@ if __name__ == "__main__":
     os.makedirs(saves_path, exist_ok=True)
 
     dialogues = subtitles.read_file(DATA_FILE, dialog_seconds=5)
-    log.info("Loaded %d dialogues with %d phrases", len(dialogues), sum(map(len, dialogues)))
-    emb_dict, emb = data.read_embeddings()
+    dial_dict = subtitles.dialogues_dict(dialogues)
+    log.info("Loaded %d dialogues with %d phrases and %d uniq words",
+             len(dialogues), sum(map(len, dialogues)), len(dial_dict))
+    emb_dict, emb = data.read_embeddings(dial_dict)
     train_data = data.dialogues_to_train(dialogues, emb_dict)
     log.info("Training data converted, got %d samples", len(train_data))
 

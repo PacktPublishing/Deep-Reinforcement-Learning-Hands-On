@@ -17,9 +17,10 @@ EMB_EXTRA = {
 log = logging.getLogger("data")
 
 
-def read_embeddings(file_name=EMBEDDINGS_FILE):
+def read_embeddings(word_set=None, file_name=EMBEDDINGS_FILE):
     """
     Read embeddings from text file: http://nlp.stanford.edu/data/glove.6B.zip
+    :param word_set: set used to filter embeddings' dictionary
     :param file_name:
     :return: tuple with (dict word->id mapping, numpy matrix with embeddings)
     """
@@ -35,13 +36,17 @@ def read_embeddings(file_name=EMBEDDINGS_FILE):
         weights = []
         words = {}
         with open(file_name, "rt", encoding='utf-8') as fd:
-            for idx, l in enumerate(fd):
+            idx = 0
+            for l in fd:
                 v = l.split(' ')
                 word, vec = v[0], list(map(float, v[1:]))
+                if word_set is not None and word not in word_set:
+                    continue
                 words[word] = idx
                 # extra dim for our tokens
                 vec.append(0.0)
                 weights.append(vec)
+                idx += 1
         for token, val in sorted(EMB_EXTRA.items()):
             words[token] = len(words)
             vec = [0.0]*(len(weights[0])-1)

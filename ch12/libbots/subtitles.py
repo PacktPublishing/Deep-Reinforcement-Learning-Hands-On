@@ -161,3 +161,16 @@ def preprocess_dialogue(dialogue):
     for phrase in dialogue:
         phrase_expand_abbrevs(phrase)
     return dialogue
+
+
+def dialogues_dict(dialogues):
+    """
+    Return set of words in the dialogues
+    :param dialogues:
+    :return: set
+    """
+    res = set()
+    for dial in dialogues:
+        for phrase in dial:
+            res |= set(map(str.lower, phrase.words))
+    return res
