@@ -20,46 +20,34 @@ EMB_EXTRA = {
 log = logging.getLogger("data")
 
 
-def read_embeddings(word_set=None, file_name=EMBEDDINGS_FILE, cache_embeddings=False):
+def read_embeddings(word_set=None, file_name=EMBEDDINGS_FILE):
     """
     Read embeddings from text file: http://nlp.stanford.edu/data/glove.6B.zip
     :param word_set: set used to filter embeddings' dictionary
     :param file_name:
     :return: tuple with (dict word->id mapping, numpy matrix with embeddings)
     """
-    emb_file_name = file_name + ".emb.npy"
-    dic_file_name = file_name + ".dic"
-    if os.path.exists(emb_file_name) and os.path.exists(dic_file_name) and cache_embeddings:
-        log.info("Loading cached embeddings from %s and %s", emb_file_name, dic_file_name)
-        with open(dic_file_name, 'rb') as fd:
-            words = pickle.load(fd)
-        emb = np.load(emb_file_name)
-    else:
-        log.info("Reading embeddings from %s", file_name)
-        weights = []
-        words = {}
-        with open(file_name, "rt", encoding='utf-8') as fd:
-            idx = 0
-            for l in fd:
-                v = l.split(' ')
-                word, vec = v[0], list(map(float, v[1:]))
-                if word_set is not None and word not in word_set:
-                    continue
-                words[word] = idx
-                # extra dim for our tokens
-                vec.append(0.0)
-                weights.append(vec)
-                idx += 1
-        for token, val in sorted(EMB_EXTRA.items()):
-            words[token] = len(words)
-            vec = [0.0]*(len(weights[0])-1)
-            vec.append(val)
+    log.info("Reading embeddings from %s", file_name)
+    weights = []
+    words = {}
+    with open(file_name, "rt", encoding='utf-8') as fd:
+        idx = 0
+        for l in fd:
+            v = l.split(' ')
+            word, vec = v[0], list(map(float, v[1:]))
+            if word_set is not None and word not in word_set:
+                continue
+            words[word] = idx
+            # extra dim for our tokens
+            vec.append(0.0)
             weights.append(vec)
-        emb = np.array(weights, dtype=np.float32)
-        if cache_embeddings:
-            with open(dic_file_name, "wb") as fd:
-                pickle.dump(words, fd)
-            np.save(emb_file_name, emb)
+            idx += 1
+    for token, val in sorted(EMB_EXTRA.items()):
+        words[token] = len(words)
+        vec = [0.0]*(len(weights[0])-1)
+        vec.append(val)
+        weights.append(vec)
+    emb = np.array(weights, dtype=np.float32)
     log.info("Embeddings loaded, shape=%s", emb.shape)
     return words, emb
 
