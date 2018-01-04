@@ -101,7 +101,7 @@ if __name__ == "__main__":
         writer.add_scalar("bleu", bleu, epoch)
         if best_bleu is None or best_bleu < bleu:
             if best_bleu is not None:
-                torch.save(net.state_dict(), os.path.join(saves_path, "pre_bleu_%.3f_%02d.dat" % (epoch, bleu)))
+                torch.save(net.state_dict(), os.path.join(saves_path, "pre_bleu_%.3f_%02d.dat" % (bleu, epoch)))
                 log.info("Best BLEU updated %.3f", bleu)
             best_bleu = bleu
     writer.close()
