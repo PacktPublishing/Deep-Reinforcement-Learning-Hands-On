@@ -12,7 +12,6 @@ def read_dir(dir_name):
     processed = set()
     for file_name in glob.glob(os.path.join(dir_name, "**/*.xml.gz"), recursive=True):
         fp = file_fingerprint(file_name)
-        print(file_name, fp)
         if fp in processed:
             continue
         processed.add(fp)
