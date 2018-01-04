@@ -59,6 +59,8 @@ if __name__ == "__main__":
     for epoch in range(MAX_EPOCHES):
         random.shuffle(train_data)
         losses = []
+        bleu_sum = 0.0
+        bleu_count = 0
         for batch in data.iterate_batches(train_data, BATCH_SIZE):
             input_seq, out_seq_list, out_idx = model.pack_batch(batch, embeddings, cuda=args.cuda)
             enc = net.encode(input_seq)
@@ -69,6 +71,8 @@ if __name__ == "__main__":
                 r = net.decode_teacher(net.get_encoded_item(enc, idx), out_seq)
                 net_results.append(r)
                 net_targets.extend(out_idx[idx][1:])
+                bleu_sum += model.seq_bleu(r, out_idx[idx][1:])
+                bleu_count += 1
             results_v = torch.cat(net_results)
             targets_v = Variable(torch.LongTensor(net_targets))
             if args.cuda:
@@ -78,7 +82,8 @@ if __name__ == "__main__":
             optimiser.step()
 
             losses.append(loss_v.data.cpu().numpy()[0])
-        log.info("Epoch %d: mean loss %.3f", epoch, np.mean(losses))
+        log.info("Epoch %d: mean loss %.3f, mean BLEU %.3f", epoch, np.mean(losses), bleu_sum / bleu_count)
         writer.add_scalar("loss", np.mean(losses), epoch)
+        writer.add_scalar("bleu", bleu_sum / bleu_count)
         torch.save(net.state_dict(), os.path.join(saves_path, "pre_%02d.dat" % epoch))
     writer.close()

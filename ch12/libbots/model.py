@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.nn.utils.rnn as rnn_utils
 from torch.autograd import Variable
 
+from . import utils
+
 
 class PhraseModel(nn.Module):
     def __init__(self, emb_size, dict_size, hid_size):
@@ -62,3 +64,9 @@ def pack_batch(batch, embeddings, cuda=False):
         out_seq = rnn_utils.pack_padded_sequence(emb_out_v, [len(seq)], batch_first=True)
         output_seq_list.append(out_seq)
     return emb_input_seq, output_seq_list, output_idx
+
+
+def seq_bleu(model_out, ref_seq):
+    model_seq = torch.max(model_out.data, dim=1)[1]
+    model_seq = model_seq.cpu().numpy()
+    return utils.calc_bleu(model_seq, ref_seq)
