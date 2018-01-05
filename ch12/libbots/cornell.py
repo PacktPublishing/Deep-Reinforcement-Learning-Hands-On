@@ -69,3 +69,13 @@ def load_conversations(data_dir, lines, movies=None):
         dial = [lines[l_id] for l_id in l_ids]
         res.append(dial)
     return res
+
+
+def read_genres(data_dir):
+    res = {}
+    for parts in iterate_entries(data_dir, "movie_titles_metadata.txt"):
+        m_id, m_genres = parts[0], parts[5]
+        l_genres = m_genres.strip("[]").split(", ")
+        l_genres = list(map(lambda s: s.strip("'"), l_genres))
+        res[m_id] = l_genres
+    return res
