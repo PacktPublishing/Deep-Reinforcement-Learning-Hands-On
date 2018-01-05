@@ -40,8 +40,11 @@ def parse_dialogues(tree, dialog_seconds=5):
         cur_dialogue.extend(split_phrase(prev_phrase))
         delta = phrase.time_start - prev_phrase.time_stop
         if delta.total_seconds() > dialog_seconds:
-            res.append(preprocess_dialogue(cur_dialogue))
-            cur_dialogue = []
+            cur_dialogue.extend(split_phrase(phrase))
+            if len(cur_dialogue) > 1:
+                res.append(preprocess_dialogue(cur_dialogue))
+                cur_dialogue = []
+            phrase = None
         prev_phrase = phrase
 
     if prev_phrase is not None:

@@ -58,6 +58,10 @@ if __name__ == "__main__":
     log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(phrase_pairs_dict))
     emb_dict, emb = data.read_embeddings(phrase_pairs_dict)
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
+    log.info("Sample phrases:")
+    for idx, phrases, encoded in zip(range(10), phrase_pairs, train_data):
+        log.info("%d: %s -> %s", idx, phrases[0].words, phrases[1].words)
+        log.info("%d: %s -> %s", idx, encoded[0], encoded[1])
     log.info("Training data converted, got %d samples", len(train_data))
 
     data.save_embeddings(saves_path, emb_dict, emb)
