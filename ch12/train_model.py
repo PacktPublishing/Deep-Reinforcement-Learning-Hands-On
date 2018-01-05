@@ -23,8 +23,8 @@ DEFAULT_FILE = "data/OpenSubtitles/en/Crime/1994/60_101020_138057_pulp_fiction.x
 DATA_DIR = "data/OpenSubtitles/en/"
 SAVES_DIR = "saves"
 
-BATCH_SIZE = 32
-LEARNING_RATE = 1e-4
+BATCH_SIZE = 64
+LEARNING_RATE = 1e-3
 MAX_EPOCHES = 1000
 MAX_TOKENS = 10
 GRAD_CLIP = 0.1
@@ -33,7 +33,7 @@ log = logging.getLogger("train")
 
 TEACHER_PROB = 0.5
 ENTROPY_BETA = 0.0
-LEARNING_RATE_RL = 1e-4
+LEARNING_RATE_RL = 1e-3
 
 
 def load_data(args):
@@ -141,7 +141,8 @@ if __name__ == "__main__":
                     torch.save(net.state_dict(), os.path.join(saves_path, "pre_bleu_%.3f_%02d.dat" % (bleu, epoch)))
                     log.info("Best BLEU updated %.3f", bleu)
                 best_bleu = bleu
-
+    sys.exit()
+    
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
         optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE_RL, eps=1e-3)
         batch_idx = 0
