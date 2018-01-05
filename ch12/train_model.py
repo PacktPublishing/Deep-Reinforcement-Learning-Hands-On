@@ -7,7 +7,7 @@ import logging
 import numpy as np
 from tensorboardX import SummaryWriter
 
-from libbots import subtitles, data, model
+from libbots import subtitles, data, model, cornell
 
 import torch
 import torch.nn as nn
@@ -30,9 +30,30 @@ GRAD_CLIP = 0.1
 log = logging.getLogger("train")
 
 
+def load_data(args):
+    if args.cornell is not None:
+        dialogues = cornell.load_dialogues(genre_filter=args.cornell)
+    else:
+        if args.data.endswith(".xml.gz"):
+            dialogues = subtitles.read_file(args.data)
+        elif len(args.data) == 0:
+            dialogues = subtitles.read_dir(DATA_DIR)
+        else:
+            data_path = os.path.join(DATA_DIR, args.data)
+            dialogues = subtitles.read_dir(data_path)
+    if not dialogues:
+        log.error("No dialogues found, exit!")
+        sys.exit()
+    log.info("Loaded %d dialogues with %d phrases, generating training pairs",
+             len(dialogues), sum(map(len, dialogues)))
+    phrase_pairs = subtitles.dialogues_to_pairs(dialogues, max_tokens=MAX_TOKENS)
+    return phrase_pairs
+
+
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)-15s %(levelname)s %(message)s", level=logging.INFO)
     parser = argparse.ArgumentParser()
+    parser.add_argument("--cornell", help="Use Cornell Movie Dialogues database could be a category or empty string to load full data")
     parser.add_argument("--data", default=DEFAULT_FILE, help="Could be file name to load or category dir")
     parser.add_argument("--cuda", action='store_true', default=False, help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
@@ -41,19 +62,8 @@ if __name__ == "__main__":
     saves_path = os.path.join(SAVES_DIR, args.name)
     os.makedirs(saves_path, exist_ok=True)
 
-    if args.data.endswith(".xml.gz"):
-        dialogues = subtitles.read_file(args.data)
-    elif len(args.data) == 0:
-        dialogues = subtitles.read_dir(DATA_DIR)
-    else:
-        data_path = os.path.join(DATA_DIR, args.data)
-        dialogues = subtitles.read_dir(data_path)
-    if not dialogues:
-        log.error("No data found in %s!", args.data)
-        sys.exit()
-    log.info("Loaded %d dialogues with %d phrases, generating training pairs",
-             len(dialogues), sum(map(len, dialogues)))
-    phrase_pairs = subtitles.dialogues_to_pairs(dialogues, max_tokens=MAX_TOKENS)
+    phrase_pairs = load_data(args)
+
     phrase_pairs_dict = subtitles.phrase_pairs_dict(phrase_pairs)
     log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(phrase_pairs_dict))
     emb_dict, emb = data.read_embeddings(phrase_pairs_dict)

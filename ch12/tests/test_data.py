@@ -1,5 +1,6 @@
 from unittest import TestCase
 
+import libbots.data
 from libbots import data, subtitles
 
 
@@ -19,12 +20,12 @@ class TestData(TestCase):
     def test_dialogues_to_train(self):
         dialogues = [
             [
-                subtitles.Phrase(words=['a', 'b'], time_start=0, time_stop=1),
-                subtitles.Phrase(words=['b', 'a'], time_start=2, time_stop=3),
-                subtitles.Phrase(words=['b', 'a'], time_start=2, time_stop=3),
+                libbots.data.Phrase(words=['a', 'b'], time_start=0, time_stop=1),
+                libbots.data.Phrase(words=['b', 'a'], time_start=2, time_stop=3),
+                libbots.data.Phrase(words=['b', 'a'], time_start=2, time_stop=3),
             ],
             [
-                subtitles.Phrase(words=['a', 'b'], time_start=0, time_stop=1),
+                libbots.data.Phrase(words=['a', 'b'], time_start=0, time_stop=1),
             ]
         ]
 

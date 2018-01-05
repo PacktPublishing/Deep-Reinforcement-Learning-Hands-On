@@ -1,20 +1,21 @@
 import datetime
 from unittest import TestCase
 
+import libbots.data
 from libbots import subtitles
 
 
 class TestPhrases(TestCase):
     def test_split_phrase(self):
-        phrase = subtitles.Phrase(words=["a", "b", "c"], time_start=datetime.timedelta(seconds=0),
-                                  time_stop=datetime.timedelta(seconds=10))
+        phrase = libbots.data.Phrase(words=["a", "b", "c"], time_start=datetime.timedelta(seconds=0),
+                                     time_stop=datetime.timedelta(seconds=10))
         res = subtitles.split_phrase(phrase)
         self.assertIsInstance(res, list)
         self.assertEqual(len(res), 1)
         self.assertEqual(res[0], phrase)
 
-        phrase = subtitles.Phrase(words=["a", "b", "-", "c"], time_start=datetime.timedelta(seconds=0),
-                                  time_stop=datetime.timedelta(seconds=10))
+        phrase = libbots.data.Phrase(words=["a", "b", "-", "c"], time_start=datetime.timedelta(seconds=0),
+                                     time_stop=datetime.timedelta(seconds=10))
         res = subtitles.split_phrase(phrase)
         self.assertEqual(len(res), 2)
         self.assertEqual(res[0].words, ["a", "b"])
@@ -24,8 +25,8 @@ class TestPhrases(TestCase):
         self.assertAlmostEqual(res[1].time_start.total_seconds(), 5)
         self.assertAlmostEqual(res[1].time_stop.total_seconds(), 10)
 
-        phrase = subtitles.Phrase(words=['-', 'Wait', 'a', 'sec', '.', '-'], time_start=datetime.timedelta(0, 588, 204000),
-               time_stop=datetime.timedelta(0, 590, 729000))
+        phrase = libbots.data.Phrase(words=['-', 'Wait', 'a', 'sec', '.', '-'], time_start=datetime.timedelta(0, 588, 204000),
+                                     time_stop=datetime.timedelta(0, 590, 729000))
         res = subtitles.split_phrase(phrase)
         self.assertEqual(res[0].words, ["Wait", "a", "sec", "."])
 

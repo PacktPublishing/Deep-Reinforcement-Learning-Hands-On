@@ -2,8 +2,9 @@ import os
 import gzip
 import glob
 import datetime
-import collections
 import xml.etree.ElementTree as ET
+
+from . import data
 
 
 def read_dir(dir_name):
@@ -53,9 +54,6 @@ def parse_dialogues(tree, dialog_seconds=5):
     return res
 
 
-Phrase = collections.namedtuple("Phrase", field_names=('words', 'time_start', 'time_stop'))
-
-
 def iterate_phrases(elem_iter):
     time_start = None
     time_stop = None
@@ -71,7 +69,7 @@ def iterate_phrases(elem_iter):
                     time_stop = parse_time(t_val)
                     words = remove_braced_words(words)
                     if words:
-                        yield Phrase(words=words, time_start=time_start, time_stop=time_stop)
+                        yield data.Phrase(words=words, time_start=time_start, time_stop=time_stop)
                     words = []
                 else:
                     print("Unknown id: %s" % t_id)
@@ -114,7 +112,7 @@ def split_phrase(phrase):
     :param phrase:
     :return:
     """
-    assert isinstance(phrase, Phrase)
+    assert isinstance(phrase, data.Phrase)
     parts = []
     cur_part = []
     for w in phrase.words:
@@ -129,11 +127,11 @@ def split_phrase(phrase):
     if len(parts) == 0:
         return []
     if len(parts) == 1:
-        return [Phrase(words=parts[0], time_start=phrase.time_start, time_stop=phrase.time_stop)]
+        return [data.Phrase(words=parts[0], time_start=phrase.time_start, time_stop=phrase.time_stop)]
     delta = (phrase.time_stop - phrase.time_start) / len(parts)
     result = []
     for idx, part in enumerate(parts):
-        result.append(Phrase(words=part, time_start=phrase.time_start + idx*delta,
+        result.append(data.Phrase(words=part, time_start=phrase.time_start + idx * delta,
                              time_stop=phrase.time_start + (idx+1)*delta))
     return result
 

@@ -1,3 +1,4 @@
+import collections
 import os
 import logging
 import numpy as np
@@ -107,3 +108,6 @@ def iterate_batches(data, batch_size):
             break
         yield batch
         ofs += 1
+
+
+Phrase = collections.namedtuple("Phrase", field_names=('words', 'time_start', 'time_stop'))
