@@ -194,14 +194,14 @@ if __name__ == "__main__":
                 nn_utils.clip_grad_norm(net.parameters(), GRAD_CLIP)
                 optimiser.step()
 
-                tb_tracker.track("bleu_argmax", sum_argmax_bleu / len(net_actions), batch_idx)
-                tb_tracker.track("bleu_sample", sum_sample_bleu / len(net_actions), batch_idx)
+                tb_tracker.track("bleu_argmax", sum_argmax_bleu / len(out_seq_list), batch_idx)
+                tb_tracker.track("bleu_sample", sum_sample_bleu / len(out_seq_list), batch_idx)
                 tb_tracker.track("advantage", adv_v, batch_idx)
                 tb_tracker.track("loss_entropy", entropy_loss_v, batch_idx)
                 tb_tracker.track("loss_policy", loss_policy_v, batch_idx)
                 tb_tracker.track("loss_total", loss_v, batch_idx)
 
-                epoch_bleu += sum_sample_bleu / len(net_actions)
+                epoch_bleu += sum_sample_bleu / len(out_seq_list)
                 epoch_bleu_count += 1
             log.info("Epoch %d: mean BLEU: %.3f", epoch, epoch_bleu / epoch_bleu_count)
 
