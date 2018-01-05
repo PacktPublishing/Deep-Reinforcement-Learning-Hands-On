@@ -16,6 +16,8 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+import ptan
+
 
 DEFAULT_FILE = "data/OpenSubtitles/en/Crime/1994/60_101020_138057_pulp_fiction.xml.gz"
 DATA_DIR = "data/OpenSubtitles/en/"
@@ -30,6 +32,8 @@ GRAD_CLIP = 0.1
 log = logging.getLogger("train")
 
 TEACHER_PROB = 0.5
+ENTROPY_BETA = 0.1
+LEARNING_RATE_RL = 1e-5
 
 
 def load_data(args):
@@ -59,6 +63,7 @@ if __name__ == "__main__":
     parser.add_argument("--data", default=DEFAULT_FILE, help="Could be file name to load or category dir")
     parser.add_argument("--cuda", action='store_true', default=False, help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
+    parser.add_argument("-l", "--load", help="Load model and continue in RL mode")
     args = parser.parse_args()
 
     saves_path = os.path.join(SAVES_DIR, args.name)
@@ -70,10 +75,6 @@ if __name__ == "__main__":
     log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(phrase_pairs_dict))
     emb_dict, emb = data.read_embeddings(phrase_pairs_dict)
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
-    log.info("Sample phrases:")
-    for idx, phrases, encoded in zip(range(10), phrase_pairs, train_data):
-        log.info("%d: %s -> %s", idx, phrases[0].words, phrases[1].words)
-        log.info("%d: %s -> %s", idx, encoded[0], encoded[1])
     log.info("Training data converted, got %d samples", len(train_data))
 
     data.save_embeddings(saves_path, emb_dict, emb)
@@ -91,48 +92,118 @@ if __name__ == "__main__":
     log.info("Model: %s", net)
 
     writer = SummaryWriter(comment="-" + args.name)
-    optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE)
-    best_bleu = None
 
-    for epoch in range(MAX_EPOCHES):
-        random.shuffle(train_data)
-        losses = []
-        bleu_sum = 0.0
-        bleu_count = 0
-        for batch in data.iterate_batches(train_data, BATCH_SIZE):
-            input_seq, out_seq_list, out_idx = model.pack_batch(batch, embeddings, cuda=args.cuda)
-            enc = net.encode(input_seq)
+    if args.load:
+        net.load_state_dict(torch.load(args.load))
+        log.info("Model loaded from %s, continue training in RL mode...", args.load)
+    else:
+        optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+        best_bleu = None
+        for epoch in range(MAX_EPOCHES):
+            random.shuffle(train_data)
+            losses = []
+            bleu_sum = 0.0
+            bleu_count = 0
+            for batch in data.iterate_batches(train_data, BATCH_SIZE):
+                optimiser.zero_grad()
+                input_seq, out_seq_list, out_idx = model.pack_batch(batch, embeddings, cuda=args.cuda)
+                enc = net.encode(input_seq)
 
-            net_results = []
-            net_targets = []
-            for idx, out_seq in enumerate(out_seq_list):
-                ref_indices = out_idx[idx][1:]
-                if random.random() < TEACHER_PROB:
-                    r = net.decode_teacher(net.get_encoded_item(enc, idx), out_seq)
-                else:
-                    r, _ = net.decode_chain_argmax(embeddings, net.get_encoded_item(enc, idx),
-                                                   out_seq.data[0], len(ref_indices))
-                net_results.append(r)
-                net_targets.extend(ref_indices)
-                bleu_sum += model.seq_bleu(r, ref_indices)
-                bleu_count += 1
-            results_v = torch.cat(net_results)
-            targets_v = Variable(torch.LongTensor(net_targets))
-            if args.cuda:
-                targets_v = targets_v.cuda()
-            loss_v = F.cross_entropy(results_v, targets_v)
-            loss_v.backward()
-            nn_utils.clip_grad_norm(net.parameters(), GRAD_CLIP)
-            optimiser.step()
+                net_results = []
+                net_targets = []
+                for idx, out_seq in enumerate(out_seq_list):
+                    ref_indices = out_idx[idx][1:]
+                    if random.random() < TEACHER_PROB:
+                        r = net.decode_teacher(net.get_encoded_item(enc, idx), out_seq)
+                    else:
+                        r, _ = net.decode_chain_argmax(embeddings, net.get_encoded_item(enc, idx),
+                                                       out_seq.data[0], len(ref_indices))
+                    net_results.append(r)
+                    net_targets.extend(ref_indices)
+                    bleu_sum += model.seq_bleu(r, ref_indices)
+                    bleu_count += 1
+                results_v = torch.cat(net_results)
+                targets_v = Variable(torch.LongTensor(net_targets))
+                if args.cuda:
+                    targets_v = targets_v.cuda()
+                loss_v = F.cross_entropy(results_v, targets_v)
+                loss_v.backward()
+#                nn_utils.clip_grad_norm(net.parameters(), GRAD_CLIP)
+                optimiser.step()
 
-            losses.append(loss_v.data.cpu().numpy()[0])
-        bleu = bleu_sum / bleu_count
-        log.info("Epoch %d: mean loss %.3f, mean BLEU %.3f", epoch, np.mean(losses), bleu)
-        writer.add_scalar("loss", np.mean(losses), epoch)
-        writer.add_scalar("bleu", bleu, epoch)
-        if best_bleu is None or best_bleu < bleu:
-            if best_bleu is not None:
-                torch.save(net.state_dict(), os.path.join(saves_path, "pre_bleu_%.3f_%02d.dat" % (bleu, epoch)))
-                log.info("Best BLEU updated %.3f", bleu)
-            best_bleu = bleu
+                losses.append(loss_v.data.cpu().numpy()[0])
+            bleu = bleu_sum / bleu_count
+            log.info("Epoch %d: mean loss %.3f, mean BLEU %.3f", epoch, np.mean(losses), bleu)
+            writer.add_scalar("loss", np.mean(losses), epoch)
+            writer.add_scalar("bleu", bleu, epoch)
+            if best_bleu is None or best_bleu < bleu:
+                if best_bleu is not None:
+                    torch.save(net.state_dict(), os.path.join(saves_path, "pre_bleu_%.3f_%02d.dat" % (bleu, epoch)))
+                    log.info("Best BLEU updated %.3f", bleu)
+                best_bleu = bleu
+
+    with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
+        optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE_RL)
+        batch_idx = 0
+        for epoch in range(MAX_EPOCHES):
+            random.shuffle(train_data)
+            epoch_bleu = 0.0
+            epoch_bleu_count = 0
+
+            for batch in data.iterate_batches(train_data, BATCH_SIZE):
+                batch_idx += 1
+                optimiser.zero_grad()
+                input_seq, out_seq_list, out_idx = model.pack_batch(batch, embeddings, cuda=args.cuda)
+                enc = net.encode(input_seq)
+
+                net_policies = []
+                net_actions = []
+                net_advantages = []
+                sum_argmax_bleu = 0.0
+                sum_sample_bleu = 0.0
+
+                for idx, out_seq in enumerate(out_seq_list):
+                    ref_indices = out_idx[idx][1:]
+                    item_enc = net.get_encoded_item(enc, idx)
+                    r_argmax, _ = net.decode_chain_argmax(embeddings, item_enc, out_seq.data[0], len(ref_indices))
+                    argmax_bleu = model.seq_bleu(r_argmax, ref_indices)
+                    r_sample, actions = net.decode_chain_sampling(embeddings, item_enc, out_seq.data[0], len(ref_indices))
+                    sample_bleu = model.seq_bleu(r_sample, ref_indices)
+
+                    net_policies.append(r_sample)
+                    net_actions.extend(actions)
+                    net_advantages.extend([sample_bleu - argmax_bleu] * len(actions))
+                    sum_argmax_bleu += argmax_bleu
+                    sum_sample_bleu += sample_bleu
+
+                policies_v = torch.cat(net_policies)
+                actions_t = torch.LongTensor(net_actions)
+                adv_v = Variable(torch.FloatTensor(net_advantages))
+                if args.cuda:
+                    actions_t = actions_t.cuda()
+                    adv_v = adv_v.cuda()
+
+                log_prob_v = F.log_softmax(policies_v)
+                log_prob_actions_v = adv_v * log_prob_v[range(len(net_actions)), actions_t]
+                loss_policy_v = -log_prob_actions_v.mean()
+
+                prob_v = F.softmax(policies_v)
+                entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
+                loss_v = entropy_loss_v + loss_policy_v
+                loss_v.backward()
+                nn_utils.clip_grad_norm(net.parameters(), GRAD_CLIP)
+                optimiser.step()
+
+                tb_tracker.track("bleu_argmax", sum_argmax_bleu / len(net_actions), batch_idx)
+                tb_tracker.track("bleu_sample", sum_sample_bleu / len(net_actions), batch_idx)
+                tb_tracker.track("advantage", adv_v, batch_idx)
+                tb_tracker.track("loss_entropy", entropy_loss_v, batch_idx)
+                tb_tracker.track("loss_policy", loss_policy_v, batch_idx)
+                tb_tracker.track("loss_total", loss_v, batch_idx)
+
+                epoch_bleu += sum_sample_bleu / len(net_actions)
+                epoch_bleu_count += 1
+            log.info("Epoch %d: mean BLEU: %.3f", epoch, epoch_bleu / epoch_bleu_count)
+
+
     writer.close()

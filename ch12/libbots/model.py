@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.utils.rnn as rnn_utils
+import torch.nn.functional as F
 from torch.autograd import Variable
 
 from . import utils
@@ -38,7 +39,7 @@ class PhraseModel(nn.Module):
 
     def decode_chain_argmax(self, embeddings, hid, begin_emb, seq_len):
         """
-        Decode chain by feeding predicted token to the net again
+        Decode sequence by feeding predicted token to the net again. Act greedily
         """
         res_logits = []
         res_tokens = []
@@ -54,6 +55,29 @@ class PhraseModel(nn.Module):
             res_logits.append(out_logits)
             res_tokens.append(out_token)
         return torch.cat(res_logits), res_tokens
+
+
+    def decode_chain_sampling(self, embeddings, hid, begin_emb, seq_len):
+        """
+        Decode sequence by feeding predicted token to the net again. Act according to probabilities
+        """
+        res_logits = []
+        res_actions = []
+        cur_emb = begin_emb.unsqueeze(0)
+
+        for _ in range(seq_len):
+            out_logits, hid = self.decode_one(hid, cur_emb)
+            out_probs_v = F.softmax(out_logits)
+            out_probs = out_probs_v.data.cpu().numpy()[0]
+            action = int(np.random.choice(out_probs.shape[0], p=out_probs))
+            action_v = Variable(torch.LongTensor([action]))
+            if begin_emb.is_cuda:
+                action_v = action_v.cuda()
+            cur_emb = embeddings(action_v)
+
+            res_logits.append(out_logits)
+            res_actions.append(action)
+        return torch.cat(res_logits), res_actions
 
 
     def decode_one(self, hid, input_x):
