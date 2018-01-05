@@ -36,6 +36,26 @@ class PhraseModel(nn.Module):
         out = self.output(out.data)
         return out
 
+    def decode_chain_argmax(self, embeddings, hid, begin_emb, seq_len):
+        """
+        Decode chain by feeding predicted token to the net again
+        """
+        res_logits = []
+        res_tokens = []
+        cur_emb = begin_emb.unsqueeze(0)
+
+        for _ in range(seq_len):
+            out_logits, hid = self.decode_one(hid, cur_emb)
+            out_token_v = torch.max(out_logits, dim=1)[1]
+            out_token = out_token_v.data.cpu().numpy()[0]
+
+            cur_emb = embeddings(out_token_v)
+
+            res_logits.append(out_logits)
+            res_tokens.append(out_token)
+        return torch.cat(res_logits), res_tokens
+
+
     def decode_one(self, hid, input_x):
         out, new_hid = self.decoder(input_x.unsqueeze(0), hid)
         out = self.output(out)
