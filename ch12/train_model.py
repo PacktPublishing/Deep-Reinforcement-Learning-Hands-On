@@ -32,8 +32,8 @@ GRAD_CLIP = 0.1
 log = logging.getLogger("train")
 
 TEACHER_PROB = 0.5
-ENTROPY_BETA = 0.1
-LEARNING_RATE_RL = 1e-5
+ENTROPY_BETA = 0.0
+LEARNING_RATE_RL = 1e-4
 
 
 def load_data(args):
@@ -143,7 +143,7 @@ if __name__ == "__main__":
                 best_bleu = bleu
 
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
-        optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE_RL)
+        optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE_RL, eps=1e-3)
         batch_idx = 0
         for epoch in range(MAX_EPOCHES):
             random.shuffle(train_data)
