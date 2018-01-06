@@ -2,6 +2,7 @@ import os
 import gzip
 import glob
 import datetime
+import itertools
 import xml.etree.ElementTree as ET
 
 from . import data
@@ -180,13 +181,17 @@ def preprocess_dialogue(dialogue):
 
 def phrase_pairs_dict(phrase_pairs):
     """
-    Return set of words in the dialogues
+    Return the dict of words in the dialogues mapped to their IDs
     :param phrase_pairs: list of (phrase, phrase) pairs
-    :return: set
+    :return: dict
     """
-    res = set()
+    next_id = 0
+    res = {}
     for p1, p2 in phrase_pairs:
-        res |= set(map(str.lower, p1.words)) | set(map(str.lower, p2.words))
+        for w in map(str.lower, itertools.chain(p1.words, p2.words)):
+            if w not in res:
+                res[w] = next_id
+                next_id += 1
     return res
 
 

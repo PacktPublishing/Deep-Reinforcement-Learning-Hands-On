@@ -139,3 +139,11 @@ def load_data(args, max_tokens=MAX_TOKENS):
 
 def decode_words(indices, rev_emb_dict):
     return [rev_emb_dict[idx] for idx in indices]
+
+
+def extend_emb_dict(emb_dict):
+    assert isinstance(emb_dict, dict)
+    next_id = len(emb_dict)
+    for token in [UNKNOWN_TOKEN, BEGIN_TOKEN, END_TOKEN]:
+        emb_dict[token] = next_id
+        next_id += 1

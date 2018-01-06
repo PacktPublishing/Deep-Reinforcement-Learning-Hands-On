@@ -39,22 +39,22 @@ if __name__ == "__main__":
     saves_path = os.path.join(SAVES_DIR, args.name)
     os.makedirs(saves_path, exist_ok=True)
 
-    phrase_pairs, phrase_pairs_dict = data.load_data(args)
-    log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(phrase_pairs_dict))
-    emb_dict, emb = data.read_embeddings(phrase_pairs_dict)
+    phrase_pairs, emb_dict = data.load_data(args)
+    log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(emb_dict))
+    data.extend_emb_dict(emb_dict)
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
     log.info("Training data converted, got %d samples", len(train_data))
 
-    data.save_embeddings(saves_path, emb_dict, emb)
+#    data.save_embeddings(saves_path, emb_dict, emb)
 
     # initialize embedding lookup table
-    embeddings = nn.Embedding(num_embeddings=emb.shape[0], embedding_dim=emb.shape[1])
-    embeddings.weight.data.copy_(torch.from_numpy(emb))
-    embeddings.weight.requires_grad = False
-    if args.cuda:
-        embeddings.cuda()
+    # embeddings = nn.Embedding(num_embeddings=emb.shape[0], embedding_dim=emb.shape[1])
+    # embeddings.weight.data.copy_(torch.from_numpy(emb))
+    # embeddings.weight.requires_grad = False
+    # if args.cuda:
+    #     embeddings.cuda()
 
-    net = model.PhraseModel(emb_size=emb.shape[1], dict_size=emb.shape[0], hid_size=model.HIDDEN_STATE_SIZE)
+    net = model.PhraseModel(emb_size=model.EMBEDDING_DIM, dict_size=len(emb_dict), hid_size=model.HIDDEN_STATE_SIZE)
     if args.cuda:
         net.cuda()
     log.info("Model: %s", net)
@@ -70,7 +70,7 @@ if __name__ == "__main__":
         bleu_count = 0
         for batch in data.iterate_batches(train_data, BATCH_SIZE):
             optimiser.zero_grad()
-            input_seq, out_seq_list, _, out_idx = model.pack_batch(batch, embeddings, cuda=args.cuda)
+            input_seq, out_seq_list, _, out_idx = model.pack_batch(batch, net.emb, cuda=args.cuda)
             enc = net.encode(input_seq)
 
             net_results = []
@@ -81,7 +81,7 @@ if __name__ == "__main__":
                     r = net.decode_teacher(net.get_encoded_item(enc, idx), out_seq)
                     bleu_sum += model.seq_bleu(r, ref_indices)
                 else:
-                    r, seq = net.decode_chain_argmax(embeddings, net.get_encoded_item(enc, idx),
+                    r, seq = net.decode_chain_argmax(net.emb, net.get_encoded_item(enc, idx),
                                                      out_seq.data[0], len(ref_indices))
                     bleu_sum += utils.calc_bleu(seq, ref_indices)
                 net_results.append(r)
