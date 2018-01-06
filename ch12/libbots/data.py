@@ -11,7 +11,7 @@ EMBEDDINGS_FILE = "data/glove.6B.100d.txt"
 UNKNOWN_TOKEN = '#UNK'
 BEGIN_TOKEN = "#BEG"
 END_TOKEN = "#END"
-MAX_TOKENS = 15
+MAX_TOKENS = 10
 
 EMB_DICT_NAME = "emb_dict.dat"
 EMB_NAME = "emb.npy"
