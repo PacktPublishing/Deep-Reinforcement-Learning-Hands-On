@@ -11,6 +11,7 @@ EMBEDDINGS_FILE = "data/glove.6B.100d.txt"
 UNKNOWN_TOKEN = '#UNK'
 BEGIN_TOKEN = "#BEG"
 END_TOKEN = "#END"
+MAX_TOKENS = 15
 
 EMB_DICT_NAME = "emb_dict.dat"
 EMB_NAME = "emb.npy"
@@ -69,7 +70,6 @@ def load_embeddings(dir_name):
     return emb_dict, emb
 
 
-
 def encode_words(words, emb_dict):
     """
     Convert list of words into list of embeddings indices, adding our tokens
@@ -116,7 +116,7 @@ def iterate_batches(data, batch_size):
 Phrase = collections.namedtuple("Phrase", field_names=('words', 'time_start', 'time_stop'))
 
 
-def load_data(args, max_tokens):
+def load_data(args, max_tokens=MAX_TOKENS):
     if args.cornell is not None:
         dialogues = cornell.load_dialogues(genre_filter=args.cornell)
     else:
@@ -135,4 +135,3 @@ def load_data(args, max_tokens):
     phrase_pairs = subtitles.dialogues_to_pairs(dialogues, max_tokens=max_tokens)
     phrase_pairs_dict = subtitles.phrase_pairs_dict(phrase_pairs)
     return phrase_pairs, phrase_pairs_dict
-

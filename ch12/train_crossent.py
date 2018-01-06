@@ -21,14 +21,10 @@ SAVES_DIR = "saves"
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-3
 MAX_EPOCHES = 1000
-MAX_TOKENS = 15
-GRAD_CLIP = 0.1
 
 log = logging.getLogger("train")
 
 TEACHER_PROB = 0.5
-ENTROPY_BETA = 0.0
-LEARNING_RATE_RL = 1e-3
 
 
 if __name__ == "__main__":
@@ -43,7 +39,7 @@ if __name__ == "__main__":
     saves_path = os.path.join(SAVES_DIR, args.name)
     os.makedirs(saves_path, exist_ok=True)
 
-    phrase_pairs, phrase_pairs_dict = data.load_data(args, MAX_TOKENS)
+    phrase_pairs, phrase_pairs_dict = data.load_data(args)
     log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(phrase_pairs_dict))
     emb_dict, emb = data.read_embeddings(phrase_pairs_dict)
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)

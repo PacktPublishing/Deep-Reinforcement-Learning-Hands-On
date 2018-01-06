@@ -21,7 +21,6 @@ SAVES_DIR = "saves"
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-3
 MAX_EPOCHES = 1000
-MAX_TOKENS = 15
 
 log = logging.getLogger("train")
 
@@ -29,7 +28,8 @@ log = logging.getLogger("train")
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)-15s %(levelname)s %(message)s", level=logging.INFO)
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cornell", help="Use Cornell Movie Dialogues database could be a category or empty string to load full data")
+    parser.add_argument("--cornell", help="Use Cornell Movie Dialogues database could be "
+                                          "a category or empty string to load full data")
     parser.add_argument("--data", default=DEFAULT_FILE, help="Could be file name to load or category dir")
     parser.add_argument("--cuda", action='store_true', default=False, help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     saves_path = os.path.join(SAVES_DIR, args.name)
     os.makedirs(saves_path, exist_ok=True)
 
-    phrase_pairs, phrase_pairs_dict = data.load_data(args, MAX_TOKENS)
+    phrase_pairs, phrase_pairs_dict = data.load_data(args)
     log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(phrase_pairs_dict))
     emb_dict, emb = data.read_embeddings(phrase_pairs_dict)
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
@@ -125,6 +125,5 @@ if __name__ == "__main__":
                 epoch_bleu += sum_sample_bleu / len(out_seq_list)
                 epoch_bleu_count += 1
             log.info("Epoch %d: mean BLEU: %.3f", epoch, epoch_bleu / epoch_bleu_count)
-
 
     writer.close()
