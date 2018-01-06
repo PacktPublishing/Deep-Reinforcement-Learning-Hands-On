@@ -61,52 +61,48 @@ if __name__ == "__main__":
 
     writer = SummaryWriter(comment="-" + args.name)
 
-    if args.load:
-        net.load_state_dict(torch.load(args.load))
-        log.info("Model loaded from %s, continue training in RL mode...", args.load)
-    else:
-        optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE)
-        best_bleu = None
-        for epoch in range(MAX_EPOCHES):
-            random.shuffle(train_data)
-            losses = []
-            bleu_sum = 0.0
-            bleu_count = 0
-            for batch in data.iterate_batches(train_data, BATCH_SIZE):
-                optimiser.zero_grad()
-                input_seq, out_seq_list, out_idx = model.pack_batch(batch, embeddings, cuda=args.cuda)
-                enc = net.encode(input_seq)
+    optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    best_bleu = None
+    for epoch in range(MAX_EPOCHES):
+        random.shuffle(train_data)
+        losses = []
+        bleu_sum = 0.0
+        bleu_count = 0
+        for batch in data.iterate_batches(train_data, BATCH_SIZE):
+            optimiser.zero_grad()
+            input_seq, out_seq_list, out_idx = model.pack_batch(batch, embeddings, cuda=args.cuda)
+            enc = net.encode(input_seq)
 
-                net_results = []
-                net_targets = []
-                for idx, out_seq in enumerate(out_seq_list):
-                    ref_indices = out_idx[idx][1:]
-                    if random.random() < TEACHER_PROB:
-                        r = net.decode_teacher(net.get_encoded_item(enc, idx), out_seq)
-                    else:
-                        r, _ = net.decode_chain_argmax(embeddings, net.get_encoded_item(enc, idx),
-                                                       out_seq.data[0], len(ref_indices))
-                    net_results.append(r)
-                    net_targets.extend(ref_indices)
-                    bleu_sum += model.seq_bleu(r, ref_indices)
-                    bleu_count += 1
-                results_v = torch.cat(net_results)
-                targets_v = Variable(torch.LongTensor(net_targets))
-                if args.cuda:
-                    targets_v = targets_v.cuda()
-                loss_v = F.cross_entropy(results_v, targets_v)
-                loss_v.backward()
-                optimiser.step()
+            net_results = []
+            net_targets = []
+            for idx, out_seq in enumerate(out_seq_list):
+                ref_indices = out_idx[idx][1:]
+                if random.random() < TEACHER_PROB:
+                    r = net.decode_teacher(net.get_encoded_item(enc, idx), out_seq)
+                else:
+                    r, _ = net.decode_chain_argmax(embeddings, net.get_encoded_item(enc, idx),
+                                                   out_seq.data[0], len(ref_indices))
+                net_results.append(r)
+                net_targets.extend(ref_indices)
+                bleu_sum += model.seq_bleu(r, ref_indices)
+                bleu_count += 1
+            results_v = torch.cat(net_results)
+            targets_v = Variable(torch.LongTensor(net_targets))
+            if args.cuda:
+                targets_v = targets_v.cuda()
+            loss_v = F.cross_entropy(results_v, targets_v)
+            loss_v.backward()
+            optimiser.step()
 
-                losses.append(loss_v.data.cpu().numpy()[0])
-            bleu = bleu_sum / bleu_count
-            log.info("Epoch %d: mean loss %.3f, mean BLEU %.3f", epoch, np.mean(losses), bleu)
-            writer.add_scalar("loss", np.mean(losses), epoch)
-            writer.add_scalar("bleu", bleu, epoch)
-            if best_bleu is None or best_bleu < bleu:
-                if best_bleu is not None:
-                    torch.save(net.state_dict(), os.path.join(saves_path, "pre_bleu_%.3f_%02d.dat" % (bleu, epoch)))
-                    log.info("Best BLEU updated %.3f", bleu)
-                best_bleu = bleu
+            losses.append(loss_v.data.cpu().numpy()[0])
+        bleu = bleu_sum / bleu_count
+        log.info("Epoch %d: mean loss %.3f, mean BLEU %.3f", epoch, np.mean(losses), bleu)
+        writer.add_scalar("loss", np.mean(losses), epoch)
+        writer.add_scalar("bleu", bleu, epoch)
+        if best_bleu is None or best_bleu < bleu:
+            if best_bleu is not None:
+                torch.save(net.state_dict(), os.path.join(saves_path, "pre_bleu_%.3f_%02d.dat" % (bleu, epoch)))
+                log.info("Best BLEU updated %.3f", bleu)
+            best_bleu = bleu
 
     writer.close()
