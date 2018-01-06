@@ -45,15 +45,6 @@ if __name__ == "__main__":
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
     log.info("Training data converted, got %d samples", len(train_data))
 
-#    data.save_embeddings(saves_path, emb_dict, emb)
-
-    # initialize embedding lookup table
-    # embeddings = nn.Embedding(num_embeddings=emb.shape[0], embedding_dim=emb.shape[1])
-    # embeddings.weight.data.copy_(torch.from_numpy(emb))
-    # embeddings.weight.requires_grad = False
-    # if args.cuda:
-    #     embeddings.cuda()
-
     net = model.PhraseModel(emb_size=model.EMBEDDING_DIM, dict_size=len(emb_dict), hid_size=model.HIDDEN_STATE_SIZE)
     if args.cuda:
         net.cuda()

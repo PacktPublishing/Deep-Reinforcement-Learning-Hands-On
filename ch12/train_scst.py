@@ -40,24 +40,15 @@ if __name__ == "__main__":
     saves_path = os.path.join(SAVES_DIR, args.name)
     os.makedirs(saves_path, exist_ok=True)
 
-    phrase_pairs, phrase_pairs_dict = data.load_data(args)
-    log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(phrase_pairs_dict))
-    emb_dict, emb = data.read_embeddings(phrase_pairs_dict)
+    phrase_pairs, emb_dict = data.load_data(args)
+    log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(emb_dict))
+    data.extend_emb_dict(emb_dict)
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
     log.info("Training data converted, got %d samples", len(train_data))
 
-    data.save_embeddings(saves_path, emb_dict, emb)
-
     rev_emb_dict = {idx: word for word, idx in emb_dict.items()}
 
-    # initialize embedding lookup table
-    embeddings = nn.Embedding(num_embeddings=emb.shape[0], embedding_dim=emb.shape[1])
-    embeddings.weight.data.copy_(torch.from_numpy(emb))
-    embeddings.weight.requires_grad = False
-    if args.cuda:
-        embeddings.cuda()
-
-    net = model.PhraseModel(emb_size=emb.shape[1], dict_size=emb.shape[0], hid_size=model.HIDDEN_STATE_SIZE)
+    net = model.PhraseModel(emb_size=model.EMBEDDING_DIM, dict_size=len(emb_dict), hid_size=model.HIDDEN_STATE_SIZE)
     if args.cuda:
         net.cuda()
     log.info("Model: %s", net)
@@ -80,12 +71,14 @@ if __name__ == "__main__":
             for batch in data.iterate_batches(train_data, BATCH_SIZE):
                 batch_idx += 1
                 optimiser.zero_grad()
-                input_seq, out_seq_list, inp_idx, out_idx = model.pack_batch(batch, embeddings, cuda=args.cuda)
+                input_seq, out_seq_list, inp_idx, out_idx = model.pack_batch(batch, net.emb, cuda=args.cuda)
                 enc = net.encode(input_seq)
 
                 net_policies = []
                 net_actions = []
                 net_advantages = []
+                sum_bleu = 0.0
+                cnt_bleu = 0
                 sum_argmax_bleu = 0.0
                 cnt_argmax_bleu = 0
                 sum_sample_bleu = 0.0
@@ -95,16 +88,20 @@ if __name__ == "__main__":
                     total_samples += 1
                     ref_indices = out_idx[idx][1:]
                     item_enc = net.get_encoded_item(enc, idx)
-                    r_argmax, actions = net.decode_chain_argmax(embeddings, item_enc, out_seq.data[0], len(ref_indices))
+                    r_argmax, actions = net.decode_chain_argmax(net.emb, item_enc, out_seq.data[0], len(ref_indices))
 
                     # if perfect match, skip the sample
                     if ref_indices == actions:
                         skipped_samples += 1
+                        sum_bleu += 1.0
+                        cnt_bleu += 1
                         continue
 
                     argmax_bleu = utils.calc_bleu(actions, ref_indices)
                     sum_argmax_bleu += argmax_bleu
                     cnt_argmax_bleu += 1
+                    sum_bleu += argmax_bleu
+                    cnt_bleu += 1
 
                     if not dial_shown:
                         log.info("Input: %s", " ".join(data.decode_words(inp_idx[idx], rev_emb_dict)))
@@ -113,7 +110,7 @@ if __name__ == "__main__":
                                  argmax_bleu)
 
                     for _ in range(args.samples):
-                        r_sample, actions = net.decode_chain_sampling(embeddings, item_enc, out_seq.data[0], len(ref_indices))
+                        r_sample, actions = net.decode_chain_sampling(net.emb, item_enc, out_seq.data[0], len(ref_indices))
                         sample_bleu = utils.calc_bleu(actions, ref_indices)
 
                         if not dial_shown:
@@ -149,6 +146,7 @@ if __name__ == "__main__":
                 loss_v.backward()
                 optimiser.step()
 
+                tb_tracker.track("bleu", sum_argmax_bleu / cnt_argmax_bleu, batch_idx)
                 tb_tracker.track("bleu_argmax", sum_argmax_bleu / cnt_argmax_bleu, batch_idx)
                 tb_tracker.track("bleu_sample", sum_sample_bleu / cnt_sample_bleu, batch_idx)
                 tb_tracker.track("advantage", adv_v, batch_idx)
