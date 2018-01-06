@@ -146,7 +146,7 @@ if __name__ == "__main__":
                 loss_v.backward()
                 optimiser.step()
 
-                tb_tracker.track("bleu", sum_argmax_bleu / cnt_argmax_bleu, batch_idx)
+                tb_tracker.track("bleu", sum_bleu / cnt_bleu, batch_idx)
                 tb_tracker.track("bleu_argmax", sum_argmax_bleu / cnt_argmax_bleu, batch_idx)
                 tb_tracker.track("bleu_sample", sum_sample_bleu / cnt_sample_bleu, batch_idx)
                 tb_tracker.track("advantage", adv_v, batch_idx)
