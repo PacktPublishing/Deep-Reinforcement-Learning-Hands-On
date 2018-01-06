@@ -19,8 +19,8 @@ DEFAULT_FILE = "data/OpenSubtitles/en/Crime/1994/60_101020_138057_pulp_fiction.x
 SAVES_DIR = "saves"
 
 BATCH_SIZE = 32
-LEARNING_RATE = 1e-3
-MAX_EPOCHES = 1000
+LEARNING_RATE = 1e-4
+MAX_EPOCHES = 100
 
 log = logging.getLogger("train")
 
