@@ -1,8 +1,11 @@
 import collections
 import os
+import sys
 import logging
 import numpy as np
 import pickle
+
+from . import cornell, subtitles
 
 EMBEDDINGS_FILE = "data/glove.6B.100d.txt"
 UNKNOWN_TOKEN = '#UNK'
@@ -111,3 +114,25 @@ def iterate_batches(data, batch_size):
 
 
 Phrase = collections.namedtuple("Phrase", field_names=('words', 'time_start', 'time_stop'))
+
+
+def load_data(args, max_tokens):
+    if args.cornell is not None:
+        dialogues = cornell.load_dialogues(genre_filter=args.cornell)
+    else:
+        if args.data.endswith(".xml.gz"):
+            dialogues = subtitles.read_file(args.data)
+        elif len(args.data) == 0:
+            dialogues = subtitles.read_dir(subtitles.DATA_DIR)
+        else:
+            data_path = os.path.join(subtitles.DATA_DIR, args.data)
+            dialogues = subtitles.read_dir(data_path)
+    if not dialogues:
+        log.error("No dialogues found, exit!")
+        sys.exit()
+    log.info("Loaded %d dialogues with %d phrases, generating training pairs",
+             len(dialogues), sum(map(len, dialogues)))
+    phrase_pairs = subtitles.dialogues_to_pairs(dialogues, max_tokens=max_tokens)
+    phrase_pairs_dict = subtitles.phrase_pairs_dict(phrase_pairs)
+    return phrase_pairs, phrase_pairs_dict
+

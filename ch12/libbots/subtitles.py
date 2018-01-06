@@ -6,6 +6,8 @@ import xml.etree.ElementTree as ET
 
 from . import data
 
+DATA_DIR = "data/OpenSubtitles/en/"
+
 
 def read_dir(dir_name):
     result = []
