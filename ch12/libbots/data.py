@@ -57,6 +57,11 @@ def read_embeddings(word_set=None, file_name=EMBEDDINGS_FILE):
     return words, emb
 
 
+def save_emb_dict(dir_name, emb_dict):
+    with open(os.path.join(dir_name, EMB_DICT_NAME), "wb") as fd:
+        pickle.dump(emb_dict, fd)
+
+
 def save_embeddings(dir_name, emb_dict, emb):
     with open(os.path.join(dir_name, EMB_DICT_NAME), "wb") as fd:
         pickle.dump(emb_dict, fd)
@@ -68,6 +73,11 @@ def load_embeddings(dir_name):
         emb_dict = pickle.load(fd)
     emb = np.load(os.path.join(dir_name, EMB_NAME))
     return emb_dict, emb
+
+
+def load_emb_dict(dir_name):
+    with open(os.path.join(dir_name, EMB_DICT_NAME), "rb") as fd:
+        return pickle.load(fd)
 
 
 def encode_words(words, emb_dict):
