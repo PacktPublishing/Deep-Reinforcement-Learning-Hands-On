@@ -70,7 +70,7 @@ if __name__ == "__main__":
         bleu_count = 0
         for batch in data.iterate_batches(train_data, BATCH_SIZE):
             optimiser.zero_grad()
-            input_seq, out_seq_list, out_idx = model.pack_batch(batch, embeddings, cuda=args.cuda)
+            input_seq, out_seq_list, _, out_idx = model.pack_batch(batch, embeddings, cuda=args.cuda)
             enc = net.encode(input_seq)
 
             net_results = []

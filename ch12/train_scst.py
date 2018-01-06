@@ -48,6 +48,8 @@ if __name__ == "__main__":
 
     data.save_embeddings(saves_path, emb_dict, emb)
 
+    rev_emb_dict = {idx: word for word, idx in emb_dict.items()}
+
     # initialize embedding lookup table
     embeddings = nn.Embedding(num_embeddings=emb.shape[0], embedding_dim=emb.shape[1])
     embeddings.weight.data.copy_(torch.from_numpy(emb))
@@ -71,11 +73,14 @@ if __name__ == "__main__":
             random.shuffle(train_data)
             epoch_bleu = 0.0
             epoch_bleu_count = 0
+            dial_shown = False
+            total_samples = 0
+            skipped_samples = 0
 
             for batch in data.iterate_batches(train_data, BATCH_SIZE):
                 batch_idx += 1
                 optimiser.zero_grad()
-                input_seq, out_seq_list, out_idx = model.pack_batch(batch, embeddings, cuda=args.cuda)
+                input_seq, out_seq_list, inp_idx, out_idx = model.pack_batch(batch, embeddings, cuda=args.cuda)
                 enc = net.encode(input_seq)
 
                 net_policies = []
@@ -87,22 +92,42 @@ if __name__ == "__main__":
                 cnt_sample_bleu = 0
 
                 for idx, out_seq in enumerate(out_seq_list):
+                    total_samples += 1
                     ref_indices = out_idx[idx][1:]
                     item_enc = net.get_encoded_item(enc, idx)
-                    r_argmax, _ = net.decode_chain_argmax(embeddings, item_enc, out_seq.data[0], len(ref_indices))
+                    r_argmax, actions = net.decode_chain_argmax(embeddings, item_enc, out_seq.data[0], len(ref_indices))
                     argmax_bleu = model.seq_bleu(r_argmax, ref_indices)
+                    if argmax_bleu >= 0.99:
+                        skipped_samples += 1
+                        continue
+
                     sum_argmax_bleu += argmax_bleu
                     cnt_argmax_bleu += 1
+
+                    if not dial_shown:
+                        log.info("Input: %s", " ".join(data.decode_words(inp_idx[idx], rev_emb_dict)))
+                        log.info("Refer: %s", " ".join(data.decode_words(ref_indices, rev_emb_dict)))
+                        log.info("Argmax: %s, bleu=%.4f", " ".join(data.decode_words(actions, rev_emb_dict)),
+                                 argmax_bleu)
 
                     for _ in range(args.samples):
                         r_sample, actions = net.decode_chain_sampling(embeddings, item_enc, out_seq.data[0], len(ref_indices))
                         sample_bleu = model.seq_bleu(r_sample, ref_indices)
+
+                        if not dial_shown:
+                            log.info("Sample: %s, bleu=%.4f", " ".join(data.decode_words(actions, rev_emb_dict)),
+                                     sample_bleu)
 
                         net_policies.append(r_sample)
                         net_actions.extend(actions)
                         net_advantages.extend([sample_bleu - argmax_bleu] * len(actions))
                         sum_sample_bleu += sample_bleu
                         cnt_sample_bleu += 1
+                    dial_shown = True
+
+                tb_tracker.track("skipped_samples", skipped_samples / total_samples, batch_idx)
+                if not net_policies:
+                    continue
 
                 policies_v = torch.cat(net_policies)
                 actions_t = torch.LongTensor(net_actions)

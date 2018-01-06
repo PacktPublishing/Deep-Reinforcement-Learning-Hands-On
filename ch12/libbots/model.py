@@ -114,7 +114,7 @@ def pack_batch(batch, embeddings, cuda=False):
         emb_out_v = embeddings(out_v)
         out_seq = rnn_utils.pack_padded_sequence(emb_out_v, [len(seq)], batch_first=True)
         output_seq_list.append(out_seq)
-    return emb_input_seq, output_seq_list, output_idx
+    return emb_input_seq, output_seq_list, input_idx, output_idx
 
 
 def pack_input(input_data, embeddings):

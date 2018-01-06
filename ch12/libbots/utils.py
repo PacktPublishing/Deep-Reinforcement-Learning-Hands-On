@@ -1,5 +1,7 @@
 import collections
 
+from nltk.translate import bleu_score
+
 
 def iterate_n_grams(seq, n):
     if n == 1:
@@ -19,16 +21,17 @@ def calc_bleu(cand_seq, ref_seq, max_n_grams=4):
     :param ref_seq:
     :return:
     """
-    score = 0.0
-
-    for n in range(1, max_n_grams+1):
-        cand_ngrams = list(iterate_n_grams(cand_seq, n=n))
-        cand_counts = collections.Counter(cand_ngrams)
-        ref_counts = collections.Counter(iterate_n_grams(ref_seq, n=n))
-        for item, count in cand_counts.items():
-            if item in ref_counts:
-                score += min(count, ref_counts[item]) / len(cand_ngrams)
-    score /= max_n_grams
-    return score
-
+    # score = 0.0
+    #
+    # for n in range(1, max_n_grams+1):
+    #     cand_ngrams = list(iterate_n_grams(cand_seq, n=n))
+    #     cand_counts = collections.Counter(cand_ngrams)
+    #     ref_counts = collections.Counter(iterate_n_grams(ref_seq, n=n))
+    #     for item, count in cand_counts.items():
+    #         if item in ref_counts:
+    #             score += min(count, ref_counts[item]) / len(cand_ngrams)
+    # score /= min(max_n_grams, len(ref_seq))
+    # return score
+    return bleu_score.sentence_bleu(
+        [tuple(ref_seq)], cand_seq, [1/max_n_grams for _ in range(max_n_grams)])
 

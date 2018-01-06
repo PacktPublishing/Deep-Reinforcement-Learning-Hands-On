@@ -16,9 +16,14 @@ class TestBLEU(TestCase):
         r = utils.calc_bleu(["the", "the", "the", "the", "the", "the", "the"],
                             ["the", "cat", "is", "on", "the", "mat"], max_n_grams=1)
         self.assertAlmostEqual(r, 2/7)
-        r = utils.calc_bleu(["I", "always", "invariably", "perpetually", "do"],
-                            ["I", "always", "do"], max_n_grams=2)
-        self.assertAlmostEqual(r, 0.425)
-        r = utils.calc_bleu([1, 2, 3], [1, 2], max_n_grams=2)
-        self.assertAlmostEqual(r, 0.5*(2/3 + 1/2))
+        # r = utils.calc_bleu(["I", "always", "invariably", "perpetually", "do"],
+        #                     ["I", "always", "do"], max_n_grams=2)
+        # self.assertAlmostEqual(r, 0.425)
+        # r = utils.calc_bleu([1, 2, 3], [1, 2], max_n_grams=2)
+        # self.assertAlmostEqual(r, 0.5*(2/3 + 1/2))
 
+        r = utils.calc_bleu(["really", "!", "#END"], ["really", "!", "#END"])
+        self.assertAlmostEqual(r, 1.0)
+
+        r = utils.calc_bleu(["a"], ["a", "a"])
+        self.assertEqual(r, 0.0)

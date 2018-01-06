@@ -135,3 +135,7 @@ def load_data(args, max_tokens=MAX_TOKENS):
     phrase_pairs = subtitles.dialogues_to_pairs(dialogues, max_tokens=max_tokens)
     phrase_pairs_dict = subtitles.phrase_pairs_dict(phrase_pairs)
     return phrase_pairs, phrase_pairs_dict
+
+
+def decode_words(indices, rev_emb_dict):
+    return [rev_emb_dict.get(idx, UNKNOWN_TOKEN) for idx in indices]

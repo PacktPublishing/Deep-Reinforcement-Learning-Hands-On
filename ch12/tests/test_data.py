@@ -17,20 +17,20 @@ class TestData(TestCase):
         res = data.encode_words(['a', 'b', 'c'], self.emb_dict)
         self.assertEqual(res, [0, 3, 4, 2, 1])
 
-    def test_dialogues_to_train(self):
-        dialogues = [
-            [
-                libbots.data.Phrase(words=['a', 'b'], time_start=0, time_stop=1),
-                libbots.data.Phrase(words=['b', 'a'], time_start=2, time_stop=3),
-                libbots.data.Phrase(words=['b', 'a'], time_start=2, time_stop=3),
-            ],
-            [
-                libbots.data.Phrase(words=['a', 'b'], time_start=0, time_stop=1),
-            ]
-        ]
-
-        res = data.dialogues_to_train(dialogues, self.emb_dict)
-        self.assertEqual(res, [
-            ([0, 3, 4, 1], [0, 4, 3, 1]),
-            ([0, 4, 3, 1], [0, 4, 3, 1]),
-        ])
+    # def test_dialogues_to_train(self):
+    #     dialogues = [
+    #         [
+    #             libbots.data.Phrase(words=['a', 'b'], time_start=0, time_stop=1),
+    #             libbots.data.Phrase(words=['b', 'a'], time_start=2, time_stop=3),
+    #             libbots.data.Phrase(words=['b', 'a'], time_start=2, time_stop=3),
+    #         ],
+    #         [
+    #             libbots.data.Phrase(words=['a', 'b'], time_start=0, time_stop=1),
+    #         ]
+    #     ]
+    #
+    #     res = data.dialogues_to_train(dialogues, self.emb_dict)
+    #     self.assertEqual(res, [
+    #         ([0, 3, 4, 1], [0, 4, 3, 1]),
+    #         ([0, 4, 3, 1], [0, 4, 3, 1]),
+    #     ])
