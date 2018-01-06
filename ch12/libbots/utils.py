@@ -1,6 +1,6 @@
 import collections
 
-from nltk.translate import bleu_score
+from nltk.translate import bleu
 
 
 def iterate_n_grams(seq, n):
@@ -32,6 +32,12 @@ def calc_bleu(cand_seq, ref_seq, max_n_grams=4):
     #             score += min(count, ref_counts[item]) / len(cand_ngrams)
     # score /= min(max_n_grams, len(ref_seq))
     # return score
-    return bleu_score.sentence_bleu(
-        [tuple(ref_seq)], cand_seq, [1/max_n_grams for _ in range(max_n_grams)])
+    # sf = bleu_score.SmoothingFunction()
+    # return bleu_score.sentence_bleu(
+    #     [tuple(ref_seq)], cand_seq,
+    #     [1/max_n_grams for _ in range(max_n_grams)],
+    #     smoothing_function=sf.method3
+#    )
+    return bleu([ref_seq], cand_seq)
+
 

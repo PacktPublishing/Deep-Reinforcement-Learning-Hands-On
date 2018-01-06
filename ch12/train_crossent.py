@@ -6,7 +6,7 @@ import logging
 import numpy as np
 from tensorboardX import SummaryWriter
 
-from libbots import data, model
+from libbots import data, model, utils
 
 import torch
 import torch.nn as nn
@@ -79,12 +79,13 @@ if __name__ == "__main__":
                 ref_indices = out_idx[idx][1:]
                 if random.random() < TEACHER_PROB:
                     r = net.decode_teacher(net.get_encoded_item(enc, idx), out_seq)
+                    bleu_sum += model.seq_bleu(r, ref_indices)
                 else:
-                    r, _ = net.decode_chain_argmax(embeddings, net.get_encoded_item(enc, idx),
-                                                   out_seq.data[0], len(ref_indices))
+                    r, seq = net.decode_chain_argmax(embeddings, net.get_encoded_item(enc, idx),
+                                                     out_seq.data[0], len(ref_indices))
+                    bleu_sum += utils.calc_bleu(seq, ref_indices)
                 net_results.append(r)
                 net_targets.extend(ref_indices)
-                bleu_sum += model.seq_bleu(r, ref_indices)
                 bleu_count += 1
             results_v = torch.cat(net_results)
             targets_v = Variable(torch.LongTensor(net_targets))

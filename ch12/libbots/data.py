@@ -138,4 +138,4 @@ def load_data(args, max_tokens=MAX_TOKENS):
 
 
 def decode_words(indices, rev_emb_dict):
-    return [rev_emb_dict.get(idx, UNKNOWN_TOKEN) for idx in indices]
+    return [rev_emb_dict[idx] for idx in indices]

@@ -5,7 +5,7 @@ import argparse
 import logging
 from tensorboardX import SummaryWriter
 
-from libbots import data, model
+from libbots import data, model, utils
 
 import torch
 import torch.nn as nn
@@ -96,11 +96,13 @@ if __name__ == "__main__":
                     ref_indices = out_idx[idx][1:]
                     item_enc = net.get_encoded_item(enc, idx)
                     r_argmax, actions = net.decode_chain_argmax(embeddings, item_enc, out_seq.data[0], len(ref_indices))
-                    argmax_bleu = model.seq_bleu(r_argmax, ref_indices)
-                    if argmax_bleu >= 0.99:
+
+                    # if perfect match, skip the sample
+                    if ref_indices == actions:
                         skipped_samples += 1
                         continue
 
+                    argmax_bleu = utils.calc_bleu(actions, ref_indices)
                     sum_argmax_bleu += argmax_bleu
                     cnt_argmax_bleu += 1
 
@@ -112,7 +114,7 @@ if __name__ == "__main__":
 
                     for _ in range(args.samples):
                         r_sample, actions = net.decode_chain_sampling(embeddings, item_enc, out_seq.data[0], len(ref_indices))
-                        sample_bleu = model.seq_bleu(r_sample, ref_indices)
+                        sample_bleu = utils.calc_bleu(actions, ref_indices)
 
                         if not dial_shown:
                             log.info("Sample: %s, bleu=%.4f", " ".join(data.decode_words(actions, rev_emb_dict)),
