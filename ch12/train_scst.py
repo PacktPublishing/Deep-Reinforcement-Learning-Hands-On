@@ -34,6 +34,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", action='store_true', default=False, help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     parser.add_argument("-l", "--load", required=True, help="Load model and continue in RL mode")
+    parser.add_argument("--samples", type=int, default=1, help="Count of samples in prob mode")
     args = parser.parse_args()
 
     saves_path = os.path.join(SAVES_DIR, args.name)
@@ -81,21 +82,27 @@ if __name__ == "__main__":
                 net_actions = []
                 net_advantages = []
                 sum_argmax_bleu = 0.0
+                cnt_argmax_bleu = 0
                 sum_sample_bleu = 0.0
+                cnt_sample_bleu = 0
 
                 for idx, out_seq in enumerate(out_seq_list):
                     ref_indices = out_idx[idx][1:]
                     item_enc = net.get_encoded_item(enc, idx)
                     r_argmax, _ = net.decode_chain_argmax(embeddings, item_enc, out_seq.data[0], len(ref_indices))
                     argmax_bleu = model.seq_bleu(r_argmax, ref_indices)
-                    r_sample, actions = net.decode_chain_sampling(embeddings, item_enc, out_seq.data[0], len(ref_indices))
-                    sample_bleu = model.seq_bleu(r_sample, ref_indices)
-
-                    net_policies.append(r_sample)
-                    net_actions.extend(actions)
-                    net_advantages.extend([sample_bleu - argmax_bleu] * len(actions))
                     sum_argmax_bleu += argmax_bleu
-                    sum_sample_bleu += sample_bleu
+                    cnt_argmax_bleu += 1
+
+                    for _ in range(args.samples):
+                        r_sample, actions = net.decode_chain_sampling(embeddings, item_enc, out_seq.data[0], len(ref_indices))
+                        sample_bleu = model.seq_bleu(r_sample, ref_indices)
+
+                        net_policies.append(r_sample)
+                        net_actions.extend(actions)
+                        net_advantages.extend([sample_bleu - argmax_bleu] * len(actions))
+                        sum_sample_bleu += sample_bleu
+                        cnt_sample_bleu += 1
 
                 policies_v = torch.cat(net_policies)
                 actions_t = torch.LongTensor(net_actions)
@@ -115,14 +122,14 @@ if __name__ == "__main__":
                 loss_v.backward()
                 optimiser.step()
 
-                tb_tracker.track("bleu_argmax", sum_argmax_bleu / len(out_seq_list), batch_idx)
-                tb_tracker.track("bleu_sample", sum_sample_bleu / len(out_seq_list), batch_idx)
+                tb_tracker.track("bleu_argmax", sum_argmax_bleu / cnt_argmax_bleu, batch_idx)
+                tb_tracker.track("bleu_sample", sum_sample_bleu / cnt_sample_bleu, batch_idx)
                 tb_tracker.track("advantage", adv_v, batch_idx)
                 # tb_tracker.track("loss_entropy", entropy_loss_v, batch_idx)
                 tb_tracker.track("loss_policy", loss_policy_v, batch_idx)
                 tb_tracker.track("loss_total", loss_v, batch_idx)
 
-                epoch_bleu += sum_sample_bleu / len(out_seq_list)
+                epoch_bleu += sum_sample_bleu / cnt_sample_bleu
                 epoch_bleu_count += 1
             log.info("Epoch %d: mean BLEU: %.3f", epoch, epoch_bleu / epoch_bleu_count)
 
