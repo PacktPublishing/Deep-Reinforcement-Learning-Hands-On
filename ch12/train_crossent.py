@@ -43,6 +43,7 @@ if __name__ == "__main__":
     log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(emb_dict))
     data.save_emb_dict(saves_path, emb_dict)
     data.extend_emb_dict(emb_dict)
+    end_token = emb_dict[data.END_TOKEN]
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
     log.info("Training data converted, got %d samples", len(train_data))
 
@@ -75,6 +76,7 @@ if __name__ == "__main__":
                 else:
                     r, seq = net.decode_chain_argmax(net.emb, net.get_encoded_item(enc, idx),
                                                      out_seq.data[0], len(ref_indices))
+                    seq = data.trim_tokens_seq(seq, end_token)
                     bleu_sum += utils.calc_bleu(seq, ref_indices)
                 net_results.append(r)
                 net_targets.extend(ref_indices)
