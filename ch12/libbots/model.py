@@ -39,7 +39,7 @@ class PhraseModel(nn.Module):
         out = self.output(out.data)
         return out
 
-    def decode_chain_argmax(self, embeddings, hid, begin_emb, seq_len):
+    def decode_chain_argmax(self, embeddings, hid, begin_emb, seq_len, stop_at_token=None):
         """
         Decode sequence by feeding predicted token to the net again. Act greedily
         """
@@ -56,10 +56,12 @@ class PhraseModel(nn.Module):
 
             res_logits.append(out_logits)
             res_tokens.append(out_token)
+            if stop_at_token is not None and out_token == stop_at_token:
+                break
         return torch.cat(res_logits), res_tokens
 
 
-    def decode_chain_sampling(self, embeddings, hid, begin_emb, seq_len):
+    def decode_chain_sampling(self, embeddings, hid, begin_emb, seq_len, stop_at_token=None):
         """
         Decode sequence by feeding predicted token to the net again. Act according to probabilities
         """
@@ -79,6 +81,8 @@ class PhraseModel(nn.Module):
 
             res_logits.append(out_logits)
             res_actions.append(action)
+            if stop_at_token is not None and action == stop_at_token:
+                break
         return torch.cat(res_logits), res_actions
 
 

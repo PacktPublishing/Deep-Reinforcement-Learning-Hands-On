@@ -75,8 +75,7 @@ if __name__ == "__main__":
                     bleu_sum += model.seq_bleu(r, ref_indices)
                 else:
                     r, seq = net.decode_chain_argmax(net.emb, net.get_encoded_item(enc, idx),
-                                                     out_seq.data[0], len(ref_indices))
-                    seq = data.trim_tokens_seq(seq, end_token)
+                                                     out_seq.data[0], 2*data.MAX_TOKENS, stop_at_token=end_token)
                     bleu_sum += utils.calc_bleu(seq, ref_indices)
                 net_results.append(r)
                 net_targets.extend(ref_indices)
