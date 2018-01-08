@@ -1,7 +1,10 @@
-from nltk.translate import bleu
+from nltk.translate import bleu_score
 
 
 def calc_bleu(cand_seq, ref_seq):
-    return bleu([ref_seq], cand_seq, emulate_multibleu=True)
+    sf = bleu_score.SmoothingFunction()
+    return bleu_score.sentence_bleu([ref_seq], cand_seq,
+                                    smoothing_function=sf.method1,
+                                    weights=(0.5, 0.5))
 
 
