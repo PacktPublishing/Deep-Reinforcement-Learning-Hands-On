@@ -4,7 +4,7 @@ import re
 import argparse
 import logging
 
-from libbots import data, model
+from libbots import data, model, utils
 
 import torch
 import torch.nn as nn
@@ -54,7 +54,6 @@ if __name__ == "__main__":
     parser.add_argument("--cornell", required=True, help="Use Cornell Movie Dialogues database could be "
                                                          "a category or empty string to load full data")
     parser.add_argument("-m", "--model", required=True, help="Model name to load")
-    parser.add_argument("-s", "--string", help="String to process, otherwise will loop")
     args = parser.parse_args()
 
     phrase_pairs, emb_dict = data.load_data(args)
@@ -66,6 +65,18 @@ if __name__ == "__main__":
     net = model.PhraseModel(emb_size=model.EMBEDDING_DIM, dict_size=len(emb_dict), hid_size=model.HIDDEN_STATE_SIZE)
     net.load_state_dict(torch.load(args.model))
 
+    end_token = emb_dict[data.END_TOKEN]
+
+    seq_count = 0
+    sum_bleu = 0.0
+
     for seq_1, seq_2 in train_data:
-        pass
-    pass
+        input_seq = model.pack_input(seq_1, net.emb)
+        enc = net.encode(input_seq)
+        _, tokens = net.decode_chain_argmax(net.emb, enc, input_seq.data[0], seq_len=20)
+        tokens = data.trim_tokens_seq(tokens, end_token)
+        bleu = utils.calc_bleu(tokens, seq_2[1:])
+        sum_bleu += bleu
+        seq_count += 1
+
+    log.info("Processed %d phrases, mean BLEU = %.4f", seq_count, sum_bleu / seq_count)

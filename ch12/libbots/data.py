@@ -157,3 +157,12 @@ def extend_emb_dict(emb_dict):
     for token in [UNKNOWN_TOKEN, BEGIN_TOKEN, END_TOKEN]:
         emb_dict[token] = next_id
         next_id += 1
+
+
+def trim_tokens_seq(tokens, end_token):
+    res = []
+    for t in tokens:
+        res.append(t)
+        if t == end_token:
+            break
+    return res
