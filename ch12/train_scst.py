@@ -44,6 +44,7 @@ if __name__ == "__main__":
     log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(emb_dict))
     data.save_emb_dict(saves_path, emb_dict)
     data.extend_emb_dict(emb_dict)
+    end_token = emb_dict[data.END_TOKEN]
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
     log.info("Training data converted, got %d samples", len(train_data))
 
@@ -78,8 +79,6 @@ if __name__ == "__main__":
                 net_policies = []
                 net_actions = []
                 net_advantages = []
-                sum_bleu = 0.0
-                cnt_bleu = 0
                 sum_argmax_bleu = 0.0
                 cnt_argmax_bleu = 0
                 sum_sample_bleu = 0.0
@@ -89,20 +88,17 @@ if __name__ == "__main__":
                     total_samples += 1
                     ref_indices = out_idx[idx][1:]
                     item_enc = net.get_encoded_item(enc, idx)
-                    r_argmax, actions = net.decode_chain_argmax(net.emb, item_enc, out_seq.data[0], len(ref_indices))
+                    r_argmax, actions = net.decode_chain_argmax(net.emb, item_enc, out_seq.data[0], data.MAX_TOKENS * 2)
+                    actions = data.trim_tokens_seq(actions, end_token)
 
                     # if perfect match, skip the sample
                     if ref_indices == actions:
                         skipped_samples += 1
-                        sum_bleu += 1.0
-                        cnt_bleu += 1
                         continue
 
                     argmax_bleu = utils.calc_bleu(actions, ref_indices)
                     sum_argmax_bleu += argmax_bleu
                     cnt_argmax_bleu += 1
-                    sum_bleu += argmax_bleu
-                    cnt_bleu += 1
 
                     if not dial_shown:
                         log.info("Input: %s", " ".join(data.decode_words(inp_idx[idx], rev_emb_dict)))
@@ -111,14 +107,15 @@ if __name__ == "__main__":
                                  argmax_bleu)
 
                     for _ in range(args.samples):
-                        r_sample, actions = net.decode_chain_sampling(net.emb, item_enc, out_seq.data[0], len(ref_indices))
+                        r_sample, actions = net.decode_chain_sampling(net.emb, item_enc, out_seq.data[0], data.MAX_TOKENS * 2)
+                        actions = data.trim_tokens_seq(actions, end_token)
                         sample_bleu = utils.calc_bleu(actions, ref_indices)
 
                         if not dial_shown:
                             log.info("Sample: %s, bleu=%.4f", " ".join(data.decode_words(actions, rev_emb_dict)),
                                      sample_bleu)
 
-                        net_policies.append(r_sample)
+                        net_policies.append(r_sample[:len(actions)])
                         net_actions.extend(actions)
                         net_advantages.extend([sample_bleu - argmax_bleu] * len(actions))
                         sum_sample_bleu += sample_bleu
@@ -147,7 +144,7 @@ if __name__ == "__main__":
                 loss_v.backward()
                 optimiser.step()
 
-                tb_tracker.track("bleu", sum_bleu / cnt_bleu, batch_idx)
+                tb_tracker.track("bleu", (sum_argmax_bleu + skipped_samples) / (cnt_argmax_bleu + skipped_samples), batch_idx)
                 tb_tracker.track("bleu_argmax", sum_argmax_bleu / cnt_argmax_bleu, batch_idx)
                 tb_tracker.track("bleu_sample", sum_sample_bleu / cnt_sample_bleu, batch_idx)
                 tb_tracker.track("advantage", adv_v, batch_idx)
