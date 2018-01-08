@@ -3,6 +3,7 @@ import os
 import random
 import argparse
 import logging
+import numpy as np
 from tensorboardX import SummaryWriter
 
 from libbots import data, model, utils
@@ -66,6 +67,11 @@ if __name__ == "__main__":
             random.shuffle(train_data)
             dial_shown = False
 
+            total_samples = 0
+            skipped_samples = 0
+            bleus_argmax = []
+            bleus_sample = []
+
             for batch in data.iterate_batches(train_data, BATCH_SIZE):
                 batch_idx += 1
                 optimiser.zero_grad()
@@ -75,12 +81,6 @@ if __name__ == "__main__":
                 net_policies = []
                 net_actions = []
                 net_advantages = []
-                sum_argmax_bleu = 0.0
-                cnt_argmax_bleu = 0
-                sum_sample_bleu = 0.0
-                cnt_sample_bleu = 0
-                total_samples = 0
-                skipped_samples = 0
 
                 for idx, out_seq in enumerate(out_seq_list):
                     total_samples += 1
@@ -94,8 +94,7 @@ if __name__ == "__main__":
                         continue
 
                     argmax_bleu = utils.calc_bleu(actions, ref_indices)
-                    sum_argmax_bleu += argmax_bleu
-                    cnt_argmax_bleu += 1
+                    bleus_argmax.append(argmax_bleu)
 
                     if not dial_shown:
                         log.info("Input: %s", " ".join(data.decode_words(inp_idx[idx], rev_emb_dict)))
@@ -115,11 +114,9 @@ if __name__ == "__main__":
                         net_policies.append(r_sample)
                         net_actions.extend(actions)
                         net_advantages.extend([sample_bleu - argmax_bleu] * len(actions))
-                        sum_sample_bleu += sample_bleu
-                        cnt_sample_bleu += 1
+                        bleus_sample.append(sample_bleu)
                     dial_shown = True
 
-                tb_tracker.track("skipped_samples", skipped_samples / total_samples, batch_idx)
                 if not net_policies:
                     continue
 
@@ -134,20 +131,19 @@ if __name__ == "__main__":
                 log_prob_actions_v = adv_v * log_prob_v[range(len(net_actions)), actions_t]
                 loss_policy_v = -log_prob_actions_v.mean()
 
-                # prob_v = F.softmax(policies_v)
-                # entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
-                # loss_v = entropy_loss_v + loss_policy_v
                 loss_v = loss_policy_v
                 loss_v.backward()
                 optimiser.step()
 
-                tb_tracker.track("bleu", (sum_argmax_bleu + skipped_samples) / total_samples, batch_idx)
-                tb_tracker.track("bleu_argmax", sum_argmax_bleu / cnt_argmax_bleu, batch_idx)
-                tb_tracker.track("bleu_sample", sum_sample_bleu / cnt_sample_bleu, batch_idx)
                 tb_tracker.track("advantage", adv_v, batch_idx)
-                # tb_tracker.track("loss_entropy", entropy_loss_v, batch_idx)
                 tb_tracker.track("loss_policy", loss_policy_v, batch_idx)
                 tb_tracker.track("loss_total", loss_v, batch_idx)
+
+            writer.add_scalar("bleu", np.mean(bleus_argmax + [1.0] * skipped_samples), batch_idx)
+            writer.add_scalar("bleu_argmax", np.mean(bleus_argmax), batch_idx)
+            writer.add_scalar("bleu_sample", np.mean(bleus_sample), batch_idx)
+            writer.add_scalar("skipped_samples", skipped_samples / total_samples, batch_idx)
+            writer.add_scalar("epoch", batch_idx, epoch)
             log.info("Epoch %d", epoch)
 
     writer.close()
