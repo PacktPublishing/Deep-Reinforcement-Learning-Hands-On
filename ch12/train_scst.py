@@ -20,7 +20,7 @@ DEFAULT_FILE = "data/OpenSubtitles/en/Crime/1994/60_101020_138057_pulp_fiction.x
 SAVES_DIR = "saves"
 
 BATCH_SIZE = 64
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 1e-5
 MAX_EPOCHES = 10000
 
 log = logging.getLogger("train")
@@ -63,6 +63,7 @@ if __name__ == "__main__":
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
         optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
         batch_idx = 0
+        best_bleu = None
         for epoch in range(MAX_EPOCHES):
             random.shuffle(train_data)
             dial_shown = False
@@ -139,11 +140,16 @@ if __name__ == "__main__":
                 tb_tracker.track("loss_policy", loss_policy_v, batch_idx)
                 tb_tracker.track("loss_total", loss_v, batch_idx)
 
-            writer.add_scalar("bleu", np.mean(bleus_argmax + [1.0] * skipped_samples), batch_idx)
+            bleu = np.mean(bleus_argmax + [1.0] * skipped_samples)
+            writer.add_scalar("bleu", bleu, batch_idx)
             writer.add_scalar("bleu_argmax", np.mean(bleus_argmax), batch_idx)
             writer.add_scalar("bleu_sample", np.mean(bleus_sample), batch_idx)
             writer.add_scalar("skipped_samples", skipped_samples / total_samples, batch_idx)
             writer.add_scalar("epoch", batch_idx, epoch)
             log.info("Epoch %d", epoch)
+            if best_bleu is None or best_bleu < bleu:
+                best_bleu = bleu
+                log.info("Best bleu updated: %.4f", bleu)
+                torch.save(net.state_dict(), os.path.join(saves_path, "bleu_%.3f_%02d.dat" % (bleu, epoch)))
 
     writer.close()
