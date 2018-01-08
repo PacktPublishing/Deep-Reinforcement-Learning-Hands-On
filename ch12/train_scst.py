@@ -89,13 +89,12 @@ if __name__ == "__main__":
                     item_enc = net.get_encoded_item(enc, idx)
                     r_argmax, actions = net.decode_chain_argmax(net.emb, item_enc, out_seq.data[0],
                                                                 data.MAX_TOKENS*2, stop_at_token=end_token)
-                    # if perfect match, skip the sample
-                    if ref_indices == actions:
-                        skipped_samples += 1
-                        continue
-
                     argmax_bleu = utils.calc_bleu(actions, ref_indices)
                     bleus_argmax.append(argmax_bleu)
+
+                    if argmax_bleu > 0.99:
+                        skipped_samples += 1
+                        continue
 
                     if not dial_shown:
                         log.info("Input: %s", " ".join(data.decode_words(inp_idx[idx], rev_emb_dict)))
@@ -140,9 +139,8 @@ if __name__ == "__main__":
                 tb_tracker.track("loss_policy", loss_policy_v, batch_idx)
                 tb_tracker.track("loss_total", loss_v, batch_idx)
 
-            bleu = np.mean(bleus_argmax + [1.0] * skipped_samples)
-            writer.add_scalar("bleu", bleu, batch_idx)
-            writer.add_scalar("bleu_argmax", np.mean(bleus_argmax), batch_idx)
+            bleu = np.mean(bleus_argmax)
+            writer.add_scalar("bleu_argmax", bleu, batch_idx)
             writer.add_scalar("bleu_sample", np.mean(bleus_sample), batch_idx)
             writer.add_scalar("skipped_samples", skipped_samples / total_samples, batch_idx)
             writer.add_scalar("epoch", batch_idx, epoch)
