@@ -66,7 +66,6 @@ if __name__ == "__main__":
     beg_token = Variable(torch.LongTensor([emb_dict[data.BEGIN_TOKEN]]))
     if args.cuda:
         beg_token = beg_token.cuda()
-    beg_embedding = net.emb(beg_token)
 
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
         optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
@@ -90,6 +89,7 @@ if __name__ == "__main__":
                 net_policies = []
                 net_actions = []
                 net_advantages = []
+                beg_embedding = net.emb(beg_token)
 
                 for idx, inp_idx in enumerate(input_batch):
                     total_samples += 1
