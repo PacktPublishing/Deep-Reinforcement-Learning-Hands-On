@@ -60,6 +60,7 @@ if __name__ == "__main__":
     data.extend_emb_dict(emb_dict)
     log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(emb_dict))
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
+    train_data = data.group_train_data(train_data)
     rev_emb_dict = {idx: word for word, idx in emb_dict.items()}
 
     net = model.PhraseModel(emb_size=model.EMBEDDING_DIM, dict_size=len(emb_dict), hid_size=model.HIDDEN_STATE_SIZE)
@@ -70,12 +71,13 @@ if __name__ == "__main__":
     seq_count = 0
     sum_bleu = 0.0
 
-    for seq_1, seq_2 in train_data:
+    for seq_1, targets in train_data:
         input_seq = model.pack_input(seq_1, net.emb)
         enc = net.encode(input_seq)
         _, tokens = net.decode_chain_argmax(net.emb, enc, input_seq.data[0:1],
                                             seq_len=data.MAX_TOKENS, stop_at_token=end_token)
-        bleu = utils.calc_bleu(tokens, seq_2[1:])
+        references = [seq[1:] for seq in targets]
+        bleu = utils.calc_bleu_many(tokens, references)
         sum_bleu += bleu
         seq_count += 1
 

@@ -19,7 +19,7 @@ import ptan
 DEFAULT_FILE = "data/OpenSubtitles/en/Crime/1994/60_101020_138057_pulp_fiction.xml.gz"
 SAVES_DIR = "saves"
 
-BATCH_SIZE = 64
+BATCH_SIZE = 32
 LEARNING_RATE = 1e-5
 MAX_EPOCHES = 10000
 
@@ -99,7 +99,7 @@ if __name__ == "__main__":
                     ]
                     item_enc = net.get_encoded_item(enc, idx)
                     r_argmax, actions = net.decode_chain_argmax(net.emb, item_enc, beg_embedding,
-                                                                data.MAX_TOKENS*2, stop_at_token=end_token)
+                                                                data.MAX_TOKENS, stop_at_token=end_token)
                     argmax_bleu = utils.calc_bleu_many(actions, ref_indices)
                     bleus_argmax.append(argmax_bleu)
 
@@ -116,7 +116,7 @@ if __name__ == "__main__":
 
                     for _ in range(args.samples):
                         r_sample, actions = net.decode_chain_sampling(net.emb, item_enc, beg_embedding,
-                                                                      data.MAX_TOKENS*2, stop_at_token=end_token)
+                                                                      data.MAX_TOKENS, stop_at_token=end_token)
                         sample_bleu = utils.calc_bleu_many(actions, ref_indices)
 
                         if not dial_shown:
