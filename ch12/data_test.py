@@ -73,7 +73,8 @@ if __name__ == "__main__":
     for seq_1, seq_2 in train_data:
         input_seq = model.pack_input(seq_1, net.emb)
         enc = net.encode(input_seq)
-        _, tokens = net.decode_chain_argmax(net.emb, enc, input_seq.data[0], seq_len=data.MAX_TOKENS, end_token=end_token)
+        _, tokens = net.decode_chain_argmax(net.emb, enc, input_seq.data[0:1],
+                                            seq_len=data.MAX_TOKENS, stop_at_token=end_token)
         bleu = utils.calc_bleu(tokens, seq_2[1:])
         sum_bleu += bleu
         seq_count += 1
