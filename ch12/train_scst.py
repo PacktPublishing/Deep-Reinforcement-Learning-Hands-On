@@ -19,7 +19,7 @@ import ptan
 DEFAULT_FILE = "data/OpenSubtitles/en/Crime/1994/60_101020_138057_pulp_fiction.xml.gz"
 SAVES_DIR = "saves"
 
-BATCH_SIZE = 32
+BATCH_SIZE = 64
 LEARNING_RATE = 1e-5
 MAX_EPOCHES = 10000
 
@@ -48,6 +48,8 @@ if __name__ == "__main__":
     end_token = emb_dict[data.END_TOKEN]
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
     log.info("Training data converted, got %d samples", len(train_data))
+    train_data = data.group_train_data(train_data)
+    log.info("After grouping, got %d samples", len(train_data))
 
     rev_emb_dict = {idx: word for word, idx in emb_dict.items()}
 
@@ -59,6 +61,12 @@ if __name__ == "__main__":
     writer = SummaryWriter(comment="-" + args.name)
     net.load_state_dict(torch.load(args.load))
     log.info("Model loaded from %s, continue training in RL mode...", args.load)
+
+    # get embedding for BEGIN token
+    beg_token = Variable(torch.LongTensor([emb_dict[data.BEGIN_TOKEN]]))
+    if args.cuda:
+        beg_token = beg_token.cuda()
+    beg_embedding = net.emb(beg_token)
 
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
         optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
@@ -76,20 +84,23 @@ if __name__ == "__main__":
             for batch in data.iterate_batches(train_data, BATCH_SIZE):
                 batch_idx += 1
                 optimiser.zero_grad()
-                input_seq, out_seq_list, inp_idx, out_idx = model.pack_batch(batch, net.emb, cuda=args.cuda)
+                input_seq, input_batch, output_batch = model.pack_batch_no_out(batch, net.emb, cuda=args.cuda)
                 enc = net.encode(input_seq)
 
                 net_policies = []
                 net_actions = []
                 net_advantages = []
 
-                for idx, out_seq in enumerate(out_seq_list):
+                for idx, inp_idx in enumerate(input_batch):
                     total_samples += 1
-                    ref_indices = out_idx[idx][1:]
+                    ref_indices = [
+                        indices[1:]
+                        for indices in output_batch[idx]
+                    ]
                     item_enc = net.get_encoded_item(enc, idx)
-                    r_argmax, actions = net.decode_chain_argmax(net.emb, item_enc, out_seq.data[0],
+                    r_argmax, actions = net.decode_chain_argmax(net.emb, item_enc, beg_embedding,
                                                                 data.MAX_TOKENS*2, stop_at_token=end_token)
-                    argmax_bleu = utils.calc_bleu(actions, ref_indices)
+                    argmax_bleu = utils.calc_bleu_many(actions, ref_indices)
                     bleus_argmax.append(argmax_bleu)
 
                     if argmax_bleu > 0.99:
@@ -97,15 +108,16 @@ if __name__ == "__main__":
                         continue
 
                     if not dial_shown:
-                        log.info("Input: %s", " ".join(data.decode_words(inp_idx[idx], rev_emb_dict)))
-                        log.info("Refer: %s", " ".join(data.decode_words(ref_indices, rev_emb_dict)))
+                        log.info("Input: %s", " ".join(data.decode_words(inp_idx, rev_emb_dict)))
+                        ref_words = [" ".join(data.decode_words(ref, rev_emb_dict)) for ref in ref_indices]
+                        log.info("Refer: %s", " ~~|~~ ".join(ref_words))
                         log.info("Argmax: %s, bleu=%.4f", " ".join(data.decode_words(actions, rev_emb_dict)),
                                  argmax_bleu)
 
                     for _ in range(args.samples):
-                        r_sample, actions = net.decode_chain_sampling(net.emb, item_enc, out_seq.data[0],
+                        r_sample, actions = net.decode_chain_sampling(net.emb, item_enc, beg_embedding,
                                                                       data.MAX_TOKENS*2, stop_at_token=end_token)
-                        sample_bleu = utils.calc_bleu(actions, ref_indices)
+                        sample_bleu = utils.calc_bleu_many(actions, ref_indices)
 
                         if not dial_shown:
                             log.info("Sample: %s, bleu=%.4f", " ".join(data.decode_words(actions, rev_emb_dict)),

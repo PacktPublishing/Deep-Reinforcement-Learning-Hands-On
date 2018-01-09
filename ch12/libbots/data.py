@@ -110,6 +110,19 @@ def encode_phrase_pairs(phrase_pairs, emb_dict):
     return result
 
 
+def group_train_data(training_data):
+    """
+    Group training pairs by first phrase
+    :param training_data: list of (seq1, seq2) pairs
+    :return: list of (seq1, [seq*]) pairs
+    """
+    groups = collections.defaultdict(list)
+    for p1, p2 in training_data:
+        l = groups[tuple(p1)]
+        l.append(p2)
+    return list(groups.items())
+
+
 def iterate_batches(data, batch_size):
     assert isinstance(data, list)
     assert isinstance(batch_size, int)

@@ -45,7 +45,7 @@ class PhraseModel(nn.Module):
         """
         res_logits = []
         res_tokens = []
-        cur_emb = begin_emb.unsqueeze(0)
+        cur_emb = begin_emb
 
         for _ in range(seq_len):
             out_logits, hid = self.decode_one(hid, cur_emb)
@@ -67,7 +67,7 @@ class PhraseModel(nn.Module):
         """
         res_logits = []
         res_actions = []
-        cur_emb = begin_emb.unsqueeze(0)
+        cur_emb = begin_emb
 
         for _ in range(seq_len):
             out_logits, hid = self.decode_one(hid, cur_emb)
@@ -93,6 +93,22 @@ class PhraseModel(nn.Module):
 
 
 def pack_batch(batch, embeddings, cuda=False):
+    emb_input_seq, input_idx, output_idx = pack_batch_no_out(batch, embeddings, cuda)
+
+    # prepare output sequences, with end token stripped
+    output_seq_list = []
+    for out in output_idx:
+        seq = out[:-1]
+        out_v = Variable(torch.LongTensor([seq]))
+        if cuda:
+            out_v = out_v.cuda()
+        emb_out_v = embeddings(out_v)
+        out_seq = rnn_utils.pack_padded_sequence(emb_out_v, [len(seq)], batch_first=True)
+        output_seq_list.append(out_seq)
+    return emb_input_seq, output_seq_list, input_idx, output_idx
+
+
+def pack_batch_no_out(batch, embeddings, cuda=False):
     assert isinstance(batch, list)
     # Sort descending (CuDNN requirements)
     batch.sort(key=lambda s: len(s[0]), reverse=True)
@@ -109,18 +125,7 @@ def pack_batch(batch, embeddings, cuda=False):
     # lookup embeddings
     r = embeddings(input_seq.data)
     emb_input_seq = rnn_utils.PackedSequence(data=r, batch_sizes=input_seq.batch_sizes)
-
-    # prepare output sequences, with end token stripped
-    output_seq_list = []
-    for out in output_idx:
-        seq = out[:-1]
-        out_v = Variable(torch.LongTensor([seq]))
-        if cuda:
-            out_v = out_v.cuda()
-        emb_out_v = embeddings(out_v)
-        out_seq = rnn_utils.pack_padded_sequence(emb_out_v, [len(seq)], batch_first=True)
-        output_seq_list.append(out_seq)
-    return emb_input_seq, output_seq_list, input_idx, output_idx
+    return emb_input_seq, input_idx, output_idx
 
 
 def pack_input(input_data, embeddings):
