@@ -126,8 +126,10 @@ def pack_batch_no_out(batch, embeddings, cuda=False):
     return emb_input_seq, input_idx, output_idx
 
 
-def pack_input(input_data, embeddings):
+def pack_input(input_data, embeddings, cuda=False):
     input_v = Variable(torch.LongTensor([input_data]))
+    if cuda:
+        input_v = input_v.cuda()
     input_seq = rnn_utils.pack_padded_sequence(input_v, [len(input_data)], batch_first=True)
     r = embeddings(input_seq.data)
     emb_input_seq = rnn_utils.PackedSequence(data=r, batch_sizes=input_seq.batch_sizes)
