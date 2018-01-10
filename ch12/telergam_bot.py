@@ -55,7 +55,7 @@ if __name__ == "__main__":
         seq_1 = data.encode_words(words, emb_dict)
         input_seq = model.pack_input(seq_1, net.emb)
         enc = net.encode(input_seq)
-        _, tokens = net.decode_chain_argmax(net.emb, enc, input_seq.data[0],
+        _, tokens = net.decode_chain_argmax(net.emb, enc, input_seq.data[0:1],
                                             seq_len=data.MAX_TOKENS, stop_at_token=end_token)
         if tokens[-1] == end_token:
             tokens = tokens[:-1]
@@ -66,6 +66,7 @@ if __name__ == "__main__":
     updater = telegram.ext.Updater(conf['telegram']['api'])
     updater.dispatcher.add_handler(telegram.ext.CommandHandler('bot', bot_func, pass_args=True))
 
+    log.info("Bot initialized, started serving")
     updater.start_polling()
     updater.idle()
 
