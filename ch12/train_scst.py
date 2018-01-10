@@ -62,11 +62,10 @@ if __name__ == "__main__":
     end_token = emb_dict[data.END_TOKEN]
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
     log.info("Training data converted, got %d samples", len(train_data))
+    train_data = data.group_train_data(train_data)
+    random.shuffle(train_data)
     train_data, test_data = data.split_train_test(train_data)
     log.info("Train set has %d phrases, test %d", len(train_data), len(test_data))
-    train_data = data.group_train_data(train_data)
-    test_data = data.group_train_data(test_data)
-    log.info("After grouping, got %d samples in train, %d in test", len(train_data), len(test_data))
 
     rev_emb_dict = {idx: word for word, idx in emb_dict.items()}
 
