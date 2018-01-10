@@ -2,12 +2,11 @@ import collections
 import os
 import sys
 import logging
-import numpy as np
+import itertools
 import pickle
 
-from . import cornell, subtitles
+from . import cornell
 
-EMBEDDINGS_FILE = "data/glove.6B.100d.txt"
 UNKNOWN_TOKEN = '#UNK'
 BEGIN_TOKEN = "#BEG"
 END_TOKEN = "#END"
@@ -25,54 +24,9 @@ EMB_EXTRA = {
 log = logging.getLogger("data")
 
 
-def read_embeddings(word_set=None, file_name=EMBEDDINGS_FILE):
-    """
-    Read embeddings from text file: http://nlp.stanford.edu/data/glove.6B.zip
-    :param word_set: set used to filter embeddings' dictionary
-    :param file_name:
-    :return: tuple with (dict word->id mapping, numpy matrix with embeddings)
-    """
-    log.info("Reading embeddings from %s", file_name)
-    weights = []
-    words = {}
-    with open(file_name, "rt", encoding='utf-8') as fd:
-        idx = 0
-        for l in fd:
-            v = l.split(' ')
-            word, vec = v[0], list(map(float, v[1:]))
-            if word_set is not None and word not in word_set:
-                continue
-            words[word] = idx
-            # extra dim for our tokens
-            vec.append(0.0)
-            weights.append(vec)
-            idx += 1
-    for token, val in sorted(EMB_EXTRA.items()):
-        words[token] = len(words)
-        vec = [0.0]*(len(weights[0])-1)
-        vec.append(val)
-        weights.append(vec)
-    emb = np.array(weights, dtype=np.float32)
-    log.info("Embeddings loaded, shape=%s", emb.shape)
-    return words, emb
-
-
 def save_emb_dict(dir_name, emb_dict):
     with open(os.path.join(dir_name, EMB_DICT_NAME), "wb") as fd:
         pickle.dump(emb_dict, fd)
-
-
-def save_embeddings(dir_name, emb_dict, emb):
-    with open(os.path.join(dir_name, EMB_DICT_NAME), "wb") as fd:
-        pickle.dump(emb_dict, fd)
-    np.save(os.path.join(dir_name, EMB_NAME), emb)
-
-
-def load_embeddings(dir_name):
-    with open(os.path.join(dir_name, EMB_DICT_NAME), "rb") as fd:
-        emb_dict = pickle.load(fd)
-    emb = np.load(os.path.join(dir_name, EMB_NAME))
-    return emb_dict, emb
 
 
 def load_emb_dict(dir_name):
@@ -105,7 +59,7 @@ def encode_phrase_pairs(phrase_pairs, emb_dict):
     """
     result = []
     for p1, p2 in phrase_pairs:
-        p = encode_words(p1.words, emb_dict), encode_words(p2.words, emb_dict)
+        p = encode_words(p1, emb_dict), encode_words(p2, emb_dict)
         result.append(p)
     return result
 
@@ -136,28 +90,50 @@ def iterate_batches(data, batch_size):
         ofs += 1
 
 
-Phrase = collections.namedtuple("Phrase", field_names=('words', 'time_start', 'time_stop'))
-
-
 def load_data(args, max_tokens=MAX_TOKENS):
-    if args.cornell is not None:
-        dialogues = cornell.load_dialogues(genre_filter=args.cornell)
-    else:
-        if args.data.endswith(".xml.gz"):
-            dialogues = subtitles.read_file(args.data)
-        elif len(args.data) == 0:
-            dialogues = subtitles.read_dir(subtitles.DATA_DIR)
-        else:
-            data_path = os.path.join(subtitles.DATA_DIR, args.data)
-            dialogues = subtitles.read_dir(data_path)
+    dialogues = cornell.load_dialogues(genre_filter=args.data)
     if not dialogues:
         log.error("No dialogues found, exit!")
         sys.exit()
     log.info("Loaded %d dialogues with %d phrases, generating training pairs",
              len(dialogues), sum(map(len, dialogues)))
-    phrase_pairs = subtitles.dialogues_to_pairs(dialogues, max_tokens=max_tokens)
-    phrase_pairs_dict = subtitles.phrase_pairs_dict(phrase_pairs)
-    return phrase_pairs, phrase_pairs_dict
+    phrase_pairs = dialogues_to_pairs(dialogues, max_tokens=max_tokens)
+    phrase_dict = phrase_pairs_dict(phrase_pairs)
+    return phrase_pairs, phrase_dict
+
+
+def phrase_pairs_dict(phrase_pairs):
+    """
+    Return the dict of words in the dialogues mapped to their IDs
+    :param phrase_pairs: list of (phrase, phrase) pairs
+    :return: dict
+    """
+    next_id = 0
+    res = {}
+    for p1, p2 in phrase_pairs:
+        for w in map(str.lower, itertools.chain(p1, p2)):
+            if w not in res:
+                res[w] = next_id
+                next_id += 1
+    return res
+
+
+def dialogues_to_pairs(dialogues, max_tokens=None):
+    """
+    Convert dialogues to training pairs of phrases
+    :param dialogues:
+    :param max_tokens: limit of tokens in both question and reply
+    :return: list of (phrase, phrase) pairs
+    """
+    result = []
+    for dial in dialogues:
+        prev_phrase = None
+        for phrase in dial:
+            if prev_phrase is not None:
+                if max_tokens is None or (len(prev_phrase) <= max_tokens and len(phrase) <= max_tokens):
+                    result.append((prev_phrase, phrase))
+            prev_phrase = phrase
+    return result
 
 
 def decode_words(indices, rev_emb_dict):

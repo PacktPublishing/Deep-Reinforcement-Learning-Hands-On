@@ -60,7 +60,6 @@ class PhraseModel(nn.Module):
                 break
         return torch.cat(res_logits), res_tokens
 
-
     def decode_chain_sampling(self, embeddings, hid, begin_emb, seq_len, stop_at_token=None):
         """
         Decode sequence by feeding predicted token to the net again. Act according to probabilities
@@ -84,7 +83,6 @@ class PhraseModel(nn.Module):
             if stop_at_token is not None and action == stop_at_token:
                 break
         return torch.cat(res_logits), res_actions
-
 
     def decode_one(self, hid, input_x):
         out, new_hid = self.decoder(input_x.unsqueeze(0), hid)

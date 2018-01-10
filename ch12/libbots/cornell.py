@@ -5,7 +5,6 @@ https://www.cs.cornell.edu/~cristian/Cornell_Movie-Dialogs_Corpus.html
 import os
 import logging
 
-from . import data
 from nltk.tokenize import TweetTokenizer
 
 
@@ -17,7 +16,7 @@ SEPARATOR = "+++$+++"
 def load_dialogues(data_dir=DATA_DIR, genre_filter=''):
     """
     Load dialogues from cornell data
-    :return: list of list of data.Phrases
+    :return: list of list of list of words
     """
     movie_set = None
     if genre_filter:
@@ -53,8 +52,7 @@ def read_phrases(data_dir, movies=None):
         l_id, m_id, l_str = parts[0], parts[2], parts[4]
         if movies and m_id not in movies:
             continue
-        tokens = tokeniser.tokenize(l_str)
-        res[l_id] = data.Phrase(words=tokens, time_start=None, time_stop=None)
+        res[l_id] = tokeniser.tokenize(l_str)
     return res
 
 

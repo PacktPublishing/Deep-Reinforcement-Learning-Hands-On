@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import os
 import re
 import argparse
 import logging
@@ -7,7 +6,6 @@ import logging
 from libbots import data, model, utils
 
 import torch
-import torch.nn as nn
 
 log = logging.getLogger("use")
 
