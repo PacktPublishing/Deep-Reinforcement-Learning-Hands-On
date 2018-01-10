@@ -9,7 +9,6 @@ from tensorboardX import SummaryWriter
 from libbots import data, model, utils
 
 import torch
-import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
@@ -29,9 +28,7 @@ log = logging.getLogger("train")
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)-15s %(levelname)s %(message)s", level=logging.INFO)
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cornell", help="Use Cornell Movie Dialogues database could be "
-                                          "a category or empty string to load full data")
-    parser.add_argument("--data", default=DEFAULT_FILE, help="Could be file name to load or category dir")
+    parser.add_argument("--data", required=True, help="Category to use for training. Empty string to train on full dataset")
     parser.add_argument("--cuda", action='store_true', default=False, help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     parser.add_argument("-l", "--load", required=True, help="Load model and continue in RL mode")
@@ -41,7 +38,7 @@ if __name__ == "__main__":
     saves_path = os.path.join(SAVES_DIR, args.name)
     os.makedirs(saves_path, exist_ok=True)
 
-    phrase_pairs, emb_dict = data.load_data(args)
+    phrase_pairs, emb_dict = data.load_data(genre_filter=args.data)
     log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(emb_dict))
     data.save_emb_dict(saves_path, emb_dict)
     data.extend_emb_dict(emb_dict)
@@ -62,7 +59,7 @@ if __name__ == "__main__":
     net.load_state_dict(torch.load(args.load))
     log.info("Model loaded from %s, continue training in RL mode...", args.load)
 
-    # get embedding for BEGIN token
+    # BEGIN token
     beg_token = Variable(torch.LongTensor([emb_dict[data.BEGIN_TOKEN]]))
     if args.cuda:
         beg_token = beg_token.cuda()

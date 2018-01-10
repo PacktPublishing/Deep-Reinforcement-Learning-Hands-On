@@ -90,8 +90,8 @@ def iterate_batches(data, batch_size):
         ofs += 1
 
 
-def load_data(args, max_tokens=MAX_TOKENS):
-    dialogues = cornell.load_dialogues(genre_filter=args.data)
+def load_data(genre_filter, max_tokens=MAX_TOKENS):
+    dialogues = cornell.load_dialogues(genre_filter=genre_filter)
     if not dialogues:
         log.error("No dialogues found, exit!")
         sys.exit()

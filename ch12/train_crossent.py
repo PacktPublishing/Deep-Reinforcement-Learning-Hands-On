@@ -36,7 +36,7 @@ if __name__ == "__main__":
     saves_path = os.path.join(SAVES_DIR, args.name)
     os.makedirs(saves_path, exist_ok=True)
 
-    phrase_pairs, emb_dict = data.load_data(args)
+    phrase_pairs, emb_dict = data.load_data(genre_filter=args.data)
     log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(emb_dict))
     data.save_emb_dict(saves_path, emb_dict)
     data.extend_emb_dict(emb_dict)
