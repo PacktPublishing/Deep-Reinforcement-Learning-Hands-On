@@ -157,6 +157,6 @@ def trim_tokens_seq(tokens, end_token):
     return res
 
 
-def split_train_test(data, train_ratio=0.8):
+def split_train_test(data, train_ratio=0.95):
     count = int(len(data) * train_ratio)
     return data[:count], data[count:]
