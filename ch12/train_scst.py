@@ -25,6 +25,23 @@ MAX_EPOCHES = 10000
 log = logging.getLogger("train")
 
 
+def run_test(test_data, net, end_token, cuda=False):
+    bleu_sum = 0.0
+    bleu_count = 0
+    for p1, p2 in test_data:
+        input_seq = model.pack_input(p1, net.emb, cuda)
+        enc = net.encode(input_seq)
+        _, tokens = net.decode_chain_argmax(net.emb, enc, input_seq.data[0:1],
+                                            seq_len=data.MAX_TOKENS, stop_at_token=end_token)
+        ref_indices = [
+            indices[1:]
+            for indices in p2
+        ]
+        bleu_sum += utils.calc_bleu_many(tokens, ref_indices)
+        bleu_count += 1
+    return bleu_sum / bleu_count
+
+
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)-15s %(levelname)s %(message)s", level=logging.INFO)
     parser = argparse.ArgumentParser()
@@ -45,8 +62,11 @@ if __name__ == "__main__":
     end_token = emb_dict[data.END_TOKEN]
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
     log.info("Training data converted, got %d samples", len(train_data))
+    train_data, test_data = data.split_train_test(train_data)
+    log.info("Train set has %d phrases, test %d", len(train_data), len(test_data))
     train_data = data.group_train_data(train_data)
-    log.info("After grouping, got %d samples", len(train_data))
+    test_data = data.group_train_data(test_data)
+    log.info("After grouping, got %d samples in train, %d in test", len(train_data), len(test_data))
 
     rev_emb_dict = {idx: word for word, idx in emb_dict.items()}
 
@@ -148,15 +168,16 @@ if __name__ == "__main__":
                 tb_tracker.track("loss_policy", loss_policy_v, batch_idx)
                 tb_tracker.track("loss_total", loss_v, batch_idx)
 
-            bleu = np.mean(bleus_argmax)
-            writer.add_scalar("bleu_argmax", bleu, batch_idx)
+            bleu_test = run_test(test_data, net, end_token, args.cuda)
+            writer.add_scalar("bleu_test", bleu_test, batch_idx)
+            writer.add_scalar("bleu_argmax", np.mean(bleus_argmax), batch_idx)
             writer.add_scalar("bleu_sample", np.mean(bleus_sample), batch_idx)
             writer.add_scalar("skipped_samples", skipped_samples / total_samples, batch_idx)
             writer.add_scalar("epoch", batch_idx, epoch)
             log.info("Epoch %d", epoch)
-            if best_bleu is None or best_bleu < bleu:
-                best_bleu = bleu
-                log.info("Best bleu updated: %.4f", bleu)
-                torch.save(net.state_dict(), os.path.join(saves_path, "bleu_%.3f_%02d.dat" % (bleu, epoch)))
+            if best_bleu is None or best_bleu < bleu_test:
+                best_bleu = bleu_test
+                log.info("Best bleu updated: %.4f", bleu_test)
+                torch.save(net.state_dict(), os.path.join(saves_path, "bleu_%.3f_%02d.dat" % (bleu_test, epoch)))
 
     writer.close()
