@@ -58,7 +58,6 @@ if __name__ == "__main__":
     phrase_pairs, emb_dict = data.load_data(genre_filter=args.data)
     log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(emb_dict))
     data.save_emb_dict(saves_path, emb_dict)
-    data.extend_emb_dict(emb_dict)
     end_token = emb_dict[data.END_TOKEN]
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
     rand = np.random.RandomState(data.SHUFFLE_SEED)
