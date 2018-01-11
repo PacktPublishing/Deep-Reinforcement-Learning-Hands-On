@@ -169,8 +169,9 @@ if __name__ == "__main__":
                 tb_tracker.track("loss_total", loss_v, batch_idx)
 
             bleu_test = run_test(test_data, net, end_token, args.cuda)
+            bleu = np.mean(bleus_argmax)
             writer.add_scalar("bleu_test", bleu_test, batch_idx)
-            writer.add_scalar("bleu_argmax", np.mean(bleus_argmax), batch_idx)
+            writer.add_scalar("bleu_argmax", bleu, batch_idx)
             writer.add_scalar("bleu_sample", np.mean(bleus_sample), batch_idx)
             writer.add_scalar("skipped_samples", skipped_samples / total_samples, batch_idx)
             writer.add_scalar("epoch", batch_idx, epoch)
@@ -179,5 +180,8 @@ if __name__ == "__main__":
                 best_bleu = bleu_test
                 log.info("Best bleu updated: %.4f", bleu_test)
                 torch.save(net.state_dict(), os.path.join(saves_path, "bleu_%.3f_%02d.dat" % (bleu_test, epoch)))
+            if epoch % 10 == 0:
+                torch.save(net.state_dict(), os.path.join(saves_path, "epoch_%03d_%.3f_%.3f.dat" % (epoch, bleu, bleu_test)))
+
 
     writer.close()
