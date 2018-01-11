@@ -40,7 +40,6 @@ if __name__ == "__main__":
         sys.exit()
 
     emb_dict = data.load_emb_dict(os.path.dirname(args.model))
-    data.extend_emb_dict(emb_dict)
     log.info("Loaded embedded dict with %d entries", len(emb_dict))
     rev_emb_dict = {idx: word for word, idx in emb_dict.items()}
     end_token = emb_dict[data.END_TOKEN]

@@ -55,7 +55,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     phrase_pairs, emb_dict = data.load_data(args)
-    data.extend_emb_dict(emb_dict)
     log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(emb_dict))
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
     train_data = data.group_train_data(train_data)
