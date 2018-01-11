@@ -19,10 +19,8 @@ class PhraseModel(nn.Module):
         super(PhraseModel, self).__init__()
 
         self.emb = nn.Embedding(num_embeddings=dict_size, embedding_dim=emb_size)
-        self.encoder = nn.LSTM(input_size=emb_size, hidden_size=hid_size, num_layers=2, batch_first=True,
-                               dropout=ENCODER_DROPOUT)
-        self.decoder = nn.LSTM(input_size=emb_size, hidden_size=hid_size, num_layers=2, batch_first=True,
-                               dropout=DECODER_DROPOUT)
+        self.encoder = nn.LSTM(input_size=emb_size, hidden_size=hid_size, num_layers=1, batch_first=True)
+        self.decoder = nn.LSTM(input_size=emb_size, hidden_size=hid_size, num_layers=1, batch_first=True)
         self.output = nn.Sequential(
             nn.Linear(hid_size, dict_size)
         )
