@@ -24,7 +24,6 @@ log = logging.getLogger("train")
 
 TEACHER_PROB = 0.5
 
-
 def run_test(test_data, net, end_token, cuda=False):
     bleu_sum = 0.0
     bleu_count = 0
@@ -55,7 +54,8 @@ if __name__ == "__main__":
     data.extend_emb_dict(emb_dict)
     end_token = emb_dict[data.END_TOKEN]
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
-    random.shuffle(train_data)
+    rand = np.random.RandomState(data.SHUFFLE_SEED)
+    rand.shuffle(train_data)
     log.info("Training data converted, got %d samples", len(train_data))
     train_data, test_data = data.split_train_test(train_data)
     log.info("Train set has %d phrases, test %d", len(train_data), len(test_data))

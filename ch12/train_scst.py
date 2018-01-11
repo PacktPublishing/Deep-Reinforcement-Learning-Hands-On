@@ -61,10 +61,12 @@ if __name__ == "__main__":
     data.extend_emb_dict(emb_dict)
     end_token = emb_dict[data.END_TOKEN]
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
+    rand = np.random.RandomState(data.SHUFFLE_SEED)
+    rand.shuffle(train_data)
+    train_data, test_data = data.split_train_test(train_data)
     log.info("Training data converted, got %d samples", len(train_data))
     train_data = data.group_train_data(train_data)
-    random.shuffle(train_data)
-    train_data, test_data = data.split_train_test(train_data)
+    test_data = data.group_train_data(test_data)
     log.info("Train set has %d phrases, test %d", len(train_data), len(test_data))
 
     rev_emb_dict = {idx: word for word, idx in emb_dict.items()}
