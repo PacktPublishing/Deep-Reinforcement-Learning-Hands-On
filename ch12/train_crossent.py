@@ -18,7 +18,7 @@ SAVES_DIR = "saves"
 
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-3
-MAX_EPOCHES = 1000
+MAX_EPOCHES = 100
 
 log = logging.getLogger("train")
 
@@ -114,5 +114,8 @@ if __name__ == "__main__":
                 torch.save(net.state_dict(), os.path.join(saves_path, "pre_bleu_%.3f_%02d.dat" % (bleu_test, epoch)))
                 log.info("Best BLEU updated %.3f", bleu_test)
             best_bleu = bleu_test
+
+        if epoch % 20 == 0:
+            torch.save(net.state_dict(), os.path.join(saves_path, "epoch_%03d_%.3f_%.3f.dat" % (epoch, bleu, bleu_test)))
 
     writer.close()
