@@ -11,6 +11,7 @@ UNKNOWN_TOKEN = '#UNK'
 BEGIN_TOKEN = "#BEG"
 END_TOKEN = "#END"
 MAX_TOKENS = 10
+MIN_TOKEN_FEQ = 5
 SHUFFLE_SEED = 5871
 
 EMB_DICT_NAME = "emb_dict.dat"
@@ -91,7 +92,7 @@ def iterate_batches(data, batch_size):
         ofs += 1
 
 
-def load_data(genre_filter, max_tokens=MAX_TOKENS):
+def load_data(genre_filter, max_tokens=MAX_TOKENS, min_token_freq=MIN_TOKEN_FEQ):
     dialogues = cornell.load_dialogues(genre_filter=genre_filter)
     if not dialogues:
         log.error("No dialogues found, exit!")
@@ -99,21 +100,29 @@ def load_data(genre_filter, max_tokens=MAX_TOKENS):
     log.info("Loaded %d dialogues with %d phrases, generating training pairs",
              len(dialogues), sum(map(len, dialogues)))
     phrase_pairs = dialogues_to_pairs(dialogues, max_tokens=max_tokens)
-    phrase_dict = phrase_pairs_dict(phrase_pairs)
+    log.info("Counting freq of words...")
+    word_counts = collections.Counter()
+    for dial in dialogues:
+        for p in dial:
+            word_counts.update(p)
+    freq_set = set(map(lambda p: p[0], filter(lambda p: p[1] >= min_token_freq, word_counts.items())))
+    log.info("Data has %d uniq words, %d of them occur more than %d",
+             len(word_counts), len(freq_set), min_token_freq)
+    phrase_dict = phrase_pairs_dict(phrase_pairs, freq_set)
     return phrase_pairs, phrase_dict
 
 
-def phrase_pairs_dict(phrase_pairs):
+def phrase_pairs_dict(phrase_pairs, freq_set):
     """
     Return the dict of words in the dialogues mapped to their IDs
     :param phrase_pairs: list of (phrase, phrase) pairs
     :return: dict
     """
-    next_id = 0
-    res = {}
+    res = {UNKNOWN_TOKEN: 0, BEGIN_TOKEN: 1, END_TOKEN: 2}
+    next_id = 3
     for p1, p2 in phrase_pairs:
         for w in map(str.lower, itertools.chain(p1, p2)):
-            if w not in res:
+            if w not in res and w in freq_set:
                 res[w] = next_id
                 next_id += 1
     return res
@@ -139,14 +148,6 @@ def dialogues_to_pairs(dialogues, max_tokens=None):
 
 def decode_words(indices, rev_emb_dict):
     return [rev_emb_dict[idx] for idx in indices]
-
-
-def extend_emb_dict(emb_dict):
-    assert isinstance(emb_dict, dict)
-    next_id = len(emb_dict)
-    for token in [UNKNOWN_TOKEN, BEGIN_TOKEN, END_TOKEN]:
-        emb_dict[token] = next_id
-        next_id += 1
 
 
 def trim_tokens_seq(tokens, end_token):

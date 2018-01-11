@@ -39,5 +39,5 @@ if __name__ == "__main__":
         words_stat.update(p1)
     print("Frequency stats for %d tokens in the dict" % len(emb_dict))
     for token, count in words_stat.most_common():
-        print("%s: %d" % (rev_emb_dict[token], count))
+        print("%s: %d" % (token, count))
     pass
