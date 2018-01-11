@@ -52,7 +52,9 @@ def read_phrases(data_dir, movies=None):
         l_id, m_id, l_str = parts[0], parts[2], parts[4]
         if movies and m_id not in movies:
             continue
-        res[l_id] = tokeniser.tokenize(l_str)
+        tokens = tokeniser.tokenize(l_str)
+        if tokens:
+            res[l_id] = tokens
     return res
 
 
@@ -64,8 +66,9 @@ def load_conversations(data_dir, lines, movies=None):
             continue
         l_ids = dial_s.strip("[]").split(", ")
         l_ids = list(map(lambda s: s.strip("'"), l_ids))
-        dial = [lines[l_id] for l_id in l_ids]
-        res.append(dial)
+        dial = [lines[l_id] for l_id in l_ids if l_id in lines]
+        if dial:
+            res.append(dial)
     return res
 
 

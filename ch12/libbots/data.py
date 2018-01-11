@@ -10,8 +10,8 @@ from . import cornell
 UNKNOWN_TOKEN = '#UNK'
 BEGIN_TOKEN = "#BEG"
 END_TOKEN = "#END"
-MAX_TOKENS = 10
-MIN_TOKEN_FEQ = 5
+MAX_TOKENS = 20
+MIN_TOKEN_FEQ = 10
 SHUFFLE_SEED = 5871
 
 EMB_DICT_NAME = "emb_dict.dat"
@@ -52,16 +52,19 @@ def encode_words(words, emb_dict):
     return res
 
 
-def encode_phrase_pairs(phrase_pairs, emb_dict):
+def encode_phrase_pairs(phrase_pairs, emb_dict, filter_unknows=True):
     """
     Convert list of phrase pairs to training data
     :param phrase_pairs: list of (phrase, phrase)
     :param emb_dict: embeddings dictionary (word -> id)
     :return: list of tuples ([input_id_seq], [output_id_seq])
     """
+    unk_token = emb_dict[UNKNOWN_TOKEN]
     result = []
     for p1, p2 in phrase_pairs:
         p = encode_words(p1, emb_dict), encode_words(p2, emb_dict)
+        if unk_token in p[0] or unk_token in p[1]:
+            continue
         result.append(p)
     return result
 
@@ -147,7 +150,7 @@ def dialogues_to_pairs(dialogues, max_tokens=None):
 
 
 def decode_words(indices, rev_emb_dict):
-    return [rev_emb_dict[idx] for idx in indices]
+    return [rev_emb_dict.get(idx, UNKNOWN_TOKEN) for idx in indices]
 
 
 def trim_tokens_seq(tokens, end_token):
