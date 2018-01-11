@@ -10,6 +10,8 @@ from . import utils
 
 HIDDEN_STATE_SIZE = 512
 EMBEDDING_DIM = 50
+ENCODER_DROPOUT = 0.5
+DECODER_DROPOUT = 0.5
 
 
 class PhraseModel(nn.Module):
@@ -17,8 +19,10 @@ class PhraseModel(nn.Module):
         super(PhraseModel, self).__init__()
 
         self.emb = nn.Embedding(num_embeddings=dict_size, embedding_dim=emb_size)
-        self.encoder = nn.LSTM(input_size=emb_size, hidden_size=hid_size, num_layers=1, batch_first=True)
-        self.decoder = nn.LSTM(input_size=emb_size, hidden_size=hid_size, num_layers=1, batch_first=True)
+        self.encoder = nn.LSTM(input_size=emb_size, hidden_size=hid_size, num_layers=1, batch_first=True,
+                               dropout=ENCODER_DROPOUT)
+        self.decoder = nn.LSTM(input_size=emb_size, hidden_size=hid_size, num_layers=1, batch_first=True,
+                               dropout=DECODER_DROPOUT)
         self.output = nn.Sequential(
             nn.Linear(hid_size, dict_size)
         )
