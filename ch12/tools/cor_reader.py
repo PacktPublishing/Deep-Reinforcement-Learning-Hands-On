@@ -23,7 +23,7 @@ if __name__ == "__main__":
     for g, count in genre_counts.most_common():
         print("%s: %d" % (g, count))
 
-    if args.show_dials is not None:
+    if args.show_dials:
         dials = cornell.load_dialogues(genre_filter=args.genre)
         for d_idx, dial in enumerate(dials):
             print("Dialog %d with %d phrases:" % (d_idx, len(dial)))
