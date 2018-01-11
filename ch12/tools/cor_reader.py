@@ -5,7 +5,7 @@ import argparse
 import collections
 sys.path.append(os.getcwd())
 
-from libbots import cornell
+from libbots import cornell, data
 
 
 if __name__ == "__main__":
@@ -27,6 +27,16 @@ if __name__ == "__main__":
         for d_idx, dial in enumerate(dials):
             print("Dialog %d with %d phrases:" % (d_idx, len(dial)))
             for p in dial:
-                print(" ".join(p.words))
+                print(" ".join(p))
             print()
+
+        phrase_pairs, emb_dict = data.load_data(genre_filter=args.data)
+        rev_emb_dict = {idx: word for word, idx in emb_dict.items()}
+        words_stat = collections.Counter()
+
+        for p1, p2 in phrase_pairs:
+            words_stat.update(p1)
+        print("Frequency stats for %d tokens in the dict" % len(emb_dict))
+        for token, count in words_stat.most_common():
+            print("%s: %d" % (rev_emb_dict[token], count))
     pass
