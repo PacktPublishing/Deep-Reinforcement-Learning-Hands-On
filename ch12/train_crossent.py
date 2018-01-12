@@ -58,6 +58,7 @@ if __name__ == "__main__":
     log.info("Training data converted, got %d samples", len(train_data))
     train_data, test_data = data.split_train_test(train_data)
     log.info("Train set has %d phrases, test %d", len(train_data), len(test_data))
+    train_data.sort(key=lambda p: len(p[0]), reverse=True)
 
     net = model.PhraseModel(emb_size=model.EMBEDDING_DIM, dict_size=len(emb_dict), hid_size=model.HIDDEN_STATE_SIZE)
     if args.cuda:
@@ -69,7 +70,7 @@ if __name__ == "__main__":
     optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE)
     best_bleu = None
     for epoch in range(MAX_EPOCHES):
-        random.shuffle(train_data)
+#        random.shuffle(train_data)
         losses = []
         bleu_sum = 0.0
         bleu_count = 0
