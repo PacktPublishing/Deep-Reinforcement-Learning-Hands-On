@@ -46,8 +46,8 @@ if __name__ == "__main__":
     net = model.PhraseModel(emb_size=model.EMBEDDING_DIM, dict_size=len(emb_dict), hid_size=model.HIDDEN_STATE_SIZE)
     net.load_state_dict(torch.load(args.model))
 
-    def bot_func(bot, update, args):
-        text = " ".join(args)
+    def bot_func(bot, update, bot_args):
+        text = " ".join(bot_args)
         words = utils.tokenize(text)
         seq_1 = data.encode_words(words, emb_dict)
         input_seq = model.pack_input(seq_1, net.emb)
