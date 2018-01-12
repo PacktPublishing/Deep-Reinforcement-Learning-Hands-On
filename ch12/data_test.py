@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import re
 import argparse
 import logging
 
@@ -7,44 +6,7 @@ from libbots import data, model, utils
 
 import torch
 
-log = logging.getLogger("use")
-
-
-def process_string(s, emb_dict, rev_emb_dict, embeddings, net, max_out=20):
-    words = re.split(r'\s+', s)
-    words = list(map(str.lower, words))
-    tokens = data.encode_words(words, emb_dict)
-    log.info("Words: %s, tokens: %s", words, tokens)
-    input_seq = model.pack_input(tokens, embeddings)
-    enc = net.encode(input_seq)
-
-    # decoding
-    cur_token = data.BEGIN_TOKEN
-    unk_idx = emb_dict[data.UNKNOWN_TOKEN]
-    end_idx = emb_dict[data.END_TOKEN]
-    result = []
-
-    while True:
-        cur_idx = emb_dict.get(cur_token, unk_idx)
-        cur_emb = embeddings(torch.LongTensor([cur_idx]))
-        out_logits, new_enc = net.decode_one(enc, cur_emb)
-        out_token_v = torch.max(out_logits, dim=1)[1]
-        out_token = out_token_v.data.cpu().numpy()[0]
-        out_word = rev_emb_dict.get(out_token, data.UNKNOWN_TOKEN)
-        result.append(out_word)
-
-        if out_token == end_idx:
-            break
-        if out_token == cur_token:
-            break
-        if len(result) > max_out:
-            break
-
-        cur_token = out_token
-        enc = new_enc
-
-    print(result)
-
+log = logging.getLogger("data_test")
 
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)-15s %(levelname)s %(message)s", level=logging.INFO)

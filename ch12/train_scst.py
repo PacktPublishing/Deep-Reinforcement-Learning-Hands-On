@@ -126,10 +126,10 @@ if __name__ == "__main__":
                         continue
 
                     if not dial_shown:
-                        log.info("Input: %s", " ".join(data.decode_words(inp_idx, rev_emb_dict)))
-                        ref_words = [" ".join(data.decode_words(ref, rev_emb_dict)) for ref in ref_indices]
+                        log.info("Input: %s", utils.untokenize(data.decode_words(inp_idx, rev_emb_dict)))
+                        ref_words = [utils.untokenize(data.decode_words(ref, rev_emb_dict)) for ref in ref_indices]
                         log.info("Refer: %s", " ~~|~~ ".join(ref_words))
-                        log.info("Argmax: %s, bleu=%.4f", " ".join(data.decode_words(actions, rev_emb_dict)),
+                        log.info("Argmax: %s, bleu=%.4f", utils.untokenize(data.decode_words(actions, rev_emb_dict)),
                                  argmax_bleu)
 
                     for _ in range(args.samples):
@@ -138,7 +138,7 @@ if __name__ == "__main__":
                         sample_bleu = utils.calc_bleu_many(actions, ref_indices)
 
                         if not dial_shown:
-                            log.info("Sample: %s, bleu=%.4f", " ".join(data.decode_words(actions, rev_emb_dict)),
+                            log.info("Sample: %s, bleu=%.4f", utils.untokenize(data.decode_words(actions, rev_emb_dict)),
                                      sample_bleu)
 
                         net_policies.append(r_sample)

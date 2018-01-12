@@ -5,8 +5,7 @@ https://www.cs.cornell.edu/~cristian/Cornell_Movie-Dialogs_Corpus.html
 import os
 import logging
 
-from nltk.tokenize import TweetTokenizer
-
+from . import utils
 
 log = logging.getLogger("cornell")
 DATA_DIR = "data/cornell"
@@ -47,12 +46,11 @@ def read_movie_set(data_dir, genre_filter):
 
 def read_phrases(data_dir, movies=None):
     res = {}
-    tokeniser = TweetTokenizer(preserve_case=False)
     for parts in iterate_entries(data_dir, "movie_lines.txt"):
         l_id, m_id, l_str = parts[0], parts[2], parts[4]
         if movies and m_id not in movies:
             continue
-        tokens = tokeniser.tokenize(l_str)
+        tokens = utils.tokenize(l_str)
         if tokens:
             res[l_id] = tokens
     return res
