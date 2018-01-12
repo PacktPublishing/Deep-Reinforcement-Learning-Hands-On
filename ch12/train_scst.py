@@ -85,7 +85,7 @@ if __name__ == "__main__":
     if args.cuda:
         beg_token = beg_token.cuda()
 
-    with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
+    with ptan.common.utils.TBMeanTracker(writer, batch_size=100) as tb_tracker:
         optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
         batch_idx = 0
         best_bleu = None
