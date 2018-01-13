@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
-import os
-import sys
 import argparse
 import collections
-sys.path.append(os.getcwd())
 
 from libbots import cornell, data
 
