@@ -50,6 +50,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     parser.add_argument("-l", "--load", required=True, help="Load model and continue in RL mode")
     parser.add_argument("--samples", type=int, default=4, help="Count of samples in prob mode")
+    parser.add_argument("--disable-skip", default=False, action='store_true', help="Disable skipping of samples with high argmax BLEU")
     args = parser.parse_args()
 
     saves_path = os.path.join(SAVES_DIR, args.name)
@@ -121,7 +122,7 @@ if __name__ == "__main__":
                     argmax_bleu = utils.calc_bleu_many(actions, ref_indices)
                     bleus_argmax.append(argmax_bleu)
 
-                    if argmax_bleu > 0.99:
+                    if not args.disable_skip and argmax_bleu > 0.99:
                         skipped_samples += 1
                         continue
 
