@@ -13,7 +13,6 @@ import torch.optim as optim
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-
 SAVES_DIR = "saves"
 
 BATCH_SIZE = 32
@@ -31,7 +30,8 @@ def run_test(test_data, net, end_token, cuda=False):
     for p1, p2 in test_data:
         input_seq = model.pack_input(p1, net.emb, cuda)
         enc = net.encode(input_seq)
-        _, tokens = net.decode_chain_argmax(enc, input_seq.data[0:1], seq_len=data.MAX_TOKENS,
+        _, tokens = net.decode_chain_argmax(enc, input_seq.data[0:1],
+                                            seq_len=data.MAX_TOKENS,
                                             stop_at_token=end_token)
         bleu_sum += utils.calc_bleu(tokens, p2[1:])
         bleu_count += 1
@@ -41,8 +41,10 @@ def run_test(test_data, net, end_token, cuda=False):
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)-15s %(levelname)s %(message)s", level=logging.INFO)
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data", required=True, help="Category to use for training. Empty string to train on full dataset")
-    parser.add_argument("--cuda", action='store_true', default=False, help="Enable cuda")
+    parser.add_argument("--data", required=True, help="Category to use for training. "
+                                                      "Empty string to train on full dataset")
+    parser.add_argument("--cuda", action='store_true', default=False,
+                        help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
 
@@ -50,7 +52,8 @@ if __name__ == "__main__":
     os.makedirs(saves_path, exist_ok=True)
 
     phrase_pairs, emb_dict = data.load_data(genre_filter=args.data)
-    log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(emb_dict))
+    log.info("Obtained %d phrase pairs with %d uniq words",
+             len(phrase_pairs), len(emb_dict))
     data.save_emb_dict(saves_path, emb_dict)
     end_token = emb_dict[data.END_TOKEN]
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
@@ -61,7 +64,8 @@ if __name__ == "__main__":
     log.info("Train set has %d phrases, test %d", len(train_data), len(test_data))
     train_data.sort(key=lambda p: len(p[0]), reverse=True)
 
-    net = model.PhraseModel(emb_size=model.EMBEDDING_DIM, dict_size=len(emb_dict), hid_size=model.HIDDEN_STATE_SIZE)
+    net = model.PhraseModel(emb_size=model.EMBEDDING_DIM, dict_size=len(emb_dict),
+                            hid_size=model.HIDDEN_STATE_SIZE)
     if args.cuda:
         net.cuda()
     log.info("Model: %s", net)
@@ -71,13 +75,13 @@ if __name__ == "__main__":
     optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE)
     best_bleu = None
     for epoch in range(MAX_EPOCHES):
-#        random.shuffle(train_data)
         losses = []
         bleu_sum = 0.0
         bleu_count = 0
         for batch in data.iterate_batches(train_data, BATCH_SIZE):
             optimiser.zero_grad()
-            input_seq, out_seq_list, _, out_idx = model.pack_batch(batch, net.emb, cuda=args.cuda)
+            input_seq, out_seq_list, _, out_idx = model.pack_batch(batch, net.emb,
+                                                                   cuda=args.cuda)
             enc = net.encode(input_seq)
 
             net_results = []
@@ -89,7 +93,8 @@ if __name__ == "__main__":
                     bleu_sum += model.seq_bleu(r, ref_indices)
                 else:
                     r, seq = net.decode_chain_argmax(net.get_encoded_item(enc, idx),
-                                                     out_seq.data[0:1], len(ref_indices))
+                                                     out_seq.data[0:1],
+                                                     len(ref_indices))
                     bleu_sum += utils.calc_bleu(seq, ref_indices)
                 net_results.append(r)
                 net_targets.extend(ref_indices)
@@ -112,11 +117,15 @@ if __name__ == "__main__":
         writer.add_scalar("bleu_test", bleu_test, epoch)
         if best_bleu is None or best_bleu < bleu_test:
             if best_bleu is not None:
-                torch.save(net.state_dict(), os.path.join(saves_path, "pre_bleu_%.3f_%02d.dat" % (bleu_test, epoch)))
+                out_name = os.path.join(saves_path, "pre_bleu_%.3f_%02d.dat" %
+                                        (bleu_test, epoch))
+                torch.save(net.state_dict(), out_name)
                 log.info("Best BLEU updated %.3f", bleu_test)
             best_bleu = bleu_test
 
         if epoch % 10 == 0:
-            torch.save(net.state_dict(), os.path.join(saves_path, "epoch_%03d_%.3f_%.3f.dat" % (epoch, bleu, bleu_test)))
+            out_name = os.path.join(saves_path, "epoch_%03d_%.3f_%.3f.dat" %
+                                    (epoch, bleu, bleu_test))
+            torch.save(net.state_dict(), out_name)
 
     writer.close()
