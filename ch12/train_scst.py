@@ -68,7 +68,6 @@ if __name__ == "__main__":
     train_data = data.group_train_data(train_data)
     test_data = data.group_train_data(test_data)
     log.info("Train set has %d phrases, test %d", len(train_data), len(test_data))
-    train_data.sort(key=lambda p: len(p[0]), reverse=True)
 
     rev_emb_dict = {idx: word for word, idx in emb_dict.items()}
 
