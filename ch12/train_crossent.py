@@ -87,12 +87,12 @@ if __name__ == "__main__":
             net_targets = []
             for idx, out_seq in enumerate(out_seq_list):
                 ref_indices = out_idx[idx][1:]
+                enc_item = net.get_encoded_item(enc, idx)
                 if random.random() < TEACHER_PROB:
-                    r = net.decode_teacher(net.get_encoded_item(enc, idx), out_seq)
+                    r = net.decode_teacher(enc_item, out_seq)
                     bleu_sum += model.seq_bleu(r, ref_indices)
                 else:
-                    r, seq = net.decode_chain_argmax(net.get_encoded_item(enc, idx),
-                                                     out_seq.data[0:1],
+                    r, seq = net.decode_chain_argmax(enc_item, out_seq.data[0:1],
                                                      len(ref_indices))
                     bleu_sum += utils.calc_bleu(seq, ref_indices)
                 net_results.append(r)
