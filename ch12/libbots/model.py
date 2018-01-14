@@ -17,8 +17,10 @@ class PhraseModel(nn.Module):
         super(PhraseModel, self).__init__()
 
         self.emb = nn.Embedding(num_embeddings=dict_size, embedding_dim=emb_size)
-        self.encoder = nn.LSTM(input_size=emb_size, hidden_size=hid_size, num_layers=1, batch_first=True)
-        self.decoder = nn.LSTM(input_size=emb_size, hidden_size=hid_size, num_layers=1, batch_first=True)
+        self.encoder = nn.LSTM(input_size=emb_size, hidden_size=hid_size,
+                               num_layers=1, batch_first=True)
+        self.decoder = nn.LSTM(input_size=emb_size, hidden_size=hid_size,
+                               num_layers=1, batch_first=True)
         self.output = nn.Sequential(
             nn.Linear(hid_size, dict_size)
         )
@@ -31,7 +33,8 @@ class PhraseModel(nn.Module):
         # For RNN
         # return encoded[:, index:index+1]
         # For LSTM
-        return encoded[0][:, index:index+1].contiguous(), encoded[1][:, index:index+1].contiguous()
+        return encoded[0][:, index:index+1].contiguous(), \
+               encoded[1][:, index:index+1].contiguous()
 
     def decode_teacher(self, hid, input_seq):
         # Method assumes batch of size=1
@@ -39,7 +42,7 @@ class PhraseModel(nn.Module):
         out = self.output(out.data)
         return out
 
-    def decode_chain_argmax(self, embeddings, hid, begin_emb, seq_len, stop_at_token=None):
+    def decode_chain_argmax(self, hid, begin_emb, seq_len, stop_at_token=None):
         """
         Decode sequence by feeding predicted token to the net again. Act greedily
         """
@@ -52,7 +55,7 @@ class PhraseModel(nn.Module):
             out_token_v = torch.max(out_logits, dim=1)[1]
             out_token = out_token_v.data.cpu().numpy()[0]
 
-            cur_emb = embeddings(out_token_v)
+            cur_emb = self.emb(out_token_v)
 
             res_logits.append(out_logits)
             res_tokens.append(out_token)
@@ -60,9 +63,10 @@ class PhraseModel(nn.Module):
                 break
         return torch.cat(res_logits), res_tokens
 
-    def decode_chain_sampling(self, embeddings, hid, begin_emb, seq_len, stop_at_token=None):
+    def decode_chain_sampling(self, hid, begin_emb, seq_len, stop_at_token=None):
         """
-        Decode sequence by feeding predicted token to the net again. Act according to probabilities
+        Decode sequence by feeding predicted token to the net again. 
+        Act according to probabilities
         """
         res_logits = []
         res_actions = []
@@ -76,7 +80,7 @@ class PhraseModel(nn.Module):
             action_v = Variable(torch.LongTensor([action]))
             if begin_emb.is_cuda:
                 action_v = action_v.cuda()
-            cur_emb = embeddings(action_v)
+            cur_emb = self.emb(action_v)
 
             res_logits.append(out_logits)
             res_actions.append(action)

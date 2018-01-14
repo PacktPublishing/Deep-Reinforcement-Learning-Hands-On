@@ -53,11 +53,11 @@ if __name__ == "__main__":
         input_seq = model.pack_input(seq_1, net.emb)
         enc = net.encode(input_seq)
         if prog_args.sample:
-            _, tokens = net.decode_chain_sampling(net.emb, enc, input_seq.data[0:1],
-                                                seq_len=data.MAX_TOKENS, stop_at_token=end_token)
+            _, tokens = net.decode_chain_sampling(enc, input_seq.data[0:1], seq_len=data.MAX_TOKENS,
+                                                  stop_at_token=end_token)
         else:
-            _, tokens = net.decode_chain_argmax(net.emb, enc, input_seq.data[0:1],
-                                                seq_len=data.MAX_TOKENS, stop_at_token=end_token)
+            _, tokens = net.decode_chain_argmax(enc, input_seq.data[0:1], seq_len=data.MAX_TOKENS,
+                                                stop_at_token=end_token)
         if tokens[-1] == end_token:
             tokens = tokens[:-1]
         reply = data.decode_words(tokens, rev_emb_dict)

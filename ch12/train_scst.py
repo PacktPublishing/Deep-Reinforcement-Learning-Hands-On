@@ -31,8 +31,8 @@ def run_test(test_data, net, end_token, cuda=False):
     for p1, p2 in test_data:
         input_seq = model.pack_input(p1, net.emb, cuda)
         enc = net.encode(input_seq)
-        _, tokens = net.decode_chain_argmax(net.emb, enc, input_seq.data[0:1],
-                                            seq_len=data.MAX_TOKENS, stop_at_token=end_token)
+        _, tokens = net.decode_chain_argmax(enc, input_seq.data[0:1], seq_len=data.MAX_TOKENS,
+                                            stop_at_token=end_token)
         ref_indices = [
             indices[1:]
             for indices in p2
@@ -117,8 +117,8 @@ if __name__ == "__main__":
                         for indices in output_batch[idx]
                     ]
                     item_enc = net.get_encoded_item(enc, idx)
-                    r_argmax, actions = net.decode_chain_argmax(net.emb, item_enc, beg_embedding,
-                                                                data.MAX_TOKENS, stop_at_token=end_token)
+                    r_argmax, actions = net.decode_chain_argmax(item_enc, beg_embedding, data.MAX_TOKENS,
+                                                                stop_at_token=end_token)
                     argmax_bleu = utils.calc_bleu_many(actions, ref_indices)
                     bleus_argmax.append(argmax_bleu)
 
@@ -134,7 +134,7 @@ if __name__ == "__main__":
                                  argmax_bleu)
 
                     for _ in range(args.samples):
-                        r_sample, actions = net.decode_chain_sampling(net.emb, item_enc, beg_embedding,
+                        r_sample, actions = net.decode_chain_sampling(item_enc, beg_embedding,
                                                                       data.MAX_TOKENS, stop_at_token=end_token)
                         sample_bleu = utils.calc_bleu_many(actions, ref_indices)
 

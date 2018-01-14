@@ -24,14 +24,15 @@ log = logging.getLogger("train")
 
 TEACHER_PROB = 0.5
 
+
 def run_test(test_data, net, end_token, cuda=False):
     bleu_sum = 0.0
     bleu_count = 0
     for p1, p2 in test_data:
         input_seq = model.pack_input(p1, net.emb, cuda)
         enc = net.encode(input_seq)
-        _, tokens = net.decode_chain_argmax(net.emb, enc, input_seq.data[0:1],
-                                            seq_len=data.MAX_TOKENS, stop_at_token=end_token)
+        _, tokens = net.decode_chain_argmax(enc, input_seq.data[0:1], seq_len=data.MAX_TOKENS,
+                                            stop_at_token=end_token)
         bleu_sum += utils.calc_bleu(tokens, p2[1:])
         bleu_count += 1
     return bleu_sum / bleu_count
@@ -87,7 +88,7 @@ if __name__ == "__main__":
                     r = net.decode_teacher(net.get_encoded_item(enc, idx), out_seq)
                     bleu_sum += model.seq_bleu(r, ref_indices)
                 else:
-                    r, seq = net.decode_chain_argmax(net.emb, net.get_encoded_item(enc, idx),
+                    r, seq = net.decode_chain_argmax(net.get_encoded_item(enc, idx),
                                                      out_seq.data[0:1], len(ref_indices))
                     bleu_sum += utils.calc_bleu(seq, ref_indices)
                 net_results.append(r)

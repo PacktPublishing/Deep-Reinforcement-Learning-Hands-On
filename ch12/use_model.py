@@ -16,11 +16,11 @@ def words_to_words(words, emb_dict, rev_emb_dict, net, use_sampling=False):
     enc = net.encode(input_seq)
     end_token = emb_dict[data.END_TOKEN]
     if use_sampling:
-        _, out_tokens = net.decode_chain_sampling(net.emb, enc, input_seq.data[0:1],
-                                                  seq_len=data.MAX_TOKENS, stop_at_token=end_token)
+        _, out_tokens = net.decode_chain_sampling(enc, input_seq.data[0:1], seq_len=data.MAX_TOKENS,
+                                                  stop_at_token=end_token)
     else:
-        _, out_tokens = net.decode_chain_argmax(net.emb, enc, input_seq.data[0:1],
-                                                seq_len=data.MAX_TOKENS, stop_at_token=end_token)
+        _, out_tokens = net.decode_chain_argmax(enc, input_seq.data[0:1], seq_len=data.MAX_TOKENS,
+                                                stop_at_token=end_token)
     if out_tokens[-1] == end_token:
         out_tokens = out_tokens[:-1]
     out_words = data.decode_words(out_tokens, rev_emb_dict)
