@@ -17,12 +17,6 @@ SHUFFLE_SEED = 5871
 EMB_DICT_NAME = "emb_dict.dat"
 EMB_NAME = "emb.npy"
 
-EMB_EXTRA = {
-    UNKNOWN_TOKEN: 0.0,
-    BEGIN_TOKEN: 1.0,
-    END_TOKEN: -1.0
-}
-
 log = logging.getLogger("data")
 
 
