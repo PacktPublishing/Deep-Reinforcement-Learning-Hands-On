@@ -114,30 +114,23 @@ def pack_batch_no_out(batch, embeddings, cuda=False):
     return emb_input_seq, input_idx, output_idx
 
 
+def pack_input(input_data, embeddings, cuda=False):
+    input_v = Variable(torch.LongTensor([input_data]))
+    if cuda:
+        input_v = input_v.cuda()
+    r = embeddings(input_v)
+    return rnn_utils.pack_padded_sequence(r, [len(input_data)], batch_first=True)
+
+
 def pack_batch(batch, embeddings, cuda=False):
     emb_input_seq, input_idx, output_idx = pack_batch_no_out(batch, embeddings, cuda)
 
     # prepare output sequences, with end token stripped
     output_seq_list = []
     for out in output_idx:
-        seq = out[:-1]
-        out_v = Variable(torch.LongTensor([seq]))
-        if cuda:
-            out_v = out_v.cuda()
-        emb_out_v = embeddings(out_v)
-        out_seq = rnn_utils.pack_padded_sequence(emb_out_v, [len(seq)], batch_first=True)
-        output_seq_list.append(out_seq)
+        output_seq_list.append(pack_input(out[:-1], embeddings, cuda))
     return emb_input_seq, output_seq_list, input_idx, output_idx
 
-
-def pack_input(input_data, embeddings, cuda=False):
-    input_v = Variable(torch.LongTensor([input_data]))
-    if cuda:
-        input_v = input_v.cuda()
-    input_seq = rnn_utils.pack_padded_sequence(input_v, [len(input_data)], batch_first=True)
-    r = embeddings(input_seq.data)
-    emb_input_seq = rnn_utils.PackedSequence(data=r, batch_sizes=input_seq.batch_sizes)
-    return emb_input_seq
 
 
 def seq_bleu(model_out, ref_seq):

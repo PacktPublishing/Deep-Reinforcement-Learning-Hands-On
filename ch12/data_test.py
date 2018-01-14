@@ -11,12 +11,12 @@ log = logging.getLogger("data_test")
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)-15s %(levelname)s %(message)s", level=logging.INFO)
     parser = argparse.ArgumentParser()
-    parser.add_argument("--cornell", required=True, help="Use Cornell Movie Dialogues database could be "
-                                                         "a category or empty string to load full data")
+    parser.add_argument("--data", required=True,
+                        help="Category to use for training. Empty string to train on full dataset")
     parser.add_argument("-m", "--model", required=True, help="Model name to load")
     args = parser.parse_args()
 
-    phrase_pairs, emb_dict = data.load_data(args)
+    phrase_pairs, emb_dict = data.load_data(args.data)
     log.info("Obtained %d phrase pairs with %d uniq words", len(phrase_pairs), len(emb_dict))
     train_data = data.encode_phrase_pairs(phrase_pairs, emb_dict)
     train_data = data.group_train_data(train_data)
