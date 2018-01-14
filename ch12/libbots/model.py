@@ -10,8 +10,6 @@ from . import utils
 
 HIDDEN_STATE_SIZE = 512
 EMBEDDING_DIM = 50
-ENCODER_DROPOUT = 0.5
-DECODER_DROPOUT = 0.5
 
 
 class PhraseModel(nn.Module):
