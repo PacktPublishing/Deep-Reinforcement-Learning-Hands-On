@@ -32,7 +32,8 @@ if __name__ == "__main__":
                 print(" ".join(p))
             print()
 
-    phrase_pairs, emb_dict = data.load_data(genre_filter=args.genre)
+    if args.show_train or args.show_dict_freq:
+        phrase_pairs, emb_dict = data.load_data(genre_filter=args.genre)
 
     if args.show_train:
         rev_emb_dict = {idx: word for word, idx in emb_dict.items()}
