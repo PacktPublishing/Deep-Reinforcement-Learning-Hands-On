@@ -15,7 +15,6 @@ from torch.autograd import Variable
 
 import ptan
 
-DEFAULT_FILE = "data/OpenSubtitles/en/Crime/1994/60_101020_138057_pulp_fiction.xml.gz"
 SAVES_DIR = "saves"
 
 BATCH_SIZE = 16
