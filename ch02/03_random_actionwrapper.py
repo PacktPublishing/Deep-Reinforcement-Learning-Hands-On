@@ -8,7 +8,7 @@ class RandomActionWrapper(gym.ActionWrapper):
         super(RandomActionWrapper, self).__init__(env)
         self.epsilon = epsilon
 
-    def action(self, action):
+    def _action(self, action):
         if random.random() < self.epsilon:
             print("Random!")
             return self.env.action_space.sample()
