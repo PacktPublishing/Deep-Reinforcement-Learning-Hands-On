@@ -11,7 +11,8 @@ class Model(nn.Module):
             nn.ReLU(),
             nn.Conv2d(64, 64, 4, stride=2),
             nn.ReLU(),
-            nn.Conv2d(64, 128, 2, stride=1),
+            nn.Conv2d(64, 128, 2, stride=2),
+
         )
 
     def forward(self, x):
