@@ -1,5 +1,5 @@
 import gym
-import collections
+import numpy as np
 
 # Area of interest
 WIDTH = 160
@@ -15,6 +15,8 @@ class MiniWoBCropper(gym.ObservationWrapper):
             if obs is None:
                 res.append(obs)
                 continue
-            res.append(obs['vision'][Y_OFS:Y_OFS+HEIGHT, X_OFS:X_OFS+WIDTH, :])
+            img = obs['vision'][Y_OFS:Y_OFS+HEIGHT, X_OFS:X_OFS+WIDTH, :]
+#            res.append(np.swapaxes(img, 2, 0))
+            res.append(np.transpose(img, (2, 0, 1)))
         return res
 
