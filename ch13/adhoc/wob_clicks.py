@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 sys.path.append("..")
 import time
@@ -15,16 +16,22 @@ if __name__ == "__main__":
     env = wob_vnc.MiniWoBCropper(env)
 
     env.configure(remotes='vnc://gpu:5900+15900')
-    print(env)
     obs = env.reset()
-    saved = False
 
     while True:
-        time.sleep(1)
         a = env.action_space.sample()
         obs, reward, is_done, info = env.step([a])
         if obs[0] is None:
             print("Env is still resetting...")
+            continue
+        break
+
+    for idx in range(100):
+        time.sleep(1)
+        a = env.action_space.sample()
+        obs, reward, is_done, info = env.step([a])
+        if obs[0] is None:
+            print("Env is resetting...")
             continue
         print("Sampled action: ", a)
         print("Response are:")
@@ -33,10 +40,8 @@ if __name__ == "__main__":
         print("Is done", is_done)
         print("Info", info)
 
-        if not saved:
-            im = Image.fromarray(obs[0])
-            im.save("image-cropped.png")
-            saved = True
+        im = Image.fromarray(obs[0])
+        im.save("wob_clicks/frame-%03d.png" % idx)
 
     env.close()
     pass
