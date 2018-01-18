@@ -1,4 +1,5 @@
 import gym
+import collections
 
 # Area of interest
 WIDTH = 160
