@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import gym
 import universe
 import argparse
@@ -27,9 +28,11 @@ REMOTE_ADDR = 'vnc://gpu:5900+15900,gpu:5901+15901'
 GAMMA = 0.99
 REWARD_STEPS = 4
 BATCH_SIZE = 32
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.0001
 ENTROPY_BETA = 0.01
 CLIP_GRAD = 0.1
+
+SAVES_DIR = "saves"
 
 
 def step_env(env, action):
@@ -47,7 +50,10 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true', help="CUDA mode")
     args = parser.parse_args()
 
-    writer = SummaryWriter(comment="-wob_click_" + ENV_NAME.split('.')[-1] + "_" + args.name)
+    name = ENV_NAME.split('.')[-1] + "_" + args.name
+    writer = SummaryWriter(comment="-wob_click_" + name)
+    saves_path = os.path.join(SAVES_DIR, name)
+    os.makedirs(saves_path, exist_ok=True)
 
     env = gym.make(ENV_NAME)
     env = universe.wrappers.experimental.SoftmaxClickMouse(env)
@@ -67,13 +73,20 @@ if __name__ == "__main__":
     exp_source = ptan.experience.ExperienceSourceFirstLast(
         [env], agent, gamma=GAMMA, steps_count=REWARD_STEPS, vectorized=True)
 
+    best_reward = None
     with common.RewardTracker(writer) as tracker:
         with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
             batch = []
             for step_idx, exp in enumerate(exp_source):
                 rewards = exp_source.pop_total_rewards()
                 if rewards:
-                    tracker.reward(np.mean(rewards), step_idx)
+                    mean_reward = tracker.reward(np.mean(rewards), step_idx)
+                    if best_reward is None or mean_reward > best_reward:
+                        if best_reward is not None:
+                            name = "best_%.3f_%d.dat" % (mean_reward, step_idx)
+                            fname = os.path.join(saves_path, name)
+                            torch.save(net.state_dict(), fname)
+                        best_reward = mean_reward
                 batch.append(exp)
                 if len(batch) < BATCH_SIZE:
                     continue
