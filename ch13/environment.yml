@@ -31,6 +31,7 @@ dependencies:
   - constantly==15.1.0
   - docker-py==1.10.3
   - docker-pycreds==0.2.1
+  - enum34==1.1.6
   - fastzbarlight==0.0.14
   - future==0.16.0
   - go-vncdriver==0.4.19
@@ -49,6 +50,7 @@ dependencies:
   - requests==2.18.4
   - six==1.11.0
   - tensorboard-pytorch==0.7.1
+  - tensorflow==1.4.1
   - tensorflow-tensorboard==0.4.0
   - torch==0.2.0.post4
   - twisted==17.9.0
