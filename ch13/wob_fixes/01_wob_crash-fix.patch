@@ -1,0 +1,11 @@
+--- app/universe-envs/world-of-bits/bin/run.py.old	2018-01-19 21:13:26.335459979 +0100
++++ app/universe-envs/world-of-bits/bin/run.py	2018-01-19 21:15:10.177316640 +0100
+@@ -584,7 +584,7 @@
+             # interact with the browser/server instance to read off current rewards and done flag
+             (reward_client, done_client) = self._read_client_reward(self.env_controller.browser)
+             (reward_server, done_server) = self._read_server_reward(self.env_controller.server)
+-            reward = reward_client + reward_server
++            reward = (0 if reward_client is None else reward_client) + (0 if reward_server is None else reward_server)
+             done = done_client or done_server # if one of them quit, the env ends.
+ 
+             if done:
