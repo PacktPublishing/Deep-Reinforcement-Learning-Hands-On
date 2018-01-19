@@ -11,12 +11,19 @@ import ptan
 import torch
 from torch.autograd import Variable
 
-
 ENV_NAME = "wob.mini.BisectAngle-v0"
-REMOTE_ADDR = 'vnc://gpu:5900+15900'
+#REMOTE_ADDR = 'vnc://gpu:5900+15900'
+#REMOTE_ADDR = 4
+REMOTE_ADDR = 'vnc://gpu:5900+15900,gpu:5901+15901'
+
+# To start multiple remote containers, use something like this
+# docker run -d -p 5900:5900 -p 15900:15900 --privileged --ipc host --cap-add SYS_ADMIN quay.io/openai/universe.world-of-bits:0.20.0
+# docker run -d -p 5901:5900 -p 15901:15900 --privileged --ipc host --cap-add SYS_ADMIN quay.io/openai/universe.world-of-bits:0.20.0
+
 
 GAMMA = 0.99
 REWARD_STEPS = 4
+BATCH_SIZE = 32
 
 
 def step_env(env, action):
@@ -54,10 +61,12 @@ if __name__ == "__main__":
     # r = net(obs_v)
     # print(r[0].size(), r[1].size())
 
+    batch = []
     for idx, exp in enumerate(exp_source):
-        print(exp)
-        if idx > 100:
-            break
-        time.sleep(0.5)
+        batch.append(exp)
+        if len(batch) < BATCH_SIZE:
+            continue
+
+        break
 
     pass
