@@ -87,7 +87,7 @@ if __name__ == "__main__":
                                 name = "best_%.3f_%d.dat" % (mean_reward, step_idx)
                                 fname = os.path.join(saves_path, name)
                                 torch.save(net.state_dict(), fname)
-                            print("Best reward updated: %s -> %s" % (best_reward, mean_reward))
+                                print("Best reward updated: %.3f -> %.3f" % (best_reward, mean_reward))
                             best_reward = mean_reward
                 batch.append(exp)
                 if len(batch) < BATCH_SIZE:
