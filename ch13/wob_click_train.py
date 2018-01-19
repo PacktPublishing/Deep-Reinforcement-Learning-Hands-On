@@ -19,7 +19,7 @@ import torch.optim as optim
 ENV_NAME = "wob.mini.BisectAngle-v0"
 #REMOTE_ADDR = 'vnc://gpu:5900+15900'
 #REMOTE_ADDR = 4
-REMOTE_ADDR = 'vnc://gpu:5900+15900,gpu:5901+15901'
+REMOTE_ADDR = 'vnc://gpu:5900+15900,gpu:5901+15901,gpu:5902+15902,gpu:5903+15903'
 
 # To start multiple remote containers, use something like this
 # docker run -d -p 5900:5900 -p 15900:15900 --privileged --ipc host --cap-add SYS_ADMIN quay.io/openai/universe.world-of-bits:0.20.0
