@@ -1,0 +1,62 @@
+name: rl_book_ch13
+channels:
+- soumith
+- defaults
+dependencies:
+- certifi=2016.2.28=py35_0
+- cffi=1.10.0=py35_0
+- libffi=3.2.1=1
+- libgcc=5.2.0=0
+- mkl=2017.0.3=0
+- numpy=1.13.1=py35_0
+- openssl=1.0.2l=0
+- pip=9.0.1=py35_1
+- pycparser=2.18=py35_0
+- python=3.5.4=0
+- readline=6.2=2
+- setuptools=36.4.0=py35_1
+- sqlite=3.13.0=0
+- tk=8.5.18=0
+- wheel=0.29.0=py35_0
+- xz=5.2.3=0
+- zlib=1.2.11=0
+- cuda80=1.0=0
+- pytorch=0.2.0=py35hb1547bd_4cu80
+- pip:
+  - attrs==17.4.0
+  - autobahn==17.10.1
+  - automat==0.6.0
+  - bleach==1.5.0
+  - chardet==3.0.4
+  - constantly==15.1.0
+  - docker-py==1.10.3
+  - docker-pycreds==0.2.1
+  - fastzbarlight==0.0.14
+  - future==0.16.0
+  - go-vncdriver==0.4.19
+  - gym==0.7.4
+  - html5lib==0.9999999
+  - hyperlink==17.3.1
+  - idna==2.6
+  - incremental==17.5.0
+  - markdown==2.6.11
+  - opencv-python==3.4.0.12
+  - pillow==5.0.0
+  - protobuf==3.5.1
+  - ptan (/home/shmuma/work/ptan)==0.2
+  - pyglet==1.3.0
+  - pyyaml==3.12
+  - requests==2.18.4
+  - six==1.11.0
+  - tensorboard-pytorch==0.7.1
+  - tensorflow-tensorboard==0.4.0
+  - torch==0.2.0.post4
+  - twisted==17.9.0
+  - txaio==2.8.2
+  - ujson==1.35
+  - universe==0.21.3
+  - urllib3==1.22
+  - websocket-client==0.46.0
+  - werkzeug==0.14.1
+  - zope.interface==4.4.3
+prefix: /home/shmuma/anaconda3/envs/rl_book_ch13
