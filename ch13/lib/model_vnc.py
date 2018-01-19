@@ -10,25 +10,25 @@ class Model(nn.Module):
         super(Model, self).__init__()
 
         self.conv = nn.Sequential(
-            nn.Conv2d(input_shape[0], 64, 4, stride=2),
+            nn.Conv2d(input_shape[0], 32, 4, stride=3),
             nn.ReLU(),
-            nn.Conv2d(64, 64, 4, stride=2),
+            nn.Conv2d(32, 64, 4, stride=2),
             nn.ReLU(),
-            nn.Conv2d(64, 128, 2, stride=2),
+            nn.Conv2d(64, 64, 3, stride=2),
         )
 
         conv_out_size = self._get_conv_out(input_shape)
 
         self.policy = nn.Sequential(
-            nn.Linear(conv_out_size, 512),
+            nn.Linear(conv_out_size, 128),
             nn.ReLU(),
-            nn.Linear(512, n_actions)
+            nn.Linear(128, n_actions)
         )
 
         self.value = nn.Sequential(
-            nn.Linear(conv_out_size, 512),
+            nn.Linear(conv_out_size, 128),
             nn.ReLU(),
-            nn.Linear(512, 1)
+            nn.Linear(128, 1)
         )
 
     def _get_conv_out(self, shape):
