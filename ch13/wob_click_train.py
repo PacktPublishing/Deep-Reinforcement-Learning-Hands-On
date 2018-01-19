@@ -2,6 +2,7 @@
 import gym
 import universe
 import argparse
+import numpy as np
 from tensorboardX import SummaryWriter
 
 from lib import wob_vnc, model_vnc, common
@@ -70,8 +71,9 @@ if __name__ == "__main__":
         with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
             batch = []
             for step_idx, exp in enumerate(exp_source):
-                for reward in exp_source.pop_total_rewards():
-                    tracker.reward(reward, step_idx)
+                rewards = exp_source.pop_total_rewards()
+                if rewards:
+                    tracker.reward(np.mean(rewards), step_idx)
                 batch.append(exp)
                 if len(batch) < BATCH_SIZE:
                     continue
