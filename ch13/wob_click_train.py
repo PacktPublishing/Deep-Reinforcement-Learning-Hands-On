@@ -6,6 +6,7 @@ import numpy as np
 
 from lib import wob_vnc, model_vnc
 
+import ptan
 import torch
 from torch.autograd import Variable
 
@@ -35,14 +36,14 @@ if __name__ == "__main__":
     env.configure(remotes=REMOTE_ADDR)
     obs = env.reset()
 
-    net = model_vnc.Model(input_shape=(3, wob_vnc.HEIGHT, wob_vnc.WIDTH))
+    net = model_vnc.Model(input_shape=(3, wob_vnc.HEIGHT, wob_vnc.WIDTH),
+                          n_actions=env.action_space.n)
     print(net)
 
     obs, reward, done, info = step_env(env, env.action_space.sample())
-    obs_v = Variable(torch.from_numpy(np.array(obs, dtype=np.float32)))
-    print(obs_v)
+    obs_v = Variable(torch.from_numpy(np.array(obs)))
     r = net(obs_v)
-    print(r.size())
-    
+    print(r[0].size(), r[1].size())
+
 
     pass
