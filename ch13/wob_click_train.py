@@ -81,12 +81,14 @@ if __name__ == "__main__":
                 rewards = exp_source.pop_total_rewards()
                 if rewards:
                     mean_reward = tracker.reward(np.mean(rewards), step_idx)
-                    if best_reward is None or mean_reward > best_reward:
-                        if best_reward is not None:
-                            name = "best_%.3f_%d.dat" % (mean_reward, step_idx)
-                            fname = os.path.join(saves_path, name)
-                            torch.save(net.state_dict(), fname)
-                        best_reward = mean_reward
+                    if mean_reward is not None:
+                        if best_reward is None or mean_reward > best_reward:
+                            if best_reward is not None:
+                                name = "best_%.3f_%d.dat" % (mean_reward, step_idx)
+                                fname = os.path.join(saves_path, name)
+                                torch.save(net.state_dict(), fname)
+                            print("Best reward updated: %s -> %s" % (best_reward, mean_reward))
+                            best_reward = mean_reward
                 batch.append(exp)
                 if len(batch) < BATCH_SIZE:
                     continue

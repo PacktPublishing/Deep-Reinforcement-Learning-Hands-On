@@ -35,7 +35,7 @@ class RewardTracker:
         self.writer.add_scalar("speed", speed, frame)
         self.writer.add_scalar("reward_100", mean_reward, frame)
         self.writer.add_scalar("reward", reward, frame)
-        return mean_reward
+        return mean_reward if len(self.total_rewards) > 100 else None
 
 
 def unpack_batch(batch, net, last_val_gamma, cuda=False):
