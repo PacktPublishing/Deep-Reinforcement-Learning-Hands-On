@@ -16,7 +16,7 @@ def remotes_url(port_ofs=0, hostname='localhost', count=4):
 
 
 def configure(env, remotes):
-    env.configure(remotes=remotes, fps=5, vnc_kwargs={
+    env.configure(remotes=remotes, fps=15, vnc_kwargs={
         'encoding': 'tight', 'compress_level': 0,
         'fine_quality_level': 100, 'subsample_level': 0
     })
