@@ -33,6 +33,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model", help="Model file to load")
     parser.add_argument("-n", "--name", required=True, help="Prefix to save screenshots")
+    parser.add_argument("--count", type=int, default=1, help="Count of runs to play, default=1")
     args = parser.parse_args()
 
     env = gym.make(ENV_NAME)
@@ -45,19 +46,21 @@ if __name__ == "__main__":
         net.load_state_dict(torch.load(args.model))
 
     env.reset()
-    action = env.action_space.sample()
-    step_idx = 0
 
-    while True:
-        obs, reward, done, info, idle_count = step_env(env, action)
-        print(step_idx, reward, done)
-        if done or reward != 0:
-            break
-        img = Image.fromarray(np.transpose(obs, (1, 2, 0)))
-        img.save("%s_%04d_%.3f.png" % (args.name, step_idx, reward))
-        obs_v = Variable(torch.from_numpy(np.array([obs])))
-        logits_v = net(obs_v)[0]
-        policy = F.softmax(logits_v).data.numpy()[0]
-        action = np.random.choice(len(policy), p=policy)
-        step_idx += 1
+    for round_idx in range(args.count):
+        action = env.action_space.sample()
+        step_idx = 0
+        while True:
+            obs, reward, done, info, idle_count = step_env(env, action)
+            print(step_idx, reward, done)
+            img = Image.fromarray(np.transpose(obs, (1, 2, 0)))
+            img.save("%s_%02d_%04d_%.3f.png" % (args.name, round_idx, step_idx, reward))
+            obs_v = Variable(torch.from_numpy(np.array([obs])))
+            logits_v = net(obs_v)[0]
+            policy = F.softmax(logits_v).data.numpy()[0]
+            action = np.random.choice(len(policy), p=policy)
+            step_idx += 1
+            if done or reward != 0:
+                print("Round %d done" % round_idx)
+                break
     pass
