@@ -16,10 +16,12 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 
+REMOTES_HOST = "gpu"
+REMOTES_COUNT = 4
 ENV_NAME = "wob.mini.ClickDialog-v0"
 #REMOTE_ADDR = 'vnc://gpu:5900+15900'
 #REMOTE_ADDR = 4
-REMOTE_ADDR = 'vnc://gpu:5900+15900,gpu:5901+15901,gpu:5902+15902,gpu:5903+15903'
+#REMOTE_ADDR = 'vnc://gpu:5900+15900,gpu:5901+15901,gpu:5902+15902,gpu:5903+15903'
 
 # To start multiple remote containers, use something like this
 # docker run -d -p 5900:5900 -p 15900:15900 --privileged --ipc host --cap-add SYS_ADMIN quay.io/openai/universe.world-of-bits:0.20.0
@@ -39,6 +41,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     parser.add_argument("--cuda", default=False, action='store_true', help="CUDA mode")
+    parser.add_argument("--port-ofs", type=int, default=0, help="Offset for container's ports, default=0")
     args = parser.parse_args()
 
     name = ENV_NAME.split('.')[-1] + "_" + args.name
@@ -49,7 +52,7 @@ if __name__ == "__main__":
     env = gym.make(ENV_NAME)
     env = universe.wrappers.experimental.SoftmaxClickMouse(env)
     env = wob_vnc.MiniWoBCropper(env)
-    wob_vnc.configure(env, REMOTE_ADDR)
+    wob_vnc.configure(env, wob_vnc.remotes_url(port_ofs=args.port_ofs, hostname=REMOTES_HOST, count=REMOTES_COUNT))
 
     net = model_vnc.Model(input_shape=wob_vnc.WOB_SHAPE, n_actions=env.action_space.n)
     if args.cuda:
