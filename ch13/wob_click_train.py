@@ -17,7 +17,7 @@ import torch.optim as optim
 
 
 REMOTES_HOST = "gpu"
-REMOTES_COUNT = 4
+REMOTES_COUNT = 8
 ENV_NAME = "wob.mini.ClickDialog-v0"
 #REMOTE_ADDR = 'vnc://gpu:5900+15900'
 #REMOTE_ADDR = 4
@@ -29,9 +29,9 @@ ENV_NAME = "wob.mini.ClickDialog-v0"
 
 GAMMA = 0.99
 REWARD_STEPS = 2
-BATCH_SIZE = 32
+BATCH_SIZE = 16
 LEARNING_RATE = 0.001
-ENTROPY_BETA = 0.01
+ENTROPY_BETA = 0.001
 CLIP_GRAD = 0.1
 
 SAVES_DIR = "saves"
