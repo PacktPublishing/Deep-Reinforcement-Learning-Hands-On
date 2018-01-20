@@ -10,6 +10,13 @@ Y_OFS = 75
 WOB_SHAPE = (3, HEIGHT, WIDTH)
 
 
+def configure(env, remotes):
+    env.configure(remotes=remotes, fps=5, vnc_kwargs={
+        'encoding': 'tight', 'compress_level': 0,
+        'fine_quality_level': 100, 'subsample_level': 0
+    })
+
+
 class MiniWoBCropper(gym.ObservationWrapper):
     """
     Crops the WoB area and converts the observation into PyTorch (C, H, W) format.

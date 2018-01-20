@@ -38,7 +38,7 @@ if __name__ == "__main__":
     env = gym.make(ENV_NAME)
     env = universe.wrappers.experimental.SoftmaxClickMouse(env)
     env = wob_vnc.MiniWoBCropper(env)
-    env.configure(remotes=REMOTE_ADDR)
+    wob_vnc.configure(env, REMOTE_ADDR)
 
     net = model_vnc.Model(input_shape=wob_vnc.WOB_SHAPE, n_actions=env.action_space.n)
     if args.model:
