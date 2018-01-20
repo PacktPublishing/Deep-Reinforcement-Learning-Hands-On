@@ -26,7 +26,7 @@ REMOTE_ADDR = 'vnc://gpu:5900+15900,gpu:5901+15901,gpu:5902+15902,gpu:5903+15903
 # docker run -d -p 5901:5900 -p 15901:15900 --privileged --ipc host --cap-add SYS_ADMIN quay.io/openai/universe.world-of-bits:0.20.0
 
 GAMMA = 0.99
-REWARD_STEPS = 4
+REWARD_STEPS = 2
 BATCH_SIZE = 32
 LEARNING_RATE = 0.001
 ENTROPY_BETA = 0.01
@@ -67,8 +67,11 @@ if __name__ == "__main__":
         with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
             batch = []
             for step_idx, exp in enumerate(exp_source):
-                rewards, steps = exp_source.pop_rewards_steps()
-                if rewards:
+                rewards_steps = exp_source.pop_rewards_steps()
+                if rewards_steps:
+                    rewards, steps = zip(*rewards_steps)
+                    tb_tracker.track("episode_steps", np.mean(steps), step_idx)
+
                     mean_reward = tracker.reward(np.mean(rewards), step_idx)
                     if mean_reward is not None:
                         if best_reward is None or mean_reward > best_reward:
@@ -78,8 +81,6 @@ if __name__ == "__main__":
                                 torch.save(net.state_dict(), fname)
                                 print("Best reward updated: %.3f -> %.3f" % (best_reward, mean_reward))
                             best_reward = mean_reward
-                if steps:
-                    tb_tracker.track("episode_steps", np.mean(steps), step_idx)
                 batch.append(exp)
                 if len(batch) < BATCH_SIZE:
                     continue
