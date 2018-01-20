@@ -16,7 +16,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 
-ENV_NAME = "wob.mini.BisectAngle-v0"
+ENV_NAME = "wob.mini.ClickDialog-v0"
 #REMOTE_ADDR = 'vnc://gpu:5900+15900'
 #REMOTE_ADDR = 4
 REMOTE_ADDR = 'vnc://gpu:5900+15900,gpu:5901+15901,gpu:5902+15902,gpu:5903+15903'
@@ -33,15 +33,6 @@ ENTROPY_BETA = 0.01
 CLIP_GRAD = 0.1
 
 SAVES_DIR = "saves"
-
-
-def step_env(env, action):
-    while True:
-        obs, reward, is_done, info = env.step([action])
-        if obs[0] is None:
-            continue
-        break
-    return obs, reward, is_done, info
 
 
 if __name__ == "__main__":
@@ -61,8 +52,7 @@ if __name__ == "__main__":
 
     env.configure(remotes=REMOTE_ADDR)
 
-    net = model_vnc.Model(input_shape=(3, wob_vnc.HEIGHT, wob_vnc.WIDTH),
-                          n_actions=env.action_space.n)
+    net = model_vnc.Model(input_shape=wob_vnc.WOB_SHAPE, n_actions=env.action_space.n)
     if args.cuda:
         net.cuda()
     print(net)

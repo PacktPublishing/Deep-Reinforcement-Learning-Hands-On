@@ -7,6 +7,8 @@ HEIGHT = 210
 X_OFS = 10
 Y_OFS = 75
 
+WOB_SHAPE = (3, HEIGHT, WIDTH)
+
 
 class MiniWoBCropper(gym.ObservationWrapper):
     """
