@@ -67,7 +67,7 @@ if __name__ == "__main__":
         with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
             batch = []
             for step_idx, exp in enumerate(exp_source):
-                rewards = exp_source.pop_total_rewards()
+                rewards, steps = exp_source.pop_rewards_steps()
                 if rewards:
                     mean_reward = tracker.reward(np.mean(rewards), step_idx)
                     if mean_reward is not None:
@@ -78,6 +78,8 @@ if __name__ == "__main__":
                                 torch.save(net.state_dict(), fname)
                                 print("Best reward updated: %.3f -> %.3f" % (best_reward, mean_reward))
                             best_reward = mean_reward
+                if steps:
+                    tb_tracker.track("episode_steps", np.mean(steps), step_idx)
                 batch.append(exp)
                 if len(batch) < BATCH_SIZE:
                     continue
