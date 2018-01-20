@@ -20,15 +20,11 @@ class Model(nn.Module):
         conv_out_size = self._get_conv_out(input_shape)
 
         self.policy = nn.Sequential(
-            nn.Linear(conv_out_size, 128),
-            nn.ReLU(),
-            nn.Linear(128, n_actions)
+            nn.Linear(conv_out_size, n_actions),
         )
 
         self.value = nn.Sequential(
-            nn.Linear(conv_out_size, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1)
+            nn.Linear(conv_out_size, 1),
         )
 
     def _get_conv_out(self, shape):
