@@ -42,14 +42,19 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     parser.add_argument("--cuda", default=False, action='store_true', help="CUDA mode")
     parser.add_argument("--port-ofs", type=int, default=0, help="Offset for container's ports, default=0")
+    parser.add_argument("--env", default=ENV_NAME, help="Environment name to solve, default=" + ENV_NAME)
     args = parser.parse_args()
 
-    name = ENV_NAME.split('.')[-1] + "_" + args.name
+    env_name = args.env
+    if not env_name.startswith('wob.mini.'):
+        env_name = "wob.mini." + env_name
+
+    name = env_name.split('.')[-1] + "_" + args.name
     writer = SummaryWriter(comment="-wob_click_" + name)
     saves_path = os.path.join(SAVES_DIR, name)
     os.makedirs(saves_path, exist_ok=True)
 
-    env = gym.make(ENV_NAME)
+    env = gym.make(env_name)
     env = universe.wrappers.experimental.SoftmaxClickMouse(env)
     env = wob_vnc.MiniWoBCropper(env)
     wob_vnc.configure(env, wob_vnc.remotes_url(port_ofs=args.port_ofs, hostname=REMOTES_HOST, count=REMOTES_COUNT))
