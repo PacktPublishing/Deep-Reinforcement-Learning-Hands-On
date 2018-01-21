@@ -1,5 +1,10 @@
 import gym
 import numpy as np
+from PIL import Image, ImageDraw
+
+# observation speed. Shouldn't be more than 15, as
+# rewarder thread on the server side will fall behind.
+FPS = 10
 
 # Area of interest
 WIDTH = 160
@@ -16,7 +21,7 @@ def remotes_url(port_ofs=0, hostname='localhost', count=4):
 
 
 def configure(env, remotes):
-    env.configure(remotes=remotes, fps=15, vnc_kwargs={
+    env.configure(remotes=remotes, fps=FPS, vnc_kwargs={
         'encoding': 'tight', 'compress_level': 0,
         'fine_quality_level': 100, 'subsample_level': 0
     })
@@ -36,3 +41,22 @@ class MiniWoBCropper(gym.ObservationWrapper):
             res.append(np.transpose(img, (2, 0, 1)))
         return res
 
+
+def save_obs(obs, file_name, action=None, action_step_pix=10, action_y_ofs=50):
+    """
+    Save observation from the WoB
+    :param obs: single observation (3d) 
+    :param file_name: image file to save 
+    :param action: action index to show on image 
+    :param action_step_pix: discrete step, taken from SoftmaxClickMouse
+    :param action_y_ofs: y ofs, taken from SoftmaxClickMouse 
+    :return: 
+    """
+    img = Image.fromarray(np.transpose(obs, (1, 2, 0)))
+    if action is not None:
+        draw = ImageDraw.Draw(img)
+        y_ofs = action_y_ofs + (action % 16) * action_step_pix
+        x_ofs = (action // 16) * action_step_pix
+        draw.ellipse((x_ofs, y_ofs, x_ofs+action_step_pix, y_ofs+action_step_pix),
+                     (0, 0, 255, 128))
+    img.save(file_name)

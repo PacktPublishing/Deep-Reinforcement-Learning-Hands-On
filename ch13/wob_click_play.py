@@ -52,13 +52,14 @@ if __name__ == "__main__":
         step_idx = 0
         while True:
             obs, reward, done, info, idle_count = step_env(env, action)
-            print(step_idx, reward, done)
-            img = Image.fromarray(np.transpose(obs, (1, 2, 0)))
-            img.save("%s_%02d_%04d_%.3f.png" % (args.name, round_idx, step_idx, reward))
+            print(step_idx, reward, done, idle_count)
+            img_name = "%s_r%02d_s%04d_%.3f_i%02d_d%d.png" % (
+                args.name, round_idx, step_idx, reward, idle_count, int(done))
             obs_v = Variable(torch.from_numpy(np.array([obs])))
             logits_v = net(obs_v)[0]
             policy = F.softmax(logits_v).data.numpy()[0]
             action = np.random.choice(len(policy), p=policy)
+            wob_vnc.save_obs(obs, img_name, action=action)
             step_idx += 1
             if done or reward != 0:
                 print("Round %d done" % round_idx)
