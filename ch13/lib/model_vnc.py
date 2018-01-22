@@ -12,7 +12,7 @@ class Model(nn.Module):
         self.conv = nn.Sequential(
             nn.Conv2d(input_shape[0], 64, 5, stride=5),
             nn.ReLU(),
-            nn.Conv2d(64, 64, 2, stride=1),
+            nn.Conv2d(64, 64, 3, stride=2),
             nn.ReLU(),
         )
 
