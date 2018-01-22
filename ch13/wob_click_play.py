@@ -34,9 +34,14 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--model", help="Model file to load")
     parser.add_argument("-n", "--name", required=True, help="Prefix to save screenshots")
     parser.add_argument("--count", type=int, default=1, help="Count of runs to play, default=1")
+    parser.add_argument("--env", default=ENV_NAME, help="Environment name to solve, default=" + ENV_NAME)
     args = parser.parse_args()
 
-    env = gym.make(ENV_NAME)
+    env_name = args.env
+    if not env_name.startswith('wob.mini.'):
+        env_name = "wob.mini." + env_name
+
+    env = gym.make(env_name)
     env = universe.wrappers.experimental.SoftmaxClickMouse(env)
     env = wob_vnc.MiniWoBCropper(env)
     wob_vnc.configure(env, REMOTE_ADDR)

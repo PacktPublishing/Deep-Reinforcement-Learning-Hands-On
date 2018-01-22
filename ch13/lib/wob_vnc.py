@@ -31,6 +31,10 @@ class MiniWoBCropper(gym.ObservationWrapper):
     """
     Crops the WoB area and converts the observation into PyTorch (C, H, W) format.
     """
+    def __init__(self, env, keep_text=False):
+        super(MiniWoBCropper, self).__init__(env)
+        self.keep_text = keep_text
+
     def _observation(self, observation_n):
         res = []
         for obs in observation_n:
@@ -38,19 +42,24 @@ class MiniWoBCropper(gym.ObservationWrapper):
                 res.append(obs)
                 continue
             img = obs['vision'][Y_OFS:Y_OFS+HEIGHT, X_OFS:X_OFS+WIDTH, :]
-            res.append(np.transpose(img, (2, 0, 1)))
+            img = np.transpose(img, (2, 0, 1))
+            if self.keep_text:
+                text = " ".join(map(lambda d: d.get('instruction', ''), obs.get('text', [{}])))
+                res.append((img, text))
+            else:
+                res.append(img)
         return res
 
 
 def save_obs(obs, file_name, action=None, action_step_pix=10, action_y_ofs=50):
     """
     Save observation from the WoB
-    :param obs: single observation (3d) 
-    :param file_name: image file to save 
-    :param action: action index to show on image 
+    :param obs: single observation (3d)
+    :param file_name: image file to save
+    :param action: action index to show on image
     :param action_step_pix: discrete step, taken from SoftmaxClickMouse
-    :param action_y_ofs: y ofs, taken from SoftmaxClickMouse 
-    :return: 
+    :param action_y_ofs: y ofs, taken from SoftmaxClickMouse
+    :return:
     """
     img = Image.fromarray(np.transpose(obs, (1, 2, 0)))
     if action is not None:
