@@ -1,8 +1,17 @@
+import logging
 import numpy as np
+from nltk.tokenize import TweetTokenizer
 
 import torch
 import torch.nn as nn
+import torch.nn.utils.rnn as rnn_utils
 from torch.autograd import Variable
+
+MM_EMBEDDINGS_DIM = 50
+MM_HIDDEN_SIZE = 128
+MM_MAX_DICT_SIZE = 500
+
+TOKEN_UNK = "#unk"
 
 
 class Model(nn.Module):
@@ -34,3 +43,110 @@ class Model(nn.Module):
         fx = x.float() / 256
         conv_out = self.conv(fx).view(fx.size()[0], -1)
         return self.policy(conv_out), self.value(conv_out)
+
+
+class ModelMultimodal(nn.Module):
+    def __init__(self, input_shape, n_actions, max_dict_size=MM_MAX_DICT_SIZE):
+        super(ModelMultimodal, self).__init__()
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(input_shape[0], 64, 5, stride=5),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, 3, stride=2),
+            nn.ReLU(),
+        )
+
+        conv_out_size = self._get_conv_out(input_shape)
+
+        self.emb = nn.Embedding(max_dict_size, MM_EMBEDDINGS_DIM)
+        self.rnn = nn.LSTM(MM_EMBEDDINGS_DIM, MM_HIDDEN_SIZE, batch_first=True)
+
+        self.policy = nn.Sequential(
+            nn.Linear(conv_out_size + MM_HIDDEN_SIZE*2, n_actions),
+        )
+
+        self.value = nn.Sequential(
+            nn.Linear(conv_out_size + MM_HIDDEN_SIZE*2, 1),
+        )
+
+    def _get_conv_out(self, shape):
+        o = self.conv(Variable(torch.zeros(1, *shape)))
+        return int(np.prod(o.size()))
+
+    def forward(self, x):
+        x_img, x_text = x
+        assert isinstance(x_text, rnn_utils.PackedSequence)
+
+        # deal with text data
+        emb_out = self.emb(x_text.data)
+        emb_out_seq = rnn_utils.PackedSequence(data=emb_out, batch_sizes=x_text.batch_sizes)
+        rnn_out, rnn_h = self.rnn(emb_out_seq)
+
+        # extract image features
+        fx = x_img.float() / 256
+        conv_out = self.conv(fx).view(fx.size()[0], -1)
+
+        # concat text and image features
+        # get policy and value output
+
+
+class MultimodalPreprocessor:
+    log = logging.getLogger("MulitmodalPreprocessor")
+
+    def __init__(self, max_dict_size=MM_MAX_DICT_SIZE):
+        self.max_dict_size = max_dict_size
+        self.token_to_id = {TOKEN_UNK: 0}
+        self.id_to_token = {0: TOKEN_UNK}
+        self.next_id = 1
+        self.tokenizer = TweetTokenizer(preserve_case=False)
+
+    def __call__(self, batch, cuda=False, device_id=None):
+        """
+        Convert list of multimodel observations (tuples with image and text string) into the form suitable
+        for ModelMultimodal to disgest
+        :param batch:
+        """
+        tokens_batch = []
+        for img_obs, txt_obs in batch:
+            tokens = self.tokenizer.tokenize(txt_obs)
+            idx_obs = self.tokens_to_idx(tokens)
+            tokens_batch.append((img_obs, idx_obs))
+        # sort batch decreasing to seq len
+        tokens_batch.sort(key=lambda p: len(p[1]), reverse=True)
+        img_batch, seq_batch = zip(*tokens_batch)
+        lens = list(map(len, seq_batch))
+
+        # convert data into the target form
+        # images
+        img_v = Variable(torch.from_numpy(np.array(img_batch)))
+        # sequences
+        seq_arr = np.zeros(shape=(len(seq_batch), max(len(seq_batch[0]), 1)), dtype=np.int64)
+        for idx, seq in enumerate(seq_batch):
+            seq_arr[idx, :len(seq)] = seq
+            # Map empty sequences into single #UNK token
+            if len(seq) == 0:
+                lens[idx] = 1
+        seq_v = Variable(torch.from_numpy(seq_arr))
+        if cuda:
+            img_v = img_v.cuda(device_id=device_id)
+            seq_v = seq_v.cuda(device_id=device_id)
+        seq_p = rnn_utils.pack_padded_sequence(seq_v, lens, batch_first=True)
+        return img_v, seq_p
+
+    def tokens_to_idx(self, tokens):
+        res = []
+        for token in tokens:
+            idx = self.token_to_id.get(token)
+            if idx is None:
+                if self.next_id == self.max_dict_size:
+                    self.log.warning("Maximum size of dict reached, token '%s' converted to #UNK token", token)
+                    idx = 0
+                else:
+                    idx = self.next_id
+                    self.next_id += 1
+                    self.token_to_id[token] = idx
+                    self.id_to_token[idx] = token
+            res.append(idx)
+        return res
+
+
