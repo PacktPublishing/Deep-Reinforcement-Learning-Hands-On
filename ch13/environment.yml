@@ -41,6 +41,7 @@ dependencies:
   - idna==2.6
   - incremental==17.5.0
   - markdown==2.6.11
+  - nltk==3.2.5
   - opencv-python==3.4.0.12
   - pillow==5.0.0
   - protobuf==3.5.1
