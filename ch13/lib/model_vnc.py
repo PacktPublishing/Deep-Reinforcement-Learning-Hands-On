@@ -73,6 +73,15 @@ class ModelMultimodal(nn.Module):
         o = self.conv(Variable(torch.zeros(1, *shape)))
         return int(np.prod(o.size()))
 
+    def _concat_features(self, img_out, rnn_hidden):
+        batch_size = img_out.size()[0]
+        if isinstance(rnn_hidden, tuple):
+            flat_h = list(map(lambda t: t.view(batch_size, -1), rnn_hidden))
+            rnn_h = torch.cat(flat_h, dim=1)
+        else:
+            rnn_h = rnn_hidden.view(batch_size, -1)
+        return torch.cat((img_out, rnn_h), dim=1)
+
     def forward(self, x):
         x_img, x_text = x
         assert isinstance(x_text, rnn_utils.PackedSequence)
@@ -86,8 +95,8 @@ class ModelMultimodal(nn.Module):
         fx = x_img.float() / 256
         conv_out = self.conv(fx).view(fx.size()[0], -1)
 
-        # concat text and image features
-        # get policy and value output
+        feats = self._concat_features(conv_out, rnn_h)
+        return self.policy(feats), self.value(feats)
 
 
 class MultimodalPreprocessor:

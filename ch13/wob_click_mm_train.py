@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
                 states_v, actions_t, vals_ref_v = \
                     common.unpack_batch(batch, net, last_val_gamma=GAMMA ** REWARD_STEPS,
-                                        cuda=args.cuda)
+                                        cuda=args.cuda, states_preprocessor=preprocessor)
                 batch.clear()
 
                 optimizer.zero_grad()
