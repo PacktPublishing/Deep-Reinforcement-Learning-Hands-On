@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw
 
 # observation speed. Shouldn't be more than 15, as
 # rewarder thread on the server side will fall behind.
-FPS = 10
+FPS = 5
 
 # Area of interest
 WIDTH = 160
@@ -15,7 +15,7 @@ Y_OFS = 75
 WOB_SHAPE = (3, HEIGHT, WIDTH)
 
 
-def remotes_url(port_ofs=0, hostname='localhost', count=4):
+def remotes_url(port_ofs=0, hostname='localhost', count=8):
     hosts = ["%s:%d+%d" % (hostname, 5900 + ofs, 15900 + ofs) for ofs in range(port_ofs, port_ofs+count)]
     return "vnc://" + ",".join(hosts)
 
