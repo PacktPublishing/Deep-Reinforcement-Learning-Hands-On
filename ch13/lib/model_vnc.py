@@ -67,9 +67,7 @@ class ModelMultimodal(nn.Module):
         )
 
         self.value = nn.Sequential(
-            nn.Linear(conv_out_size + MM_HIDDEN_SIZE*2, 128),
-            nn.ReLU(),
-            nn.Linear(128, 1),
+            nn.Linear(conv_out_size + MM_HIDDEN_SIZE*2, 1),
         )
 
     def _get_conv_out(self, shape):
