@@ -7,7 +7,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from torch.autograd import Variable
-from PIL import Image
 
 from lib import wob_vnc, model_vnc
 

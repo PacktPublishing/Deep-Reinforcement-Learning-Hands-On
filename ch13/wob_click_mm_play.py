@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import os
 import argparse
 import gym
 import universe
@@ -7,12 +6,11 @@ import numpy as np
 
 import torch
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 from lib import wob_vnc, model_vnc
 
 
-ENV_NAME = "wob.mini.ClickButton-v0"
+ENV_NAME = "wob.mini.ClickTab-v0"
 REMOTE_ADDR = 'vnc://gpu:5910+15910'
 
 # docker run -d -p 5910:5900 -p 15910:15900 --privileged --ipc host --cap-add SYS_ADMIN 92756d1f08ac

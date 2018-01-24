@@ -18,7 +18,7 @@ import torch.optim as optim
 
 REMOTES_HOST = "gpu"
 REMOTES_COUNT = 4
-ENV_NAME = "wob.mini.ClickButton-v0"
+ENV_NAME = "wob.mini.ClickTab-v0"
 
 GAMMA = 0.99
 REWARD_STEPS = 1
