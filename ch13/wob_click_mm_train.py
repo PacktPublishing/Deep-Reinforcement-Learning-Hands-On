@@ -117,5 +117,6 @@ if __name__ == "__main__":
                 tb_tracker.track("loss_policy", loss_policy_v, step_idx)
                 tb_tracker.track("loss_value", loss_value_v, step_idx)
                 tb_tracker.track("loss_total", loss_v, step_idx)
+                tb_tracker.track("dict_size", len(preprocessor), step_idx)
 
     pass
