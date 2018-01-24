@@ -79,9 +79,9 @@ if __name__ == "__main__":
                         if best_reward is None or mean_reward > best_reward:
                             if best_reward is not None:
                                 name = "best_%.3f_%d" % (mean_reward, step_idx)
-                                fname = os.path.join(saves_path, name + ".dat")
-                                torch.save(net.state_dict(), fname)
-                                preprocessor.save(name + ".pre")
+                                fname = os.path.join(saves_path, name)
+                                torch.save(net.state_dict(), fname + ".dat")
+                                preprocessor.save(fname + ".pre")
                                 print("Best reward updated: %.3f -> %.3f" % (best_reward, mean_reward))
                             best_reward = mean_reward
                 batch.append(exp)
