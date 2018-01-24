@@ -1,4 +1,5 @@
 import logging
+import pickle
 import numpy as np
 from nltk.tokenize import TweetTokenizer
 
@@ -9,7 +10,7 @@ from torch.autograd import Variable
 
 MM_EMBEDDINGS_DIM = 50
 MM_HIDDEN_SIZE = 128
-MM_MAX_DICT_SIZE = 20
+MM_MAX_DICT_SIZE = 100
 
 TOKEN_UNK = "#unk"
 
@@ -160,5 +161,26 @@ class MultimodalPreprocessor:
                     self.id_to_token[idx] = token
             res.append(idx)
         return res
+
+    def save(self, file_name):
+        with open(file_name, 'wb') as fd:
+            pickle.dump(self.token_to_id, fd)
+            pickle.dump(self.max_dict_size, fd)
+            pickle.dump(self.next_id, fd)
+
+    @classmethod
+    def load(cls, file_name):
+        with open(file_name, "rb") as fd:
+            token_to_id = pickle.load(fd)
+            max_dict_size = pickle.load(fd)
+            next_id = pickle.load(fd)
+
+            res = MultimodalPreprocessor(max_dict_size)
+            res.token_to_id = token_to_id
+            res.id_to_token = {idx: token for token, idx in token_to_id.items()}
+            res.next_id = next_id
+            return res
+
+    pass
 
 
