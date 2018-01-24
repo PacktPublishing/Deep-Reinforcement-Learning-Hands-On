@@ -58,8 +58,8 @@ class ModelMultimodal(nn.Module):
 
         conv_out_size = self._get_conv_out(input_shape)
 
-        self.emb = nn.Embedding(max_dict_size, MM_EMBEDDINGS_DIM)
-        self.rnn = nn.LSTM(MM_EMBEDDINGS_DIM, MM_HIDDEN_SIZE, batch_first=True)
+#        self.emb = nn.Embedding(max_dict_size, MM_EMBEDDINGS_DIM)
+        self.rnn = nn.LSTM(max_dict_size, MM_HIDDEN_SIZE, batch_first=True)
 
         self.policy = nn.Sequential(
             nn.Linear(conv_out_size + MM_HIDDEN_SIZE*2, n_actions),
@@ -87,9 +87,9 @@ class ModelMultimodal(nn.Module):
         assert isinstance(x_text, rnn_utils.PackedSequence)
 
         # deal with text data
-        emb_out = self.emb(x_text.data)
-        emb_out_seq = rnn_utils.PackedSequence(data=emb_out, batch_sizes=x_text.batch_sizes)
-        rnn_out, rnn_h = self.rnn(emb_out_seq)
+#        emb_out = self.emb(x_text.data)
+#        emb_out_seq = rnn_utils.PackedSequence(data=emb_out, batch_sizes=x_text.batch_sizes)
+        rnn_out, rnn_h = self.rnn(x_text)
 
         # extract image features
         fx = x_img.float() / 256
