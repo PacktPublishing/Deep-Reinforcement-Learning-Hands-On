@@ -4,7 +4,7 @@ from PIL import Image, ImageDraw
 
 # observation speed. Shouldn't be more than 15, as
 # rewarder thread on the server side will fall behind.
-FPS = 5
+FPS = 15
 
 # Area of interest
 WIDTH = 160
