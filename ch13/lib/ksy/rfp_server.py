@@ -17,11 +17,7 @@ class RfpServer(KaitaiStruct):
         self._io = _io
         self._parent = _parent
         self._root = _root if _root else self
-        self.magic = (self._io.read_bytes_term(10, False, True, True)).decode(u"ascii")
-        self.some_data = self._io.read_bytes(4)
-        self.challenge = self._io.read_bytes(16)
-        self.security_status = self._io.read_u4be()
-        self.server_init = self._root.ServerInit(self._io, self, self._root)
+        self.header = self._root.Header(self._io, self, self._root)
         self.messages = []
         while not self._io.is_eof():
             self.messages.append(self._root.Message(self._io, self, self._root))
@@ -41,7 +37,7 @@ class RfpServer(KaitaiStruct):
             self._io = _io
             self._parent = _parent
             self._root = _root if _root else self
-            self.data = self._io.read_bytes(((self._parent.header.width * self._parent.header.height) * self._root.server_init.pixel_format.bpp // 8))
+            self.data = self._io.read_bytes(((self._parent.header.width * self._parent.header.height) * self._root.header.server_init.pixel_format.bpp // 8))
             self.bitmask = self._io.read_bytes((self._parent.header.height * ((self._parent.header.width + 7) >> 3)))
 
 
@@ -59,7 +55,7 @@ class RfpServer(KaitaiStruct):
             self._io = _io
             self._parent = _parent
             self._root = _root if _root else self
-            self.data = self._io.read_bytes(((self._parent.header.width * self._parent.header.height) * self._root.server_init.pixel_format.bpp // 8))
+            self.data = self._io.read_bytes(((self._parent.header.width * self._parent.header.height) * self._root.header.server_init.pixel_format.bpp // 8))
 
 
     class PixelFormat(KaitaiStruct):
@@ -98,7 +94,19 @@ class RfpServer(KaitaiStruct):
             self._parent = _parent
             self._root = _root if _root else self
             self.subrects_count = self._io.read_u4be()
-            self.background = self._io.read_bytes(self._root.server_init.pixel_format.bpp // 8)
+            self.background = self._io.read_bytes(self._root.header.server_init.pixel_format.bpp // 8)
+
+
+    class Header(KaitaiStruct):
+        def __init__(self, _io, _parent=None, _root=None):
+            self._io = _io
+            self._parent = _parent
+            self._root = _root if _root else self
+            self.magic = (self._io.read_bytes_term(10, False, True, True)).decode(u"ascii")
+            self.some_data = self._io.read_bytes(4)
+            self.challenge = self._io.read_bytes(16)
+            self.security_status = self._io.read_u4be()
+            self.server_init = self._root.ServerInit(self._io, self, self._root)
 
 
     class Message(KaitaiStruct):

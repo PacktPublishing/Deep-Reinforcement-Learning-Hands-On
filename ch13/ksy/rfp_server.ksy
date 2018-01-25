@@ -3,24 +3,28 @@ meta:
   file-extension: rfp_server
   endian: be
 seq:
-  - id: magic
-    type: str
-    terminator: 10
-    encoding: ascii
-    doc: ProtocolVersion
-  - id: some_data
-    size: 4
-  - id: challenge
-    size: 16
-    doc: Challenge bytes
-  - id: security_status
-    type: u4
-  - id: server_init
-    type: server_init
+  - id: header
+    type: header
   - id: messages
     type: message
     repeat: eos
 types:
+  header:
+    seq:
+      - id: magic
+        type: str
+        terminator: 10
+        encoding: ascii
+        doc: ProtocolVersion
+      - id: some_data
+        size: 4
+      - id: challenge
+        size: 16
+        doc: Challenge bytes
+      - id: security_status
+        type: u4
+      - id: server_init
+        type: server_init
   server_init:
     seq:
       - id: width
@@ -107,13 +111,13 @@ types:
   rect_cursor_pseudo_encoding:
     seq:
       - id: data
-        size: _parent.header.width * _parent.header.height * (_root.server_init.pixel_format.bpp / 8)
+        size: _parent.header.width * _parent.header.height * (_root.header.server_init.pixel_format.bpp / 8)
       - id: bitmask
         size: _parent.header.height * ((_parent.header.width + 7) >> 3)
   rect_raw_encoding:
     seq:
       - id: data
-        size: _parent.header.width * _parent.header.height * (_root.server_init.pixel_format.bpp / 8)
+        size: _parent.header.width * _parent.header.height * (_root.header.server_init.pixel_format.bpp / 8)
   rect_copy_rect_encoding:
     seq:
       - id: src_x
@@ -125,7 +129,7 @@ types:
       - id: subrects_count
         type: u4
       - id: background
-        size: _root.server_init.pixel_format.bpp / 8
+        size: _root.header.server_init.pixel_format.bpp / 8
   rect_zrle_encoding:
     seq:
       - id: length

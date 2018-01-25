@@ -17,9 +17,7 @@ class RfpClient(KaitaiStruct):
         self._io = _io
         self._parent = _parent
         self._root = _root if _root else self
-        self.magic = (self._io.read_bytes_term(10, False, True, True)).decode(u"ascii")
-        self.challenge_response = self._io.read_bytes(16)
-        self.client_init = self._io.ensure_fixed_contents(struct.pack('1b', 1))
+        self.header = self._root.Header(self._io, self, self._root)
         self.messages = []
         while not self._io.is_eof():
             self.messages.append(self._root.Message(self._io, self, self._root))
@@ -62,6 +60,16 @@ class RfpClient(KaitaiStruct):
             self.button_mask = self._io.read_u1()
             self.pos_x = self._io.read_u2be()
             self.pos_y = self._io.read_u2be()
+
+
+    class Header(KaitaiStruct):
+        def __init__(self, _io, _parent=None, _root=None):
+            self._io = _io
+            self._parent = _parent
+            self._root = _root if _root else self
+            self.magic = (self._io.read_bytes_term(10, False, True, True)).decode(u"ascii")
+            self.challenge_response = self._io.read_bytes(16)
+            self.client_init = self._io.ensure_fixed_contents(struct.pack('1b', 1))
 
 
     class Message(KaitaiStruct):
@@ -108,6 +116,3 @@ class RfpClient(KaitaiStruct):
             self.pos_y = self._io.read_u2be()
             self.width = self._io.read_u2be()
             self.height = self._io.read_u2be()
-
-
-

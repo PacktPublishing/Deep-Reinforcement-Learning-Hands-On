@@ -3,20 +3,24 @@ meta:
   file-extension: rfp_client
   endian: be
 seq:
-  - id: magic
-    type: str
-    terminator: 10
-    encoding: ascii
-    doc: ProtocolVersion
-  - id: challenge_response
-    size: 16
-    doc: Encrypted challenge bytes
-  - id: client_init
-    contents: [1]
+  - id: header
+    type: header
   - id: messages
     type: message
     repeat: eos
 types:
+  header:
+    seq:
+      - id: magic
+        type: str
+        terminator: 10
+        encoding: ascii
+        doc: ProtocolVersion
+      - id: challenge_response
+        size: 16
+        doc: Encrypted challenge bytes
+      - id: client_init
+        contents: [1]
   message:
     seq:
       - id: message_type
