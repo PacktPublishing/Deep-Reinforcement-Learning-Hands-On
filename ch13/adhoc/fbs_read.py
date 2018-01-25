@@ -4,7 +4,6 @@ sys.path.append("..")
 
 import struct
 import argparse
-import universe
 from universe.vncdriver.fbs_reader import FBSReader
 
 
