@@ -40,6 +40,7 @@ dependencies:
   - hyperlink==17.3.1
   - idna==2.6
   - incremental==17.5.0
+  - kaitaistruct==0.7
   - markdown==2.6.11
   - nltk==3.2.5
   - opencv-python==3.4.0.12
