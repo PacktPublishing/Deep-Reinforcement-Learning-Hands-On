@@ -6,12 +6,14 @@ sys.path.append(os.getcwd())
 sys.path.append("..")
 import argparse
 import struct
+import collections
 
+from universe.spaces import vnc_event
 from universe.vncdriver import fbs_reader, server_messages, vnc_client
 from lib.ksy import rfp_client, rfp_server
 from kaitaistruct import KaitaiStream
 
-from PIL import Image
+from PIL import Image, ImageDraw
 
 
 def read_fbp_file(file_name, msg_root_class, msg_header_class, msg_class):
@@ -62,6 +64,7 @@ def decode_rectangle(client, msg_rect):
     else:
         print("Warning! Unsupported encoding requested: %s" % msg_rect.header.encoding)
 
+
 class Client:
     def __init__(self, server_header):
         assert isinstance(server_header, rfp_server.RfpServer.Header)
@@ -95,25 +98,60 @@ if __name__ == "__main__":
 
     client = Client(srv_header)
     numpy_screen = client.framebuffer.numpy_screen
+    numpy_screen.set_paint_cursor(True)
 
-    for idx, (ts, msg) in enumerate(srv_messages):
-        # framebuffer update
-        if msg.message_type == rfp_server.RfpServer.MessageType.fb_update:
-            rects = []
-            for msg_r in msg.message_body.rects:
-                rect = decode_rectangle(client, msg_r)
-                if rect is not None:
-                    rects.append(rect)
-            update = server_messages.FramebufferUpdate(rects)
+    server_deque = collections.deque(srv_messages)
+
+    start_ts = None
+    last_save = None
+
+    for idx, (ts, msg) in enumerate(client_messages):
+        if start_ts is None:
+            start_ts = ts
+
+        # apply server messages to the framebuffer
+        while server_deque:
+            top_ts = server_deque[0][0]
+
+            if top_ts > ts:
+                break
+            msg = server_deque.popleft()[1]
+
+            # framebuffer update
+            if msg.message_type == rfp_server.RfpServer.MessageType.fb_update:
+                rects = []
+                for msg_r in msg.message_body.rects:
+                    rect = decode_rectangle(client, msg_r)
+                    if rect is not None:
+                        rects.append(rect)
+                update = server_messages.FramebufferUpdate(rects)
+                numpy_screen.flip()
+                numpy_screen.apply(update)
+                numpy_screen.flip()
+
+        # pass client action to framebuffer to track cursor position
+        if msg.message_type == 5: # TODO: enum
+            event = vnc_event.PointerEvent(msg.message_body.pos_x, msg.message_body.pos_y, msg.message_body.button_mask)
             numpy_screen.flip()
-            numpy_screen.apply(update)
+            numpy_screen.apply_action(event)
             numpy_screen.flip()
-            n = "img_%04d_%.4f.png" % (idx, ts)
-            img = Image.fromarray(numpy_screen.peek())
-            img.save(n)
 
-
-
+            # if button was pressed, record the image
+            if msg.message_body.button_mask or last_save is None or (ts - last_save) > 0.5:
+                n = "img_%04d_%.4f_%d.png" % (idx, ts - start_ts, msg.message_body.button_mask)
+                img = Image.fromarray(numpy_screen.peek())
+                draw = ImageDraw.Draw(img)
+                y_ofs = msg.message_body.pos_y
+                x_ofs = msg.message_body.pos_x
+                if msg.message_body.button_mask:
+                    size = 10
+                else:
+                    size = 2
+                draw.ellipse(
+                    (x_ofs, y_ofs, x_ofs + size, y_ofs + size),
+                    (0, 0, 255, 128))
+                img.save(n)
+                last_save = ts
 
     pass
 
