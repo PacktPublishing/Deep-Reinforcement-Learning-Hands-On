@@ -8,6 +8,18 @@ seq:
   - id: messages
     type: message
     repeat: eos
+enums:
+  message_type:
+    0: fb_update
+    1: set_colormap
+    2: bell
+    3: cut_text
+  encoding:
+    0xFFFFFF11: cursor
+    0: raw
+    1: copy_rect
+    2: rre
+    16: zrle
 types:
   header:
     seq:
@@ -67,12 +79,15 @@ types:
     seq:
       - id: message_type
         type: u1
+        enum: message_type
       - id: message_body
         type:
           switch-on: message_type
           cases:
-            0: msg_fb_update
-            1: msg_fb_update
+            'message_type::fb_update': msg_fb_update
+            'message_type::set_colormap': msg_set_colormap
+            'message_type::bell': msg_bell
+            'message_type::cut_text': msg_cut_text
   msg_fb_update:
     seq:
       - id: padding
@@ -91,11 +106,12 @@ types:
         type:
           switch-on: header.encoding
           cases:
-            -239: rect_cursor_pseudo_encoding
-            0: rect_raw_encoding
-            1: rect_copy_rect_encoding
-            2: rect_rre_encoding
-            16: rect_zrle_encoding
+            'encoding::cursor': rect_cursor_pseudo_encoding
+            'encoding::raw': rect_raw_encoding
+            'encoding::copy_rect': rect_copy_rect_encoding
+            'encoding::rre': rect_rre_encoding
+            'encoding::zrle': rect_zrle_encoding
+# TODO: other encodings
   rect_header:
     seq:
       - id: pos_x
@@ -107,32 +123,55 @@ types:
       - id: height
         type: u2
       - id: encoding
-        type: s4
+        type: u4
+        enum: encoding
   rect_cursor_pseudo_encoding:
     seq:
       - id: data
-        size: _parent.header.width * _parent.header.height * (_root.header.server_init.pixel_format.bpp / 8)
-      - id: bitmask
-        size: _parent.header.height * ((_parent.header.width + 7) >> 3)
+        size: _parent.header.width * _parent.header.height * (_root.header.server_init.pixel_format.bpp / 8) + _parent.header.height * ((_parent.header.width + 7) >> 3)
   rect_raw_encoding:
     seq:
       - id: data
         size: _parent.header.width * _parent.header.height * (_root.header.server_init.pixel_format.bpp / 8)
   rect_copy_rect_encoding:
     seq:
-      - id: src_x
-        type: u2
-      - id: src_y
-        type: u2
+      - id: data
+        size: 4
   rect_rre_encoding:
     seq:
       - id: subrects_count
         type: u4
       - id: background
         size: _root.header.server_init.pixel_format.bpp / 8
+      - id: data
+        size: subrects_count * (_root.header.server_init.pixel_format.bpp / 8 + 8)
   rect_zrle_encoding:
     seq:
       - id: length
         type: u4
-      - id: zlib_data
+      - id: data
+        size: length
+  msg_set_colormap:
+    seq:
+      - id: padding
+        size: 1
+      - id: first_color
+        type: u2
+      - id: number_colors
+        type: u2
+      - id: data
+        size: number_colors * 6
+  msg_bell:
+    seq:
+      - id: empty
+        size: 0
+  msg_cut_text:
+    seq:
+      - id: padding
+        size: 3
+      - id: length
+        type: u4
+      - id: text
+        type: str
+        encoding: ascii
         size: length

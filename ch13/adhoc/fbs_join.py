@@ -49,11 +49,18 @@ def decode_rectangle(client, msg_rect):
     :return:
     """
     assert isinstance(msg_rect, rfp_server.RfpServer.Rectangle)
-    if msg_rect.header.encoding == 0:
-        return server_messages.RAWEncoding.parse_rectangle(client, msg_rect.header.pos_x, msg_rect.header.pos_y,
-                                                           msg_rect.header.width, msg_rect.header.height,
-                                                           msg_rect.body.data)
-
+    if msg_rect.header.encoding == rfp_server.RfpServer.Encoding.raw:
+        return server_messages.RAWEncoding.parse_rectangle(
+            client, msg_rect.header.pos_x, msg_rect.header.pos_y,
+            msg_rect.header.width, msg_rect.header.height,
+            msg_rect.body.data)
+    elif msg_rect.header.encoding == rfp_server.RfpServer.Encoding.cursor:
+        return server_messages.PseudoCursorEncoding.parse_rectangle(
+            client, msg_rect.header.pos_x, msg_rect.header.pos_y,
+            msg_rect.header.width, msg_rect.header.height,
+            msg_rect.body.data)
+    else:
+        print("Warning! Unsupported encoding requested: %s" % msg_rect.header.encoding)
 
 class Client:
     def __init__(self, server_header):
@@ -86,15 +93,12 @@ if __name__ == "__main__":
         read_fbp_file(file_name, rfp_server.RfpServer, rfp_server.RfpServer.Header, rfp_server.RfpServer.Message)
     print("Server file processed, it has %d messages" % len(srv_messages))
 
-    # render sever screen step by step
-#    screen = numpy_screen.NumpyScreen(server_header.server_init.width, server_header.server_init.height)
-
     client = Client(srv_header)
     numpy_screen = client.framebuffer.numpy_screen
 
     for idx, (ts, msg) in enumerate(srv_messages):
         # framebuffer update
-        if msg.message_type == 0:
+        if msg.message_type == rfp_server.RfpServer.MessageType.fb_update:
             rects = []
             for msg_r in msg.message_body.rects:
                 rect = decode_rectangle(client, msg_r)

@@ -13,6 +13,19 @@ if parse_version(ks_version) < parse_version('0.7'):
     raise Exception("Incompatible Kaitai Struct Python API: 0.7 or later is required, but you have %s" % (ks_version))
 
 class RfpServer(KaitaiStruct):
+
+    class MessageType(Enum):
+        fb_update = 0
+        set_colormap = 1
+        bell = 2
+        cut_text = 3
+
+    class Encoding(Enum):
+        raw = 0
+        copy_rect = 1
+        rre = 2
+        zrle = 16
+        cursor = 4294967057
     def __init__(self, _io, _parent=None, _root=None):
         self._io = _io
         self._parent = _parent
@@ -29,7 +42,7 @@ class RfpServer(KaitaiStruct):
             self._parent = _parent
             self._root = _root if _root else self
             self.length = self._io.read_u4be()
-            self.zlib_data = self._io.read_bytes(self.length)
+            self.data = self._io.read_bytes(self.length)
 
 
     class RectCursorPseudoEncoding(KaitaiStruct):
@@ -37,8 +50,7 @@ class RfpServer(KaitaiStruct):
             self._io = _io
             self._parent = _parent
             self._root = _root if _root else self
-            self.data = self._io.read_bytes(((self._parent.header.width * self._parent.header.height) * self._root.header.server_init.pixel_format.bpp // 8))
-            self.bitmask = self._io.read_bytes((self._parent.header.height * ((self._parent.header.width + 7) >> 3)))
+            self.data = self._io.read_bytes((((self._parent.header.width * self._parent.header.height) * self._root.header.server_init.pixel_format.bpp // 8) + (self._parent.header.height * ((self._parent.header.width + 7) >> 3))))
 
 
     class RectCopyRectEncoding(KaitaiStruct):
@@ -46,8 +58,7 @@ class RfpServer(KaitaiStruct):
             self._io = _io
             self._parent = _parent
             self._root = _root if _root else self
-            self.src_x = self._io.read_u2be()
-            self.src_y = self._io.read_u2be()
+            self.data = self._io.read_bytes(4)
 
 
     class RectRawEncoding(KaitaiStruct):
@@ -85,7 +96,7 @@ class RfpServer(KaitaiStruct):
             self.pos_y = self._io.read_u2be()
             self.width = self._io.read_u2be()
             self.height = self._io.read_u2be()
-            self.encoding = self._io.read_s4be()
+            self.encoding = self._root.Encoding(self._io.read_u4be())
 
 
     class RectRreEncoding(KaitaiStruct):
@@ -95,6 +106,36 @@ class RfpServer(KaitaiStruct):
             self._root = _root if _root else self
             self.subrects_count = self._io.read_u4be()
             self.background = self._io.read_bytes(self._root.header.server_init.pixel_format.bpp // 8)
+            self.data = self._io.read_bytes((self.subrects_count * (self._root.header.server_init.pixel_format.bpp // 8 + 8)))
+
+
+    class MsgSetColormap(KaitaiStruct):
+        def __init__(self, _io, _parent=None, _root=None):
+            self._io = _io
+            self._parent = _parent
+            self._root = _root if _root else self
+            self.padding = self._io.read_bytes(1)
+            self.first_color = self._io.read_u2be()
+            self.number_colors = self._io.read_u2be()
+            self.data = self._io.read_bytes((self.number_colors * 6))
+
+
+    class MsgBell(KaitaiStruct):
+        def __init__(self, _io, _parent=None, _root=None):
+            self._io = _io
+            self._parent = _parent
+            self._root = _root if _root else self
+            self.empty = self._io.read_bytes(0)
+
+
+    class MsgCutText(KaitaiStruct):
+        def __init__(self, _io, _parent=None, _root=None):
+            self._io = _io
+            self._parent = _parent
+            self._root = _root if _root else self
+            self.padding = self._io.read_bytes(3)
+            self.length = self._io.read_u4be()
+            self.text = (self._io.read_bytes(self.length)).decode(u"ascii")
 
 
     class Header(KaitaiStruct):
@@ -114,12 +155,16 @@ class RfpServer(KaitaiStruct):
             self._io = _io
             self._parent = _parent
             self._root = _root if _root else self
-            self.message_type = self._io.read_u1()
+            self.message_type = self._root.MessageType(self._io.read_u1())
             _on = self.message_type
-            if _on == 0:
+            if _on == self._root.MessageType.fb_update:
                 self.message_body = self._root.MsgFbUpdate(self._io, self, self._root)
-            elif _on == 1:
-                self.message_body = self._root.MsgFbUpdate(self._io, self, self._root)
+            elif _on == self._root.MessageType.set_colormap:
+                self.message_body = self._root.MsgSetColormap(self._io, self, self._root)
+            elif _on == self._root.MessageType.bell:
+                self.message_body = self._root.MsgBell(self._io, self, self._root)
+            elif _on == self._root.MessageType.cut_text:
+                self.message_body = self._root.MsgCutText(self._io, self, self._root)
 
 
     class MsgFbUpdate(KaitaiStruct):
@@ -142,16 +187,16 @@ class RfpServer(KaitaiStruct):
             self._root = _root if _root else self
             self.header = self._root.RectHeader(self._io, self, self._root)
             _on = self.header.encoding
-            if _on == 0:
-                self.body = self._root.RectRawEncoding(self._io, self, self._root)
-            elif _on == 1:
-                self.body = self._root.RectCopyRectEncoding(self._io, self, self._root)
-            elif _on == -239:
-                self.body = self._root.RectCursorPseudoEncoding(self._io, self, self._root)
-            elif _on == 16:
-                self.body = self._root.RectZrleEncoding(self._io, self, self._root)
-            elif _on == 2:
+            if _on == self._root.Encoding.rre:
                 self.body = self._root.RectRreEncoding(self._io, self, self._root)
+            elif _on == self._root.Encoding.raw:
+                self.body = self._root.RectRawEncoding(self._io, self, self._root)
+            elif _on == self._root.Encoding.cursor:
+                self.body = self._root.RectCursorPseudoEncoding(self._io, self, self._root)
+            elif _on == self._root.Encoding.copy_rect:
+                self.body = self._root.RectCopyRectEncoding(self._io, self, self._root)
+            elif _on == self._root.Encoding.zrle:
+                self.body = self._root.RectZrleEncoding(self._io, self, self._root)
 
 
     class ServerInit(KaitaiStruct):
