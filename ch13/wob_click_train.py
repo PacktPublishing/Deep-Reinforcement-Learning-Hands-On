@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 import os
 import gym
+import random
 import universe
 import argparse
 import numpy as np
 from tensorboardX import SummaryWriter
 
-from lib import wob_vnc, model_vnc, common
+from lib import wob_vnc, model_vnc, common, vnc_demo
 
 import ptan
 
@@ -34,6 +35,8 @@ LEARNING_RATE = 0.0001
 ENTROPY_BETA = 0.01
 CLIP_GRAD = 0.05
 
+DEMO_PROB = 0.5
+
 SAVES_DIR = "saves"
 
 
@@ -43,6 +46,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true', help="CUDA mode")
     parser.add_argument("--port-ofs", type=int, default=0, help="Offset for container's ports, default=0")
     parser.add_argument("--env", default=ENV_NAME, help="Environment name to solve, default=" + ENV_NAME)
+    parser.add_argument("--demo", help="Demo dir to load. Default=No demo")
     args = parser.parse_args()
 
     env_name = args.env
@@ -53,6 +57,14 @@ if __name__ == "__main__":
     writer = SummaryWriter(comment="-wob_click_" + name)
     saves_path = os.path.join(SAVES_DIR, name)
     os.makedirs(saves_path, exist_ok=True)
+
+    demo_samples = None
+    if args.demo:
+        demo_samples = vnc_demo.load_demo(args.demo, env_name)
+        if not demo_samples:
+            demo_samples = None
+        else:
+            print("Loaded %d demo samples, will use them during training" % len(demo_samples))
 
     env = gym.make(env_name)
     env = universe.wrappers.experimental.SoftmaxClickMouse(env)
@@ -92,6 +104,13 @@ if __name__ == "__main__":
                 batch.append(exp)
                 if len(batch) < BATCH_SIZE:
                     continue
+
+                if random.random() < DEMO_PROB:
+                    random.shuffle(demo_samples)
+                    demo_batch = demo_samples[:BATCH_SIZE]
+                    model_vnc.train_demo(net, optimizer, demo_batch, writer, step_idx,
+                                         preprocessor=ptan.agent.default_states_preprocessor,
+                                         cuda=args.cuda)
 
                 states_v, actions_t, vals_ref_v = \
                     common.unpack_batch(batch, net, last_val_gamma=GAMMA ** REWARD_STEPS,

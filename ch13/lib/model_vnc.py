@@ -5,6 +5,7 @@ from nltk.tokenize import TweetTokenizer
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.nn.utils.rnn as rnn_utils
 from torch.autograd import Variable
 
@@ -183,4 +184,20 @@ class MultimodalPreprocessor:
 
     pass
 
+
+def train_demo(net, optimizer, batch, writer, step_idx, preprocessor, cuda=False):
+    """
+    Train net on demonstration batch
+    """
+    batch_obs, batch_act = zip(*batch)
+    batch_v = preprocessor(batch_obs, cuda=cuda)
+    optimizer.zero_grad()
+    ref_actions_v = Variable(torch.LongTensor(batch_act))
+    if cuda:
+        ref_actions_v = ref_actions_v.cuda()
+    policy_v = net(batch_v)[0]
+    loss_v = F.cross_entropy(policy_v, ref_actions_v)
+    loss_v.backward()
+    optimizer.step()
+    writer.add_scalar("demo_loss", loss_v.data.cpu().numpy()[0], step_idx)
 
