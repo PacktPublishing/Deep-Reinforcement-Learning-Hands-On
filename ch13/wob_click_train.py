@@ -105,7 +105,7 @@ if __name__ == "__main__":
                 if len(batch) < BATCH_SIZE:
                     continue
 
-                if random.random() < DEMO_PROB:
+                if demo_samples and random.random() < DEMO_PROB:
                     random.shuffle(demo_samples)
                     demo_batch = demo_samples[:BATCH_SIZE]
                     model_vnc.train_demo(net, optimizer, demo_batch, writer, step_idx,
