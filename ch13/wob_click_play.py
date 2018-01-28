@@ -42,8 +42,9 @@ if __name__ == "__main__":
 
     env = gym.make(env_name)
     env = universe.wrappers.experimental.SoftmaxClickMouse(env)
+    env = wob_vnc.MiniWoBPeeker(env, args.name)
     env = wob_vnc.MiniWoBCropper(env)
-    wob_vnc.configure(env, REMOTE_ADDR)
+    wob_vnc.configure(env, REMOTE_ADDR, fps=2)
 
     net = model_vnc.Model(input_shape=wob_vnc.WOB_SHAPE, n_actions=env.action_space.n)
     if args.model:
@@ -63,7 +64,7 @@ if __name__ == "__main__":
             logits_v = net(obs_v)[0]
             policy = F.softmax(logits_v).data.numpy()[0]
             action = np.random.choice(len(policy), p=policy)
-            wob_vnc.save_obs(obs, img_name, action=action)
+#            wob_vnc.save_obs(obs, img_name, action=action)
             step_idx += 1
             if done or reward != 0:
                 print("Round %d done" % round_idx)
