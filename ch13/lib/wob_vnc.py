@@ -1,4 +1,5 @@
 import gym
+import copy
 import numpy as np
 from PIL import Image, ImageDraw
 
@@ -93,6 +94,7 @@ class MiniWoBPeeker(vectorized.Wrapper):
         self.img_prefix = img_prefix
         self.episodes = None
         self.steps = None
+        self.img_stack = None
         e = env
         while e is not None and not isinstance(e, SoftmaxClickMouse):
             e = e.env
@@ -105,9 +107,17 @@ class MiniWoBPeeker(vectorized.Wrapper):
             self.episodes = [0] * len(res)
         if self.steps is None:
             self.steps = [0] * len(res)
+        self.img_stack = [None] * len(res)
         return res
 
     def _step(self, action_n):
+        for img_item, action in zip(self.img_stack, action_n):
+            if img_item is None:
+                continue
+            img, fname = img_item
+            action_coords = self.softmax_env._points[action]
+            save_obs(img, fname, action_coords, transpose=False)
+
         observation_n, reward_n, done_n, info = self.env.step(action_n)
         for idx, (obs, reward, done, action) in enumerate(zip(observation_n, reward_n, done_n, action_n)):
             if obs is not None:
@@ -116,8 +126,7 @@ class MiniWoBPeeker(vectorized.Wrapper):
                 )
                 img = obs['vision']
                 img = img[Y_OFS:Y_OFS+HEIGHT, X_OFS:X_OFS+WIDTH*2, :]
-                action_coords = self.softmax_env._points[action]
-                save_obs(img, fname, action_coords, transpose=False)
+                self.img_stack[idx] = (img, fname)
             if done:
                 self.episodes[idx] += 1
                 self.steps[idx] = 0
