@@ -1,0 +1,48 @@
+% C-c C-o to insert the block
+
+% Individual equation: equation* block
+% Inline equation \begin{math}\frac{sin(x)}{x}\end{math}
+\documentclass{article}
+
+\usepackage{amsmath,amssymb}
+
+\ifdefined\ispreview
+\usepackage[active,tightpage]{preview}
+\PreviewEnvironment{math}
+\PreviewEnvironment{equation*}
+\fi
+
+\DeclareMathOperator{\E}{\mathbb{E}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\begin{document}
+
+Page 8,
+
+To understand how to switch our training from log-likelihood objective to RL
+scenario, let’s let’s look at both from the mathematical point of
+view. Log-likelihood estimation means maximizing the
+sum \begin{math}\sum_{i=1}^{N}\log p_{model}(y_i|x_i)\end{math}
+by tweaking model’s parameter, which is exactly the same as minimization of
+KL-divergence between the data probability distribution and and probability
+distribution parameterized by the model, which could be written as maximisation
+of \begin{math}\E_{x \sim p_{data}}\log p_{model}(x)\end{math}
+
+On the other hand, the REINFORCE method from chapter 9 has the objective to
+maximize \begin{math}\E_{s \sim data, a \sim \pi(a|s)}Q(s,a)\log \pi(a|s)\end{math}
+
+Later on the same page
+
+6. Estimate of the gradient \begin{math}\nabla J = \sum_TQ\nabla \log p(T)\end{math}
+
+
+Page 9
+
+Switching to argmax mode makes the decoder process fully deterministic and
+provides the baseline for REINFORCE policy gradient in the formula
+
+\begin{equation*}
+\nabla J = \E[(Q(s)-b(s))\nabla \log p(a|s)]
+\end{equation*}
+
+\end{document}
