@@ -8,7 +8,7 @@ from universe import vectorized
 
 # observation speed. Shouldn't be more than 15, as
 # rewarder thread on the server side will fall behind.
-FPS = 15
+FPS = 5
 
 # Area of interest
 WIDTH = 160
