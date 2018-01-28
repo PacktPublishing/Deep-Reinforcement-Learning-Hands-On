@@ -35,7 +35,7 @@ dependencies:
   - fastzbarlight==0.0.14
   - future==0.16.0
   - go-vncdriver==0.4.19
-  - gym==0.7.4
+  - gym==0.9.5
   - html5lib==0.9999999
   - hyperlink==17.3.1
   - idna==2.6
@@ -49,7 +49,7 @@ dependencies:
   - ptan (/home/shmuma/work/ptan)==0.2
   - pyglet==1.3.0
   - pyyaml==3.12
-  - requests==2.18.4
+  - requests==2.10.0
   - six==1.11.0
   - tensorboard-pytorch==0.7.1
   - tensorflow==1.4.1
@@ -58,9 +58,10 @@ dependencies:
   - twisted==17.9.0
   - txaio==2.8.2
   - ujson==1.35
-  - universe==0.21.3
+  - universe==0.21.5
   - urllib3==1.22
   - websocket-client==0.46.0
   - werkzeug==0.14.1
   - zope.interface==4.4.3
 prefix: /home/shmuma/anaconda3/envs/rl_book_ch13
+

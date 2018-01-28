@@ -1,5 +1,4 @@
 import gym
-import copy
 import numpy as np
 from PIL import Image, ImageDraw
 
@@ -32,7 +31,7 @@ def configure(env, remotes, fps=FPS):
     })
 
 
-class MiniWoBCropper(gym.ObservationWrapper):
+class MiniWoBCropper(vectorized.ObservationWrapper):
     """
     Crops the WoB area and converts the observation into PyTorch (C, H, W) format.
     """
