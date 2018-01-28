@@ -44,7 +44,7 @@ if __name__ == "__main__":
     env = universe.wrappers.experimental.SoftmaxClickMouse(env)
     env = wob_vnc.MiniWoBPeeker(env, args.name)
     env = wob_vnc.MiniWoBCropper(env)
-    wob_vnc.configure(env, REMOTE_ADDR, fps=15)
+    wob_vnc.configure(env, REMOTE_ADDR, fps=5)
 
     net = model_vnc.Model(input_shape=wob_vnc.WOB_SHAPE, n_actions=env.action_space.n)
     if args.model:
@@ -58,13 +58,10 @@ if __name__ == "__main__":
         while True:
             obs, reward, done, info, idle_count = step_env(env, action)
             print(step_idx, reward, done, idle_count)
-            img_name = "%s_r%02d_s%04d_%.3f_i%02d_d%d.png" % (
-                args.name, round_idx, step_idx, reward, idle_count, int(done))
             obs_v = Variable(torch.from_numpy(np.array([obs])))
             logits_v = net(obs_v)[0]
             policy = F.softmax(logits_v).data.numpy()[0]
             action = np.random.choice(len(policy), p=policy)
-#            wob_vnc.save_obs(obs, img_name, action=action)
             step_idx += 1
             if done or reward != 0:
                 print("Round %d done" % round_idx)
