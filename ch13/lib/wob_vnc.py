@@ -126,6 +126,8 @@ class MiniWoBPeeker(vectorized.Wrapper):
                 img = obs['vision']
                 img = img[Y_OFS:Y_OFS+HEIGHT, X_OFS:X_OFS+WIDTH*2, :]
                 self.img_stack[idx] = (img, fname)
+            else:
+                self.img_stack[idx] = None
             if done:
                 self.episodes[idx] += 1
                 self.steps[idx] = 0
@@ -134,12 +136,12 @@ class MiniWoBPeeker(vectorized.Wrapper):
         return observation_n, reward_n, done_n, info
 
 
-class MiniWoBActionBlind(vectorized.ObservationWrapper):
+class MiniWoBActionSkipper(vectorized.ObservationWrapper):
     """
     Drop N observations after the action
     """
     def __init__(self, env, drop_count):
-        super(MiniWoBActionBlind, self).__init__(env)
+        super(MiniWoBActionSkipper, self).__init__(env)
         self.drop_count = drop_count
         self.counters = None
 
@@ -148,10 +150,18 @@ class MiniWoBActionBlind(vectorized.ObservationWrapper):
         self.counters = [0] * len(res)
         return res
 
-    # def _step(self, action_n):
-    #     observation_n, reward_n, done_n, info = self.env.step(action_n)
-    #     for idx, counter in enumerate(self.counters):
-    #         if
+    def _step(self, action_n):
+        for idx, counter in enumerate(self.counters):
+           if counter > 0:
+               action_n[idx] = []
+        observation_n, reward_n, done_n, info = self.env.step(action_n)
+        for idx, counter in enumerate(self.counters):
+            if counter > 0:
+                observation_n[idx] = None
+                self.counters[idx] -= 1
+            else:
+                self.counters[idx] = self.drop_count
+        return observation_n, reward_n, done_n, info
 
 
 pass

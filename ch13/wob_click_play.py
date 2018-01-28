@@ -44,7 +44,7 @@ if __name__ == "__main__":
     env = universe.wrappers.experimental.SoftmaxClickMouse(env)
     env = wob_vnc.MiniWoBPeeker(env, args.name)
     env = wob_vnc.MiniWoBCropper(env)
-    wob_vnc.configure(env, REMOTE_ADDR, fps=2)
+    wob_vnc.configure(env, REMOTE_ADDR, fps=15)
 
     net = model_vnc.Model(input_shape=wob_vnc.WOB_SHAPE, n_actions=env.action_space.n)
     if args.model:
