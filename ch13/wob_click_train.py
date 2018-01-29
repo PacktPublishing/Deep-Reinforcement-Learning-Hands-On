@@ -17,16 +17,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 
-REMOTES_HOST = "gpu"
 REMOTES_COUNT = 8
 ENV_NAME = "wob.mini.ClickDialog-v0"
-#REMOTE_ADDR = 'vnc://gpu:5900+15900'
-#REMOTE_ADDR = 4
-#REMOTE_ADDR = 'vnc://gpu:5900+15900,gpu:5901+15901,gpu:5902+15902,gpu:5903+15903'
-
-# To start multiple remote containers, use something like this
-# docker run -d -p 5900:5900 -p 15900:15900 --privileged --ipc host --cap-add SYS_ADMIN quay.io/openai/universe.world-of-bits:0.20.0
-# docker run -d -p 5901:5900 -p 15901:15900 --privileged --ipc host --cap-add SYS_ADMIN quay.io/openai/universe.world-of-bits:0.20.0
 
 GAMMA = 0.99
 REWARD_STEPS = 2
@@ -47,6 +39,7 @@ if __name__ == "__main__":
     parser.add_argument("--port-ofs", type=int, default=0, help="Offset for container's ports, default=0")
     parser.add_argument("--env", default=ENV_NAME, help="Environment name to solve, default=" + ENV_NAME)
     parser.add_argument("--demo", help="Demo dir to load. Default=No demo")
+    parser.add_argument("--host", default='localhost', help="Host with docker containers")
     args = parser.parse_args()
 
     env_name = args.env
@@ -69,7 +62,7 @@ if __name__ == "__main__":
     env = gym.make(env_name)
     env = universe.wrappers.experimental.SoftmaxClickMouse(env)
     env = wob_vnc.MiniWoBCropper(env)
-    wob_vnc.configure(env, wob_vnc.remotes_url(port_ofs=args.port_ofs, hostname=REMOTES_HOST, count=REMOTES_COUNT))
+    wob_vnc.configure(env, wob_vnc.remotes_url(port_ofs=args.port_ofs, hostname=args.host, count=REMOTES_COUNT))
 
     net = model_vnc.Model(input_shape=wob_vnc.WOB_SHAPE, n_actions=env.action_space.n)
     if args.cuda:
@@ -130,19 +123,10 @@ if __name__ == "__main__":
                 prob_v = F.softmax(logits_v)
                 entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
 
-                # calculate policy gradients only
-                loss_policy_v.backward(retain_graph=True)
-                grads = np.concatenate([p.grad.data.cpu().numpy().flatten()
-                                        for p in net.parameters()
-                                        if p.grad is not None])
-
-                # apply entropy and value gradients
-                loss_v = entropy_loss_v + loss_value_v
+                loss_v = loss_policy_v + entropy_loss_v + loss_value_v
                 loss_v.backward()
                 nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
                 optimizer.step()
-                # get full loss
-                loss_v += loss_policy_v
 
                 tb_tracker.track("advantage", adv_v, step_idx)
                 tb_tracker.track("values", value_v, step_idx)
@@ -151,8 +135,3 @@ if __name__ == "__main__":
                 tb_tracker.track("loss_policy", loss_policy_v, step_idx)
                 tb_tracker.track("loss_value", loss_value_v, step_idx)
                 tb_tracker.track("loss_total", loss_v, step_idx)
-                tb_tracker.track("grad_l2", np.sqrt(np.mean(np.square(grads))), step_idx)
-                tb_tracker.track("grad_max", np.max(np.abs(grads)), step_idx)
-                tb_tracker.track("grad_var", np.var(grads), step_idx)
-
-    pass
