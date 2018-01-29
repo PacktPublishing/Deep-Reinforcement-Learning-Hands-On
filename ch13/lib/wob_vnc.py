@@ -119,7 +119,7 @@ class MiniWoBPeeker(vectorized.Wrapper):
 
         observation_n, reward_n, done_n, info = self.env.step(action_n)
         for idx, (obs, reward, done, action) in enumerate(zip(observation_n, reward_n, done_n, action_n)):
-            if obs is not None:
+            if obs is not None and not done:
                 fname = "%s_env%d_ep%03d_st%03d_rw%.2f_d%d.png" % (
                     self.img_prefix, idx, self.episodes[idx], self.steps[idx], reward, int(done)
                 )
@@ -134,34 +134,3 @@ class MiniWoBPeeker(vectorized.Wrapper):
             else:
                 self.steps[idx] += 1
         return observation_n, reward_n, done_n, info
-
-
-class MiniWoBActionSkipper(vectorized.ObservationWrapper):
-    """
-    Drop N observations after the action
-    """
-    def __init__(self, env, drop_count):
-        super(MiniWoBActionSkipper, self).__init__(env)
-        self.drop_count = drop_count
-        self.counters = None
-
-    def _reset(self):
-        res = self.env.reset()
-        self.counters = [0] * len(res)
-        return res
-
-    def _step(self, action_n):
-        for idx, counter in enumerate(self.counters):
-           if counter > 0:
-               action_n[idx] = []
-        observation_n, reward_n, done_n, info = self.env.step(action_n)
-        for idx, counter in enumerate(self.counters):
-            if counter > 0:
-                observation_n[idx] = None
-                self.counters[idx] -= 1
-            else:
-                self.counters[idx] = self.drop_count
-        return observation_n, reward_n, done_n, info
-
-
-pass
