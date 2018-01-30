@@ -39,7 +39,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output", required=True, help="Output prefix to save images")
     args = parser.parse_args()
 
-    demo = vnc_demo.load_demo(args.demo, args.env)
+    demo = vnc_demo.load_demo(args.demo, args.env, read_text=True)
     print("Loaded %d demo samples" % len(demo))
 
     env = gym.make(args.env)
@@ -48,7 +48,9 @@ if __name__ == "__main__":
     for idx, (obs, action) in enumerate(demo):
         fname = "%s_%04d.png" % (args.output, idx)
         action_coords = env._points[action]
-        wob_vnc.save_obs(obs, fname, action_coords)
+        img, text = obs
+        wob_vnc.save_obs(img, fname, action_coords)
+        print(fname, text)
 
     pass
 

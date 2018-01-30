@@ -1,5 +1,6 @@
 import io
 import glob
+import json
 import struct
 import os.path
 import collections
@@ -25,7 +26,7 @@ def iterate_demo_dirs(dir_name, env_name):
         yield os.path.dirname(env_file_name)
 
 
-def load_demo(dir_name, env_name):
+def load_demo(dir_name, env_name, read_text=False):
     """
     Loads demonstration from the specified directory, filtering by env name
     :param dir_name:
@@ -51,10 +52,33 @@ def load_demo(dir_name, env_name):
                           rfp_server.RfpServer, rfp_server.RfpServer.Header,
                           rfp_server.RfpServer.Message)
 
+        if read_text:
+            text_entries = read_text_entries(os.path.join(demo_dir, "rewards.demo"))
+        else:
+            text_entries = None
+
+
         samples = extract_samples(client_header, client_messages,
-                                  srv_header, srv_messages, mouse_to_action=mouse_to_action)
+                                  srv_header, srv_messages,
+                                  text_entries=text_entries,
+                                  mouse_to_action=mouse_to_action)
         result.extend(samples)
 
+    return result
+
+
+def read_text_entries(file_name):
+    result = []
+    with open(file_name, "rt", encoding='utf-8') as fd:
+        for l in fd:
+            data = json.loads(l)
+            if "message" not in data:
+                continue
+            if data["message"]['method'] != "v0.env.text":
+                continue
+            txt = data['message']['body']['text'].get('instruction', '')
+            result.append((data['timestamp'], txt))
+    result.sort(key=lambda v: v[0])
     return result
 
 
@@ -132,7 +156,20 @@ def default_mouse_to_action(pointer_event):
     return action
 
 
+def iterate_earlier(queue, boundary_ts):
+    assert isinstance(queue, (collections.deque, type(None)))
+
+    while queue:
+        top_ts = queue[0][0]
+        if top_ts > boundary_ts:
+            break
+        item = queue.popleft()[1]
+        yield item
+
+
+
 def extract_samples(client_header, client_messages, srv_header, srv_messages,
+                    text_entries=None,
                     mouse_to_action=default_mouse_to_action):
     samples = []
     client = Client(srv_header)
@@ -140,20 +177,19 @@ def extract_samples(client_header, client_messages, srv_header, srv_messages,
     numpy_screen.set_paint_cursor(True)
 
     server_deque = collections.deque(srv_messages)
+    text_deque = None if text_entries is None else collections.deque(text_entries)
+    cur_text = ""
 
     for idx, (ts, msg) in enumerate(client_messages):
+        # update the current text
+        for text in iterate_earlier(text_deque, ts):
+            cur_text = text
+
         # apply server messages to the framebuffer
-        while server_deque:
-            top_ts = server_deque[0][0]
-
-            if top_ts > ts:
-                break
-            msg = server_deque.popleft()[1]
-
-            # framebuffer update
-            if msg.message_type == rfp_server.RfpServer.MessageType.fb_update:
+        for srv_msg in iterate_earlier(server_deque, ts):
+            if srv_msg.message_type == rfp_server.RfpServer.MessageType.fb_update:
                 rects = []
-                for msg_r in msg.message_body.rects:
+                for msg_r in srv_msg.message_body.rects:
                     rect = client.decode_rectangle(msg_r)
                     if rect is not None:
                         rects.append(rect)
@@ -174,7 +210,8 @@ def extract_samples(client_header, client_messages, srv_header, srv_messages,
                 img = crop_image(numpy_screen.peek().copy())
                 action = mouse_to_action(event)
                 if action is not None:
-                    samples.append((img, action))
+                    obs = img if text_entries is None else (img, cur_text)
+                    samples.append((obs, action))
 
     return samples
 
