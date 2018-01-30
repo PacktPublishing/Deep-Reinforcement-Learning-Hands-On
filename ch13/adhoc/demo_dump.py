@@ -42,9 +42,13 @@ if __name__ == "__main__":
     demo = vnc_demo.load_demo(args.demo, args.env)
     print("Loaded %d demo samples" % len(demo))
 
+    env = gym.make(args.env)
+    env = universe.wrappers.experimental.SoftmaxClickMouse(env)
+
     for idx, (obs, action) in enumerate(demo):
         fname = "%s_%04d.png" % (args.output, idx)
-        wob_vnc.save_obs(obs, fname, action)
+        action_coords = env._points[action]
+        wob_vnc.save_obs(obs, fname, action_coords)
 
     pass
 

@@ -3,6 +3,8 @@ import glob
 import struct
 import os.path
 import collections
+import gym
+import universe
 
 import numpy as np
 
@@ -26,11 +28,17 @@ def iterate_demo_dirs(dir_name, env_name):
 def load_demo(dir_name, env_name):
     """
     Loads demonstration from the specified directory, filtering by env name
-    :param dir_name: 
-    :param env_name: 
-    :return: list of (obs, action) tuples 
+    :param dir_name:
+    :param env_name:
+    :return: list of (obs, action) tuples
     """
     result = []
+
+    env = gym.make(env_name)
+    env = universe.wrappers.experimental.SoftmaxClickMouse(env)
+
+    def mouse_to_action(pointer_event):
+        return env._action_to_discrete(pointer_event)
 
     for demo_dir in iterate_demo_dirs(dir_name, env_name):
         client_header, client_messages = \
@@ -44,7 +52,7 @@ def load_demo(dir_name, env_name):
                           rfp_server.RfpServer.Message)
 
         samples = extract_samples(client_header, client_messages,
-                                  srv_header, srv_messages)
+                                  srv_header, srv_messages, mouse_to_action=mouse_to_action)
         result.extend(samples)
 
     return result
@@ -114,7 +122,18 @@ class Client:
             print("Warning! Unsupported encoding requested: %s" % msg_rect.header.encoding)
 
 
-def extract_samples(client_header, client_messages, srv_header, srv_messages):
+def default_mouse_to_action(pointer_event):
+    pos_x, pos_y = pointer_event.x, pointer_event.y
+    x = pos_x - wob_vnc.X_OFS
+    y = pos_y - wob_vnc.Y_OFS - 50
+    action = (y // 10) + (x // 10) * 16
+    if action > 255 or action < 0:
+        return None
+    return action
+
+
+def extract_samples(client_header, client_messages, srv_header, srv_messages,
+                    mouse_to_action=default_mouse_to_action):
     samples = []
     client = Client(srv_header)
     numpy_screen = client.framebuffer.numpy_screen
@@ -153,8 +172,7 @@ def extract_samples(client_header, client_messages, srv_header, srv_messages):
             # if button was pressed, record the observation and the event
             if msg.message_body.button_mask:
                 img = crop_image(numpy_screen.peek().copy())
-                action = mouse_to_action(msg.message_body.pos_x,
-                                         msg.message_body.pos_y)
+                action = mouse_to_action(event)
                 if action is not None:
                     samples.append((img, action))
 
@@ -164,12 +182,3 @@ def extract_samples(client_header, client_messages, srv_header, srv_messages):
 def crop_image(buffer):
     img = buffer[wob_vnc.Y_OFS:wob_vnc.Y_OFS+wob_vnc.HEIGHT, wob_vnc.X_OFS:wob_vnc.X_OFS+wob_vnc.WIDTH, :]
     return np.transpose(img, (2, 0, 1))
-
-
-def mouse_to_action(pos_x, pos_y):
-    x = pos_x - wob_vnc.X_OFS
-    y = pos_y - wob_vnc.Y_OFS - 50
-    action = (y // 10) + (x // 10) * 16
-    if action > 255 or action < 0:
-        return None
-    return action
