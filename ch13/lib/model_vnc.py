@@ -21,13 +21,9 @@ class Model(nn.Module):
         super(Model, self).__init__()
 
         self.conv = nn.Sequential(
-            nn.Conv2d(input_shape[0], 64, 5, stride=3),
+            nn.Conv2d(input_shape[0], 64, 5, stride=5),
             nn.ReLU(),
-            nn.Conv2d(64, 128, 4, stride=2),
-            nn.ReLU(),
-            nn.Conv2d(128, 128, 3, stride=2),
-            nn.ReLU(),
-            nn.Conv2d(128, 128, 3, stride=2),
+            nn.Conv2d(64, 64, 3, stride=2),
             nn.ReLU(),
         )
 
@@ -56,13 +52,9 @@ class ModelMultimodal(nn.Module):
         super(ModelMultimodal, self).__init__()
 
         self.conv = nn.Sequential(
-            nn.Conv2d(input_shape[0], 64, 5, stride=3),
+            nn.Conv2d(input_shape[0], 64, 5, stride=5),
             nn.ReLU(),
-            nn.Conv2d(64, 128, 4, stride=2),
-            nn.ReLU(),
-            nn.Conv2d(128, 128, 3, stride=2),
-            nn.ReLU(),
-            nn.Conv2d(128, 128, 3, stride=2),
+            nn.Conv2d(64, 64, 3, stride=2),
             nn.ReLU(),
         )
 
