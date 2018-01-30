@@ -29,6 +29,9 @@ TypeError: unsupported operand type(s) for +: 'NoneType' and 'int'
 As there is no open-sourced version of WoB or other Universe docker images,
  the only way to fix this is to change the image directly. Below are the 
  instruction how to do this.
+
+Another issue found a bit later is that reward proxy daemon is constantly overwrites the reward data.
+This problem is fixed by the second patch.
  
 ## Starting the image
 
@@ -52,6 +55,12 @@ Apply the image with provided patch 01_wob_crash-fix.patch by running:
 ```bash
 shmuma@gpu:~/work/rl_book_samples/ch13/wob_fixes$ docker exec -i d521098d9c48 patch -d / /app/universe-envs/world-of-bits/bin/run.py < 01_wob_crash-fix.patch
 patching file /app/universe-envs/world-of-bits/bin/run.py
+```
+
+Second patch should be applied the same way:
+```bash
+shmuma@gpu:~/work/rl_book_samples/ch13/wob_fixes$ docker exec -i d521098d9c48 patch -d / /app/universe/universe/rewarder/reward_proxy_server.py < 02_reward_proxy_append_rewards.patch
+patching file /app/universe/universe/rewarder/reward_proxy_server.py
 ```
 
 ## Save modified image

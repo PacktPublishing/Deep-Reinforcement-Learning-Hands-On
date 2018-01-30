@@ -1,0 +1,11 @@
+--- app/universe/universe/rewarder/reward_proxy_server.py.orig	2018-01-30 18:42:42.013814652 +0100
++++ app/universe/universe/rewarder/reward_proxy_server.py	2018-01-30 18:52:23.574571296 +0100
+@@ -101,7 +101,7 @@
+             self.close()
+             return
+ 
+-        self.file = open(self.logfile_path, 'w')
++        self.file = open(self.logfile_path, 'a')
+ 
+         self._n_open_files += 1
+         logger.info("[RewardProxyServer] [%d] n open rewards files incremented: %s", self.id, self._n_open_files)
