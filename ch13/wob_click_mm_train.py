@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 import os
 import gym
+import random
 import universe
 import argparse
 import numpy as np
 from tensorboardX import SummaryWriter
 
-from lib import wob_vnc, model_vnc, common
+from lib import wob_vnc, model_vnc, common, vnc_demo
 
 import ptan
 
@@ -16,7 +17,6 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 
-REMOTES_HOST = "gpu"
 REMOTES_COUNT = 8
 ENV_NAME = "wob.mini.ClickTab-v0"
 
@@ -26,6 +26,7 @@ BATCH_SIZE = 16
 LEARNING_RATE = 0.0001
 ENTROPY_BETA = 0.001
 CLIP_GRAD = 0.05
+DEMO_PROB = 0.5
 
 SAVES_DIR = "saves"
 
@@ -36,6 +37,8 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true', help="CUDA mode")
     parser.add_argument("--port-ofs", type=int, default=0, help="Offset for container's ports, default=0")
     parser.add_argument("--env", default=ENV_NAME, help="Environment name to solve, default=" + ENV_NAME)
+    parser.add_argument("--demo", help="Demo dir to load. Default=No demo")
+    parser.add_argument("--host", default='localhost', help="Host with docker containers")
     args = parser.parse_args()
 
     env_name = args.env
@@ -47,10 +50,18 @@ if __name__ == "__main__":
     saves_path = os.path.join(SAVES_DIR, name)
     os.makedirs(saves_path, exist_ok=True)
 
+    demo_samples = None
+    if args.demo:
+        demo_samples = vnc_demo.load_demo(args.demo, env_name, read_text=True)
+        if not demo_samples:
+            demo_samples = None
+        else:
+            print("Loaded %d demo samples, will use them during training" % len(demo_samples))
+
     env = gym.make(env_name)
     env = universe.wrappers.experimental.SoftmaxClickMouse(env)
     env = wob_vnc.MiniWoBCropper(env, keep_text=True)
-    wob_vnc.configure(env, wob_vnc.remotes_url(port_ofs=args.port_ofs, hostname=REMOTES_HOST, count=REMOTES_COUNT))
+    wob_vnc.configure(env, wob_vnc.remotes_url(port_ofs=args.port_ofs, hostname=args.host, count=REMOTES_COUNT))
 
     net = model_vnc.ModelMultimodal(input_shape=wob_vnc.WOB_SHAPE, n_actions=env.action_space.n)
     if args.cuda:
@@ -87,6 +98,13 @@ if __name__ == "__main__":
                 batch.append(exp)
                 if len(batch) < BATCH_SIZE:
                     continue
+
+                if demo_samples and random.random() < DEMO_PROB:
+                    random.shuffle(demo_samples)
+                    demo_batch = demo_samples[:BATCH_SIZE]
+                    model_vnc.train_demo(net, optimizer, demo_batch, writer, step_idx,
+                                         preprocessor=preprocessor,
+                                         cuda=args.cuda)
 
                 states_v, actions_t, vals_ref_v = \
                     common.unpack_batch(batch, net, last_val_gamma=GAMMA ** REWARD_STEPS,
