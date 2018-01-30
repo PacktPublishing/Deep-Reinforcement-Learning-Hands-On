@@ -25,16 +25,22 @@ class Model(nn.Module):
             nn.ReLU(),
             nn.Conv2d(64, 64, 3, stride=2),
             nn.ReLU(),
+            nn.Conv2d(64, 64, 3, stride=2),
+            nn.ReLU(),
         )
 
         conv_out_size = self._get_conv_out(input_shape)
 
         self.policy = nn.Sequential(
-            nn.Linear(conv_out_size, n_actions),
+            nn.Linear(conv_out_size, n_actions*2),
+            nn.ReLU(),
+            nn.Linear(n_actions*2, n_actions),
         )
 
         self.value = nn.Sequential(
-            nn.Linear(conv_out_size, 1),
+            nn.Linear(conv_out_size, n_actions*2),
+            nn.ReLU(),
+            nn.Linear(n_actions*2, 1),
         )
 
     def _get_conv_out(self, shape):
