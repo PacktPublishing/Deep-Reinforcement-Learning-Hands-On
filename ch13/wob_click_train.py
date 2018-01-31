@@ -28,7 +28,7 @@ ENTROPY_BETA = 0.001
 CLIP_GRAD = 0.05
 
 DEMO_PROB = 0.5
-CUT_DEMO_PROB_FRAMES = 50000        # After how many frames, demo probability will be dropped to 1%
+CUT_DEMO_PROB_FRAMES = 25000        # After how many frames, demo probability will be dropped to 1%
 
 SAVES_DIR = "saves"
 
