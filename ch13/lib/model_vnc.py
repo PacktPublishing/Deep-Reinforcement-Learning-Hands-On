@@ -107,7 +107,6 @@ class MultimodalPreprocessor:
     def __init__(self, max_dict_size=MM_MAX_DICT_SIZE):
         self.max_dict_size = max_dict_size
         self.token_to_id = {TOKEN_UNK: 0}
-        self.id_to_token = {0: TOKEN_UNK}
         self.next_id = 1
         self.tokenizer = TweetTokenizer(preserve_case=False)
 
@@ -159,7 +158,6 @@ class MultimodalPreprocessor:
                     idx = self.next_id
                     self.next_id += 1
                     self.token_to_id[token] = idx
-                    self.id_to_token[idx] = token
             res.append(idx)
         return res
 
@@ -178,11 +176,8 @@ class MultimodalPreprocessor:
 
             res = MultimodalPreprocessor(max_dict_size)
             res.token_to_id = token_to_id
-            res.id_to_token = {idx: token for token, idx in token_to_id.items()}
             res.next_id = next_id
             return res
-
-    pass
 
 
 def train_demo(net, optimizer, batch, writer, step_idx, preprocessor, cuda=False):
