@@ -26,7 +26,9 @@ BATCH_SIZE = 16
 LEARNING_RATE = 0.0001
 ENTROPY_BETA = 0.001
 CLIP_GRAD = 0.05
+
 DEMO_PROB = 0.5
+CUT_DEMO_PROB_FRAMES = 50000        # After how many frames, demo probability will be dropped to 1%
 
 SAVES_DIR = "saves"
 
@@ -99,6 +101,8 @@ if __name__ == "__main__":
                 if len(batch) < BATCH_SIZE:
                     continue
 
+                if step_idx > CUT_DEMO_PROB_FRAMES:
+                    DEMO_PROB = 0.01
                 if demo_samples and random.random() < DEMO_PROB:
                     random.shuffle(demo_samples)
                     demo_batch = demo_samples[:BATCH_SIZE]
