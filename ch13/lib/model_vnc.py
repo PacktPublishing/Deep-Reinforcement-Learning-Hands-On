@@ -108,7 +108,7 @@ class MultimodalPreprocessor:
         self.max_dict_size = max_dict_size
         self.token_to_id = {TOKEN_UNK: 0}
         self.next_id = 1
-        self.tokenizer = TweetTokenizer(preserve_case=False)
+        self.tokenizer = TweetTokenizer(preserve_case=True)
 
     def __len__(self):
         return len(self.token_to_id)
