@@ -16,17 +16,10 @@ import torch.nn.functional as F
 
 ENV_ID = "MinitaurBulletEnv-v0"
 GAMMA = 0.99
-REWARD_STEPS = 2
-BATCH_SIZE = 32
-LEARNING_RATE = 1e-4
+BATCH_SIZE = 64
+LEARNING_RATE = 5e-5
 REPLAY_SIZE = 100000
-REPLAY_INITIAL = 1000
-
-
-def calc_logprob(mu_v, var_v, actions_v):
-    p1 = - ((mu_v - actions_v) ** 2) / (2*var_v.clamp(min=1e-3))
-    p2 = - torch.log(torch.sqrt(2 * math.pi * var_v))
-    return p1 + p2
+REPLAY_INITIAL = 10000
 
 
 if __name__ == "__main__":
@@ -73,13 +66,13 @@ if __name__ == "__main__":
                 q_v = net.critic(states_v, actions_v)
                 q_last_v = net(last_states_v)[1]
                 q_last_v[dones_mask] = 0.0
-                q_last_v.volatile = False
                 q_ref_v = rewards_v.unsqueeze(dim=-1) + q_last_v * GAMMA
-                critic_loss_v = F.mse_loss(q_v, q_ref_v)
+                critic_loss_v = F.mse_loss(q_v, q_ref_v.detach())
                 critic_loss_v.backward()
                 net.n_actor.zero_grad()
                 optimizer.step()
                 tb_tracker.track("loss_critic", critic_loss_v, frame_idx)
+                tb_tracker.track("critic_ref", q_ref_v.mean(), frame_idx)
 
                 # train actor
                 optimizer.zero_grad()

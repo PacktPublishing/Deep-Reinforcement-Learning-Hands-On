@@ -58,9 +58,8 @@ def unpack_batch_ddqn(batch, cuda=False):
     states_v = ptan.agent.float32_preprocessor(states, cuda=cuda)
     actions_v = ptan.agent.float32_preprocessor(actions, cuda=cuda)
     rewards_v = ptan.agent.float32_preprocessor(rewards, cuda=cuda)
+    last_states_v = ptan.agent.float32_preprocessor(last_states, cuda=cuda)
     dones_t = torch.ByteTensor(dones)
-    last_states_v = Variable(torch.from_numpy(np.array(last_states, dtype=np.float32)), volatile=True)
     if cuda:
         dones_t = dones_t.cuda()
-        last_states_v = last_states_v.cuda()
     return states_v, actions_v, rewards_v, dones_t, last_states_v
