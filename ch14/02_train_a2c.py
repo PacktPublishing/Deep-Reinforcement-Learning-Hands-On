@@ -19,7 +19,7 @@ GAMMA = 0.99
 REWARD_STEPS = 2
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-4
-ENTROPY_BETA = 1e-4
+ENTROPY_BETA = 1e-3
 
 
 def calc_logprob(mu_v, var_v, actions_v):
@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     env = gym.make(ENV_ID)
 
-    net = model.Model(env.observation_space.shape[0], env.action_space.shape[0])
+    net = model.ModelA2C(env.observation_space.shape[0], env.action_space.shape[0])
     if args.cuda:
         net.cuda()
     print(net)

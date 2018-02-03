@@ -7,9 +7,9 @@ import torch.nn as nn
 HID_SIZE = 128
 
 
-class Model(nn.Module):
+class ModelA2C(nn.Module):
     def __init__(self, obs_size, act_size):
-        super(Model, self).__init__()
+        super(ModelA2C, self).__init__()
 
         self.base = nn.Sequential(
             nn.Linear(obs_size, HID_SIZE),

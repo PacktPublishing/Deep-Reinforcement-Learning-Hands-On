@@ -26,7 +26,7 @@ if __name__ == "__main__":
     if args.record:
         env = gym.wrappers.Monitor(env, args.record)
 
-    net = model.Model(env.observation_space.shape[0], env.action_space.shape[0])
+    net = model.ModelA2C(env.observation_space.shape[0], env.action_space.shape[0])
     net.load_state_dict(torch.load(args.model))
 
     obs = env.reset()
