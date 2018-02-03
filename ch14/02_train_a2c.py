@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import time
 import math
 import ptan
 import gym
@@ -9,6 +10,7 @@ from tensorboardX import SummaryWriter
 
 from lib import model, common
 
+import numpy as np
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
@@ -20,6 +22,26 @@ REWARD_STEPS = 2
 BATCH_SIZE = 32
 LEARNING_RATE = 5e-5
 ENTROPY_BETA = 1e-4
+
+TEST_ITERS = 1000
+
+
+def test_net(net, env, count=10, cuda=False):
+    rewards = 0.0
+    steps = 0
+    for _ in range(count):
+        obs = env.reset()
+        while True:
+            obs_v = ptan.agent.float32_preprocessor([obs], cuda)
+            mu_v = net(obs_v)[0]
+            action = mu_v.squeeze(dim=0).data.cpu().numpy()
+            action = np.clip(action, -1, 1)
+            obs, reward, done, _ = env.step(action)
+            rewards += reward
+            steps += 1
+            if done:
+                break
+    return rewards / count, steps / count
 
 
 def calc_logprob(mu_v, var_v, actions_v):
@@ -38,6 +60,7 @@ if __name__ == "__main__":
     os.makedirs(save_path, exist_ok=True)
 
     env = gym.make(ENV_ID)
+    test_env = gym.make(ENV_ID)
 
     net = model.ModelA2C(env.observation_space.shape[0], env.action_space.shape[0])
     if args.cuda:
@@ -59,15 +82,7 @@ if __name__ == "__main__":
                 if rewards_steps:
                     rewards, steps = zip(*rewards_steps)
                     tb_tracker.track("episode_steps", steps[0], step_idx)
-
-                    mean_reward = tracker.reward(rewards[0], step_idx)
-                    if mean_reward is not None and (best_reward is None or best_reward < mean_reward):
-                        if best_reward is not None:
-                            print("Best reward updated: %.3f -> %.3f" % (best_reward, mean_reward))
-                            name = "best_%+.3f_%d.dat" % (mean_reward, step_idx)
-                            fname = os.path.join(save_path, name)
-                            torch.save(net.state_dict(), fname)
-                        best_reward = mean_reward
+                    tracker.reward(rewards[0], step_idx)
 
                 batch.append(exp)
                 if len(batch) < BATCH_SIZE:
@@ -98,3 +113,18 @@ if __name__ == "__main__":
                 tb_tracker.track("loss_policy", loss_policy_v, step_idx)
                 tb_tracker.track("loss_value", loss_value_v, step_idx)
                 tb_tracker.track("loss_total", loss_v, step_idx)
+
+                if step_idx % TEST_ITERS == 0:
+                    ts = time.time()
+                    rewards, steps = test_net(net, step_idx, cuda=args.cuda)
+                    print("Test done is %.2f sec, reward %.3f, steps %d" % (
+                        time.time() - ts, rewards, steps))
+                    writer.add_scalar("test_reward", rewards, step_idx)
+                    writer.add_scalar("test_steps", steps, step_idx)
+                    if best_reward is None or best_reward < rewards:
+                        if best_reward is not None:
+                            print("Best reward updated: %.3f -> %.3f" % (best_reward, rewards))
+                            name = "best_%+.3f_%d.dat" % (rewards, step_idx)
+                            fname = os.path.join(save_path, name)
+                            torch.save(net.state_dict(), fname)
+                        best_reward = rewards

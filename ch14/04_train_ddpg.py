@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 import os
 import ptan
+import time
 import gym
 import pybullet_envs
 import argparse
 from tensorboardX import SummaryWriter
+import numpy as np
 
 from lib import model, common
 
@@ -21,6 +23,26 @@ REPLAY_SIZE = 100000
 REPLAY_INITIAL = 10000
 TGT_NET_SYNC = 100
 
+TEST_ITERS = 1000
+
+
+def test_net(net, env, count=10, cuda=False):
+    rewards = 0.0
+    steps = 0
+    for _ in range(count):
+        obs = env.reset()
+        while True:
+            obs_v = ptan.agent.float32_preprocessor([obs], cuda)
+            mu_v = net.actor(obs_v)
+            action = mu_v.squeeze(dim=0).data.cpu().numpy()
+            action = np.clip(action, -1, 1)
+            obs, reward, done, _ = env.step(action)
+            rewards += reward
+            steps += 1
+            if done:
+                break
+    return rewards / count, steps / count
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -32,6 +54,7 @@ if __name__ == "__main__":
     os.makedirs(save_path, exist_ok=True)
 
     env = gym.make(ENV_ID)
+    test_env = gym.make(ENV_ID)
 
     net = model.ModelDDPG(env.observation_space.shape[0], env.action_space.shape[0])
     if args.cuda:
@@ -56,15 +79,7 @@ if __name__ == "__main__":
                 if rewards_steps:
                     rewards, steps = zip(*rewards_steps)
                     tb_tracker.track("episode_steps", steps[0], frame_idx)
-                    
-                    mean_reward = tracker.reward(rewards[0], frame_idx)
-                    if mean_reward is not None and (best_reward is None or best_reward < mean_reward):
-                        if best_reward is not None:
-                            print("Best reward updated: %.3f -> %.3f" % (best_reward, mean_reward))
-                            name = "best_%+.3f_%d.dat" % (mean_reward, frame_idx)
-                            fname = os.path.join(save_path, name)
-                            torch.save(net.state_dict(), fname)
-                        best_reward = mean_reward
+                    tracker.reward(rewards[0], frame_idx)
 
                 if len(buffer) < REPLAY_INITIAL:
                     continue
@@ -98,4 +113,20 @@ if __name__ == "__main__":
 
                 if frame_idx % TGT_NET_SYNC == 0:
                     tgt_net.sync()
+
+                if frame_idx % TEST_ITERS == 0:
+                    ts = time.time()
+                    rewards, steps = test_net(net, test_env, cuda=args.cuda)
+                    print("Test done in %.2f sec, reward %.3f, steps %d" % (
+                        time.time() - ts, rewards, steps))
+                    writer.add_scalar("test_reward", rewards, frame_idx)
+                    writer.add_scalar("test_steps", steps, frame_idx)
+                    if best_reward is None or best_reward < rewards:
+                        if best_reward is not None:
+                            print("Best reward updated: %.3f -> %.3f" % (best_reward, rewards))
+                            name = "best_%+.3f_%d.dat" % (rewards, frame_idx)
+                            fname = os.path.join(save_path, name)
+                            torch.save(net.state_dict(), fname)
+                        best_reward = rewards
+
     pass
