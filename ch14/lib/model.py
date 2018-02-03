@@ -15,10 +15,13 @@ class Model(nn.Module):
             nn.Linear(obs_size, HID_SIZE),
             nn.ReLU(),
         )
-        self.mu = nn.Linear(HID_SIZE, act_size)
+        self.mu = nn.Sequential(
+            nn.Linear(HID_SIZE, act_size),
+            nn.Tanh(),
+        )
         self.var = nn.Sequential(
             nn.Linear(HID_SIZE, act_size),
-            nn.Softplus()
+            nn.Softplus(),
         )
         self.value = nn.Linear(HID_SIZE, 1)
 
