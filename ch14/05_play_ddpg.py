@@ -35,6 +35,7 @@ if __name__ == "__main__":
         obs_v = Variable(torch.from_numpy(np.array([obs], dtype=np.float32)))
         mu_v = net.actor(obs_v)
         action = mu_v.squeeze(dim=0).data.numpy()
+        action = np.clip(action, -1, 1)
         obs, reward, done, _ = env.step(action)
         total_reward += reward
         total_steps += 1
