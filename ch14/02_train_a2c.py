@@ -84,6 +84,21 @@ if __name__ == "__main__":
                     tb_tracker.track("episode_steps", steps[0], step_idx)
                     tracker.reward(rewards[0], step_idx)
 
+                if step_idx % TEST_ITERS == 0:
+                    ts = time.time()
+                    rewards, steps = test_net(net, test_env, cuda=args.cuda)
+                    print("Test done is %.2f sec, reward %.3f, steps %d" % (
+                        time.time() - ts, rewards, steps))
+                    writer.add_scalar("test_reward", rewards, step_idx)
+                    writer.add_scalar("test_steps", steps, step_idx)
+                    if best_reward is None or best_reward < rewards:
+                        if best_reward is not None:
+                            print("Best reward updated: %.3f -> %.3f" % (best_reward, rewards))
+                            name = "best_%+.3f_%d.dat" % (rewards, step_idx)
+                            fname = os.path.join(save_path, name)
+                            torch.save(net.state_dict(), fname)
+                        best_reward = rewards
+
                 batch.append(exp)
                 if len(batch) < BATCH_SIZE:
                     continue
@@ -114,17 +129,3 @@ if __name__ == "__main__":
                 tb_tracker.track("loss_value", loss_value_v, step_idx)
                 tb_tracker.track("loss_total", loss_v, step_idx)
 
-                if step_idx % TEST_ITERS == 0:
-                    ts = time.time()
-                    rewards, steps = test_net(net, step_idx, cuda=args.cuda)
-                    print("Test done is %.2f sec, reward %.3f, steps %d" % (
-                        time.time() - ts, rewards, steps))
-                    writer.add_scalar("test_reward", rewards, step_idx)
-                    writer.add_scalar("test_steps", steps, step_idx)
-                    if best_reward is None or best_reward < rewards:
-                        if best_reward is not None:
-                            print("Best reward updated: %.3f -> %.3f" % (best_reward, rewards))
-                            name = "best_%+.3f_%d.dat" % (rewards, step_idx)
-                            fname = os.path.join(save_path, name)
-                            torch.save(net.state_dict(), fname)
-                        best_reward = rewards
