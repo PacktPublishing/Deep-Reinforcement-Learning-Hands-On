@@ -52,8 +52,11 @@ if __name__ == "__main__":
             while True:
                 frame_idx += 1
                 buffer.populate(1)
-                rewards = exp_source.pop_total_rewards()
-                if rewards:
+                rewards_steps = exp_source.pop_rewards_steps()
+                if rewards_steps:
+                    rewards, steps = zip(*rewards_steps)
+                    tb_tracker.track("episode_steps", steps[0], frame_idx)
+                    
                     mean_reward = tracker.reward(rewards[0], frame_idx)
                     if mean_reward is not None and (best_reward is None or best_reward < mean_reward):
                         if best_reward is not None:

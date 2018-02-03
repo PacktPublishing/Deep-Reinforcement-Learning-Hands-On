@@ -55,8 +55,11 @@ if __name__ == "__main__":
     with ptan.common.utils.RewardTracker(writer) as tracker:
         with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
             for step_idx, exp in enumerate(exp_source):
-                rewards = exp_source.pop_total_rewards()
-                if rewards:
+                rewards_steps = exp_source.pop_rewards_steps()
+                if rewards_steps:
+                    rewards, steps = zip(*rewards_steps)
+                    tb_tracker.track("episode_steps", steps[0], step_idx)
+
                     mean_reward = tracker.reward(rewards[0], step_idx)
                     if mean_reward is not None and (best_reward is None or best_reward < mean_reward):
                         if best_reward is not None:
