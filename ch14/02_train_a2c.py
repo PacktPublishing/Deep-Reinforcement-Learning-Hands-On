@@ -34,7 +34,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
 
-    save_path = os.path.join("saves", args.name)
+    save_path = os.path.join("saves", "a2c-" + args.name)
     os.makedirs(save_path, exist_ok=True)
 
     env = gym.make(ENV_ID)
@@ -71,7 +71,7 @@ if __name__ == "__main__":
                     continue
 
                 states_v, actions_v, vals_ref_v = \
-                    common.unpack_batch(batch, net, last_val_gamma=GAMMA ** REWARD_STEPS, cuda=args.cuda)
+                    common.unpack_batch_a2c(batch, net, last_val_gamma=GAMMA ** REWARD_STEPS, cuda=args.cuda)
                 batch.clear()
 
                 optimizer.zero_grad()
