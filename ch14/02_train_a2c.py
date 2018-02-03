@@ -18,8 +18,8 @@ ENV_ID = "MinitaurBulletEnv-v0"
 GAMMA = 0.99
 REWARD_STEPS = 2
 BATCH_SIZE = 32
-LEARNING_RATE = 1e-4
-ENTROPY_BETA = 1e-3
+LEARNING_RATE = 5e-5
+ENTROPY_BETA = 1e-4
 
 
 def calc_logprob(mu_v, var_v, actions_v):
@@ -45,7 +45,7 @@ if __name__ == "__main__":
     print(net)
 
     writer = SummaryWriter(comment="-a2c_" + args.name)
-    agent = model.ContAgent(net, cuda=args.cuda)
+    agent = model.AgentA2C(net, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
