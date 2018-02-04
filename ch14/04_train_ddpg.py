@@ -110,7 +110,7 @@ if __name__ == "__main__":
                 optimizer.step()
                 tb_tracker.track("loss_actor", actor_loss_v, frame_idx)
 
-                tgt_net.alpha_sync(alpha=1e-2)
+                tgt_net.alpha_sync(alpha=1-1e-3)
 
                 if frame_idx % TEST_ITERS == 0:
                     ts = time.time()
