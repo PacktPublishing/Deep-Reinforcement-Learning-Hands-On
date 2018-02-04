@@ -21,7 +21,6 @@ BATCH_SIZE = 64
 LEARNING_RATE = 1e-4
 REPLAY_SIZE = 100000
 REPLAY_INITIAL = 10000
-TGT_NET_SYNC = 100
 
 TEST_ITERS = 1000
 
@@ -111,8 +110,7 @@ if __name__ == "__main__":
                 optimizer.step()
                 tb_tracker.track("loss_actor", actor_loss_v, frame_idx)
 
-                if frame_idx % TGT_NET_SYNC == 0:
-                    tgt_net.sync()
+                tgt_net.alpha_sync(alpha=1e-2)
 
                 if frame_idx % TEST_ITERS == 0:
                     ts = time.time()
