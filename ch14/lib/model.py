@@ -30,11 +30,11 @@ class ModelA2C(nn.Module):
         return self.mu(base_out), self.var(base_out), self.value(base_out)
 
 
-class ModelDDPG(nn.Module):
+class DDPGActor(nn.Module):
     def __init__(self, obs_size, act_size):
-        super(ModelDDPG, self).__init__()
+        super(DDPGActor, self).__init__()
 
-        self.n_actor = nn.Sequential(
+        self.net = nn.Sequential(
             nn.Linear(obs_size, 300),
             nn.ReLU(),
             nn.Linear(300, 200),
@@ -43,24 +43,34 @@ class ModelDDPG(nn.Module):
             nn.Tanh()
         )
 
-        self.n_critic = nn.Sequential(
-            nn.Linear(obs_size + act_size, 400),
-            nn.ReLU(),
-            nn.Linear(400, 300),
-            nn.ReLU(),
-            nn.Linear(300, 1)
+    def forward(self, x):
+        return self.net(x)
+
+
+class DDPGCritic(nn.Module):
+    def __init__(self, obs_size, act_size):
+        super(DDPGCritic, self).__init__()
+
+        self.obs_net = nn.Sequential(
+            nn.Linear(obs_size, 400),
+            nn.ReLU()
         )
 
-    def actor(self, x):
-        return self.n_actor(x)
+        self.act_net = nn.Sequential(
+            nn.Linear(act_size, 300),
+            nn.ReLU(),
+            nn.Linear(300, 400),
+            nn.ReLU()
+        )
 
-    def critic(self, obs, act):
-        critic_input = torch.cat((obs, act), dim=1)
-        return self.n_critic(critic_input)
+        self.out_net = nn.Sequential(
+            nn.Linear(400, 1)
+        )
 
-    def forward(self, x):
-        action = self.actor(x)
-        return action, self.critic(x, action)
+    def forward(self, x, a):
+        obs = self.obs_net(x)
+        act = self.act_net(a)
+        return self.out_net(obs + act)
 
 
 class AgentA2C(ptan.agent.BaseAgent):
@@ -97,7 +107,7 @@ class AgentDDPG(ptan.agent.BaseAgent):
 
     def __call__(self, states, agent_states):
         states_v = ptan.agent.float32_preprocessor(states, cuda=self.cuda)
-        mu_v = self.net.actor(states_v)
+        mu_v = self.net(states_v)
         actions = mu_v.data.cpu().numpy()
 
         if self.ou_enabled and self.ou_epsilon > 0:

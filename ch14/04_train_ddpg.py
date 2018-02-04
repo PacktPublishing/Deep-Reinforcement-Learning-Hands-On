@@ -32,7 +32,7 @@ def test_net(net, env, count=10, cuda=False):
         obs = env.reset()
         while True:
             obs_v = ptan.agent.float32_preprocessor([obs], cuda)
-            mu_v = net.actor(obs_v)
+            mu_v = net(obs_v)
             action = mu_v.squeeze(dim=0).data.cpu().numpy()
             action = np.clip(action, -1, 1)
             obs, reward, done, _ = env.step(action)
@@ -55,17 +55,22 @@ if __name__ == "__main__":
     env = gym.make(ENV_ID)
     test_env = gym.make(ENV_ID)
 
-    net = model.ModelDDPG(env.observation_space.shape[0], env.action_space.shape[0])
+    act_net = model.DDPGActor(env.observation_space.shape[0], env.action_space.shape[0])
+    crt_net = model.DDPGCritic(env.observation_space.shape[0], env.action_space.shape[0])
     if args.cuda:
-        net.cuda()
-    print(net)
-    tgt_net = ptan.agent.TargetNet(net)
+        act_net.cuda()
+        crt_net.cuda()
+    print(act_net)
+    print(crt_net)
+    tgt_act_net = ptan.agent.TargetNet(act_net)
+    tgt_crt_net = ptan.agent.TargetNet(crt_net)
 
     writer = SummaryWriter(comment="-ddpg_" + args.name)
-    agent = model.AgentDDPG(net, cuda=args.cuda)
+    agent = model.AgentDDPG(act_net, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=1)
     buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=REPLAY_SIZE)
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    act_opt = optim.Adam(act_net.parameters(), lr=LEARNING_RATE)
+    crt_opt = optim.Adam(crt_net.parameters(), lr=LEARNING_RATE)
 
     frame_idx = 0
     best_reward = None
@@ -88,33 +93,33 @@ if __name__ == "__main__":
                     common.unpack_batch_ddqn(batch, cuda=args.cuda)
 
                 # train critic
-                optimizer.zero_grad()
-                q_v = net.critic(states_v, actions_v)
-                q_last_v = tgt_net.target_model(last_states_v)[1]
+                crt_opt.zero_grad()
+                q_v = crt_net(states_v, actions_v)
+                last_act_v = tgt_act_net.target_model(last_states_v)
+                q_last_v = tgt_crt_net.target_model(last_states_v, last_act_v)
                 q_last_v[dones_mask] = 0.0
                 q_ref_v = rewards_v.unsqueeze(dim=-1) + q_last_v * GAMMA
                 critic_loss_v = F.mse_loss(q_v, q_ref_v.detach())
                 critic_loss_v.backward()
-                net.n_actor.zero_grad()
-                optimizer.step()
+                crt_opt.step()
                 tb_tracker.track("loss_critic", critic_loss_v, frame_idx)
                 tb_tracker.track("critic_ref", q_ref_v.mean(), frame_idx)
 
                 # train actor
-                optimizer.zero_grad()
-                cur_actions_v = net.actor(states_v)
-                actor_loss_v = -net.critic(states_v, cur_actions_v)
+                act_opt.zero_grad()
+                cur_actions_v = act_net(states_v)
+                actor_loss_v = -crt_net(states_v, cur_actions_v)
                 actor_loss_v = actor_loss_v.mean()
                 actor_loss_v.backward()
-                net.n_critic.zero_grad()
-                optimizer.step()
+                act_opt.step()
                 tb_tracker.track("loss_actor", actor_loss_v, frame_idx)
 
-                tgt_net.alpha_sync(alpha=1-1e-3)
+                tgt_act_net.alpha_sync(alpha=1 - 1e-3)
+                tgt_crt_net.alpha_sync(alpha=1 - 1e-3)
 
                 if frame_idx % TEST_ITERS == 0:
                     ts = time.time()
-                    rewards, steps = test_net(net, test_env, cuda=args.cuda)
+                    rewards, steps = test_net(act_net, test_env, cuda=args.cuda)
                     print("Test done in %.2f sec, reward %.3f, steps %d" % (
                         time.time() - ts, rewards, steps))
                     writer.add_scalar("test_reward", rewards, frame_idx)
@@ -124,7 +129,7 @@ if __name__ == "__main__":
                             print("Best reward updated: %.3f -> %.3f" % (best_reward, rewards))
                             name = "best_%+.3f_%d.dat" % (rewards, frame_idx)
                             fname = os.path.join(save_path, name)
-                            torch.save(net.state_dict(), fname)
+                            torch.save(act_net.state_dict(), fname)
                         best_reward = rewards
 
     pass
