@@ -13,6 +13,7 @@ from lib import model, common
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 
 ENV_ID = "MinitaurBulletEnv-v0"
@@ -24,6 +25,11 @@ REPLAY_INITIAL = 10000
 REWARD_STEPS = 5
 
 TEST_ITERS = 1000
+
+Vmax = 10
+Vmin = -10
+N_ATOMS = 51
+DELTA_Z = (Vmax - Vmin) / (N_ATOMS - 1)
 
 
 def test_net(net, env, count=10, cuda=False):
@@ -44,6 +50,47 @@ def test_net(net, env, count=10, cuda=False):
     return rewards / count, steps / count
 
 
+def distr_projection(next_distr_v, rewards_v, dones_mask_t, gamma, cuda=False):
+    next_distr = next_distr_v.data.cpu().numpy()
+    rewards = rewards_v.data.cpu().numpy()
+    dones_mask = dones_mask_t.cpu().numpy()
+    batch_size = len(rewards)
+    proj_distr = np.zeros((batch_size, N_ATOMS), dtype=np.float32)
+
+    for atom in range(N_ATOMS):
+        tz_j = np.minimum(Vmax, np.maximum(Vmin, rewards + (Vmin + atom * DELTA_Z) * gamma))
+        b_j = (tz_j - Vmin) / DELTA_Z
+        l = np.floor(b_j).astype(np.int64)
+        u = np.ceil(b_j).astype(np.int64)
+        eq_mask = u == l
+        proj_distr[eq_mask, l[eq_mask]] += next_distr[eq_mask, atom]
+        ne_mask = u != l
+        proj_distr[ne_mask, l[ne_mask]] += next_distr[ne_mask, atom] * (u - b_j)[ne_mask]
+        proj_distr[ne_mask, u[ne_mask]] += next_distr[ne_mask, atom] * (b_j - l)[ne_mask]
+
+    if dones_mask.any():
+        proj_distr[dones_mask] = 0.0
+        tz_j = np.minimum(Vmax, np.maximum(Vmin, rewards[dones_mask]))
+        b_j = (tz_j - Vmin) / DELTA_Z
+        l = np.floor(b_j).astype(np.int64)
+        u = np.ceil(b_j).astype(np.int64)
+        eq_mask = u == l
+        eq_dones = dones_mask.copy()
+        eq_dones[dones_mask] = eq_mask
+        if eq_dones.any():
+            proj_distr[eq_dones, l] = 1.0
+        ne_mask = u != l
+        ne_dones = dones_mask.copy()
+        ne_dones[dones_mask] = ne_mask
+        if ne_dones.any():
+            proj_distr[ne_dones, l] = (u - b_j)[ne_mask]
+            proj_distr[ne_dones, u] = (b_j - l)[ne_mask]
+    proj_distr_v = Variable(torch.from_numpy(proj_distr))
+    if cuda:
+        proj_distr_v = proj_distr_v.cuda()
+    return proj_distr_v
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action='store_true', help='Enable CUDA')
@@ -57,7 +104,7 @@ if __name__ == "__main__":
     test_env = gym.make(ENV_ID)
 
     act_net = model.DDPGActor(env.observation_space.shape[0], env.action_space.shape[0])
-    crt_net = model.DDPGCritic(env.observation_space.shape[0], env.action_space.shape[0])
+    crt_net = model.D4PGCritic(env.observation_space.shape[0], env.action_space.shape[0], N_ATOMS, Vmin, Vmax)
     if args.cuda:
         act_net.cuda()
         crt_net.cuda()
@@ -66,7 +113,7 @@ if __name__ == "__main__":
     tgt_act_net = ptan.agent.TargetNet(act_net)
     tgt_crt_net = ptan.agent.TargetNet(crt_net)
 
-    writer = SummaryWriter(comment="-ddpg_" + args.name)
+    writer = SummaryWriter(comment="-d4pg_" + args.name)
     agent = model.AgentDDPG(act_net, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
     buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=REPLAY_SIZE)
@@ -95,21 +142,22 @@ if __name__ == "__main__":
 
                 # train critic
                 crt_opt.zero_grad()
-                q_v = crt_net(states_v, actions_v)
+                crt_distr_v = crt_net(states_v, actions_v)
                 last_act_v = tgt_act_net.target_model(last_states_v)
-                q_last_v = tgt_crt_net.target_model(last_states_v, last_act_v)
-                q_last_v[dones_mask] = 0.0
-                q_ref_v = rewards_v.unsqueeze(dim=-1) + q_last_v * (GAMMA ** REWARD_STEPS)
-                critic_loss_v = F.mse_loss(q_v, q_ref_v.detach())
+                last_distr_v = F.softmax(tgt_crt_net.target_model(last_states_v, last_act_v))
+                proj_distr_v = distr_projection(last_distr_v, rewards_v, dones_mask,
+                                                gamma=GAMMA**REWARD_STEPS, cuda=args.cuda)
+                prob_dist_v = -F.log_softmax(crt_distr_v) * proj_distr_v
+                critic_loss_v = prob_dist_v.sum(dim=1).mean()
                 critic_loss_v.backward()
                 crt_opt.step()
                 tb_tracker.track("loss_critic", critic_loss_v, frame_idx)
-                tb_tracker.track("critic_ref", q_ref_v.mean(), frame_idx)
 
                 # train actor
                 act_opt.zero_grad()
                 cur_actions_v = act_net(states_v)
-                actor_loss_v = -crt_net(states_v, cur_actions_v)
+                crt_distr_v = crt_net(states_v, cur_actions_v)
+                actor_loss_v = -crt_net.distr_to_q(crt_distr_v)
                 actor_loss_v = actor_loss_v.mean()
                 actor_loss_v.backward()
                 act_opt.step()
