@@ -91,7 +91,7 @@ class D4PGCritic(nn.Module):
         return self.out_net(torch.cat([obs, a], dim=1))
 
     def distr_to_q(self, distr):
-        weights = F.softmax(distr) * Variable(self.supports, volatile=True)
+        weights = F.softmax(distr) * Variable(self.supports)
         res = weights.sum(dim=1)
         return res.unsqueeze(dim=-1)
 
