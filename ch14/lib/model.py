@@ -35,11 +35,11 @@ class DDPGActor(nn.Module):
         super(DDPGActor, self).__init__()
 
         self.net = nn.Sequential(
-            nn.Linear(obs_size, 300),
+            nn.Linear(obs_size, 400),
             nn.ReLU(),
-            nn.Linear(300, 200),
+            nn.Linear(400, 300),
             nn.ReLU(),
-            nn.Linear(200, act_size),
+            nn.Linear(300, act_size),
             nn.Tanh()
         )
 
@@ -53,24 +53,18 @@ class DDPGCritic(nn.Module):
 
         self.obs_net = nn.Sequential(
             nn.Linear(obs_size, 400),
-            nn.ReLU()
-        )
-
-        self.act_net = nn.Sequential(
-            nn.Linear(act_size, 300),
             nn.ReLU(),
-            nn.Linear(300, 400),
-            nn.ReLU()
         )
 
         self.out_net = nn.Sequential(
-            nn.Linear(400, 1)
+            nn.Linear(400 + act_size, 300),
+            nn.ReLU(),
+            nn.Linear(300, 1)
         )
 
     def forward(self, x, a):
         obs = self.obs_net(x)
-        act = self.act_net(a)
-        return self.out_net(obs + act)
+        return self.out_net(torch.cat([obs, a], dim=1))
 
 
 class AgentA2C(ptan.agent.BaseAgent):
@@ -124,4 +118,20 @@ class AgentDDPG(ptan.agent.BaseAgent):
         actions = np.clip(actions, -1, 1)
         return actions, new_a_states
 
-pass
+
+class AgentD4PG(ptan.agent.BaseAgent):
+    """
+    Agent implementing noisy agent
+    """
+    def __init__(self, net, cuda=False, epsilon=0.3):
+        self.net = net
+        self.cuda = cuda
+        self.epsilon = epsilon
+
+    def __call__(self, states, agent_states):
+        states_v = ptan.agent.float32_preprocessor(states, cuda=self.cuda)
+        mu_v = self.net(states_v)
+        actions = mu_v.data.cpu().numpy()
+        actions += self.epsilon * np.random.normal(size=actions.shape)
+        actions = np.clip(actions, -1, 1)
+        return actions, agent_states
