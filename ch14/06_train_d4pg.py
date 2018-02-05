@@ -53,7 +53,7 @@ def test_net(net, env, count=10, cuda=False):
 def distr_projection(next_distr_v, rewards_v, dones_mask_t, gamma, cuda=False):
     next_distr = next_distr_v.data.cpu().numpy()
     rewards = rewards_v.data.cpu().numpy()
-    dones_mask = dones_mask_t.cpu().numpy()
+    dones_mask = dones_mask_t.cpu().numpy().astype(np.bool)
     batch_size = len(rewards)
     proj_distr = np.zeros((batch_size, N_ATOMS), dtype=np.float32)
 
