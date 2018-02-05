@@ -11,8 +11,8 @@ if __name__ == "__main__":
     spec._kwargs['render'] = RENDER
     env = gym.make(ENV_ID)
 
-    print(env.observation_space)
-    print(env.action_space, env.action_space.sample())
+    print("Observation space:", env.observation_space)
+    print("Action space:", env.action_space)
     print(env)
     print(env.reset())
     input("Press any key to exit\n")
