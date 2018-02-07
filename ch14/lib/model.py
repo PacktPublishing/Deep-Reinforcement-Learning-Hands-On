@@ -136,11 +136,13 @@ class AgentDDPG(ptan.agent.BaseAgent):
         if self.ou_enabled and self.ou_epsilon > 0:
             new_a_states = []
             for a_state, action in zip(agent_states, actions):
-                if a_state is not None:
-                    noise = self.ou_teta * (self.ou_mu - action)
-                    noise += self.ou_sigma * np.random.normal(size=action.shape)
-                    action += self.ou_epsilon * noise
-                new_a_states.append(action)
+                if a_state is None:
+                    a_state = np.zeros(shape=action.shape, dtype=np.float32)
+                a_state += self.ou_teta * (self.ou_mu - a_state)
+                a_state += self.ou_sigma * np.random.normal(size=action.shape)
+
+                action += self.ou_epsilon * a_state
+                new_a_states.append(a_state)
         else:
             new_a_states = agent_states
 
