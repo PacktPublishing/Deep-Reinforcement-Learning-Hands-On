@@ -4,7 +4,7 @@ import time
 import math
 import ptan
 import gym
-from pybulletgym import envs
+import pybullet_envs
 import argparse
 from tensorboardX import SummaryWriter
 
@@ -16,33 +16,15 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 
-ENV_ID = "HalfCheetahPyBulletEnv-v0"
+ENV_ID = "HalfCheetahBulletEnv-v0"
 GAMMA = 0.99
 REWARD_STEPS = 2
 BATCH_SIZE = 32
 LEARNING_RATE = 5e-5
 ENTROPY_BETA = 1e-4
-ENV_COUNT = 16
+ENV_COUNT = 1
 
 TEST_ITERS = 1000
-
-
-def test_net(net, env, count=10, cuda=False):
-    rewards = 0.0
-    steps = 0
-    for _ in range(count):
-        obs = env.reset()
-        while True:
-            obs_v = ptan.agent.float32_preprocessor([obs], cuda)
-            mu_v = net(obs_v)[0]
-            action = mu_v.squeeze(dim=0).data.cpu().numpy()
-            action = np.clip(action, -1, 1)
-            obs, reward, done, _ = env.step(action)
-            rewards += reward
-            steps += 1
-            if done:
-                break
-    return rewards / count, steps / count
 
 
 def calc_logprob(mu_v, var_v, actions_v):
@@ -60,17 +42,16 @@ if __name__ == "__main__":
     save_path = os.path.join("saves", "a2c-" + args.name)
     os.makedirs(save_path, exist_ok=True)
 
-    envs = [gym.make(ENV_ID) for _ in range(ENV_COUNT)]
-    test_env = gym.make(ENV_ID)
+    env = gym.make(ENV_ID)
 
-    net = model.ModelA2C(test_env.observation_space.shape[0], test_env.action_space.shape[0])
+    net = model.ModelA2C(env.observation_space.shape[0], env.action_space.shape[0])
     if args.cuda:
         net.cuda()
     print(net)
 
     writer = SummaryWriter(comment="-a2c_" + args.name)
     agent = model.AgentA2C(net, cuda=args.cuda)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, GAMMA, steps_count=REWARD_STEPS)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
@@ -83,22 +64,15 @@ if __name__ == "__main__":
                 if rewards_steps:
                     rewards, steps = zip(*rewards_steps)
                     tb_tracker.track("episode_steps", np.mean(steps), step_idx)
-                    tracker.reward(np.mean(rewards), step_idx)
+                    mean_reward = tracker.reward(np.mean(rewards), step_idx)
 
-                if step_idx % TEST_ITERS == 0:
-                    ts = time.time()
-                    rewards, steps = test_net(net, test_env, cuda=args.cuda)
-                    print("Test done is %.2f sec, reward %.3f, steps %d" % (
-                        time.time() - ts, rewards, steps))
-                    writer.add_scalar("test_reward", rewards, step_idx)
-                    writer.add_scalar("test_steps", steps, step_idx)
-                    if best_reward is None or best_reward < rewards:
+                    if best_reward is None or best_reward < mean_reward:
                         if best_reward is not None:
-                            print("Best reward updated: %.3f -> %.3f" % (best_reward, rewards))
-                            name = "best_%+.3f_%d.dat" % (rewards, step_idx)
+                            print("Best reward updated: %.3f -> %.3f" % (best_reward, mean_reward))
+                            name = "best_%+.3f_%d.dat" % (mean_reward, step_idx)
                             fname = os.path.join(save_path, name)
                             torch.save(net.state_dict(), fname)
-                        best_reward = rewards
+                        best_reward = mean_reward
 
                 batch.append(exp)
                 if len(batch) < BATCH_SIZE:
