@@ -16,7 +16,6 @@ class StadiumScene(Scene):
 	def episode_restart(self):
 		Scene.episode_restart(self)   # contains cpp_world.clean_everything()
 		filename = os.path.join(os.path.dirname(__file__), "..", "assets", "scenes", "stadium", "stadium.sdf")
-		print(filename)		
 		self.stadium = p.loadSDF(filename)
 		planeName = os.path.join(os.path.dirname(__file__), "..", "assets", "mjcf/ground_plane.xml")
 		
