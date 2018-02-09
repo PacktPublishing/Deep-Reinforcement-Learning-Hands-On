@@ -4,7 +4,6 @@ import time
 import math
 import ptan
 import gym
-#import pybullet_envs
 from pybulletgym import envs
 import argparse
 from tensorboardX import SummaryWriter
@@ -17,12 +16,13 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 
-ENV_ID = "HalfCheetahPyBulletEnv-v0"  #"HalfCheetahBulletEnv-v0"
+ENV_ID = "HalfCheetahPyBulletEnv-v0"
 GAMMA = 0.99
 REWARD_STEPS = 2
 BATCH_SIZE = 32
 LEARNING_RATE = 5e-5
 ENTROPY_BETA = 1e-4
+ENV_COUNT = 16
 
 TEST_ITERS = 1000
 
@@ -60,17 +60,17 @@ if __name__ == "__main__":
     save_path = os.path.join("saves", "a2c-" + args.name)
     os.makedirs(save_path, exist_ok=True)
 
-    env = gym.make(ENV_ID)
+    envs = [gym.make(ENV_ID) for _ in range(ENV_COUNT)]
     test_env = gym.make(ENV_ID)
 
-    net = model.ModelA2C(env.observation_space.shape[0], env.action_space.shape[0])
+    net = model.ModelA2C(test_env.observation_space.shape[0], test_env.action_space.shape[0])
     if args.cuda:
         net.cuda()
     print(net)
 
     writer = SummaryWriter(comment="-a2c_" + args.name)
     agent = model.AgentA2C(net, cuda=args.cuda)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
+    exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
@@ -82,8 +82,8 @@ if __name__ == "__main__":
                 rewards_steps = exp_source.pop_rewards_steps()
                 if rewards_steps:
                     rewards, steps = zip(*rewards_steps)
-                    tb_tracker.track("episode_steps", steps[0], step_idx)
-                    tracker.reward(rewards[0], step_idx)
+                    tb_tracker.track("episode_steps", np.mean(steps), step_idx)
+                    tracker.reward(np.mean(rewards), step_idx)
 
                 if step_idx % TEST_ITERS == 0:
                     ts = time.time()
