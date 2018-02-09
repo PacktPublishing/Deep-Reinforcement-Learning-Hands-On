@@ -135,7 +135,6 @@ class URDFBasedRobot(XmlBasedRobot):
 		self.ordered_joints = []
 
 		full_path = os.path.join(os.path.dirname(__file__), "..", "assets", "robots", self.model_urdf)
-		print(full_path)
 
 		if self.self_collision:
 			self.parts, self.jdict, self.ordered_joints, self.robot_body = self.addToScene(
