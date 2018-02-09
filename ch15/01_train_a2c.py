@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 import os
-import time
 import math
 import ptan
 import gym
-import pybullet_envs
+import roboschool
 import argparse
 from tensorboardX import SummaryWriter
 
@@ -16,15 +15,33 @@ import torch.optim as optim
 import torch.nn.functional as F
 
 
-ENV_ID = "HalfCheetahBulletEnv-v0"
+ENV_ID = "RoboschoolHalfCheetah-v1"
 GAMMA = 0.99
 REWARD_STEPS = 2
 BATCH_SIZE = 32
-LEARNING_RATE = 5e-5
+LEARNING_RATE = 1e-5
 ENTROPY_BETA = 1e-4
-ENV_COUNT = 1
 
 TEST_ITERS = 1000
+
+
+def test_net(net, env, count=10, cuda=False):
+    rewards = 0.0
+    steps = 0
+    for _ in range(count):
+        obs = env.reset()
+        while True:
+            obs_v = ptan.agent.float32_preprocessor([obs], cuda)
+            mu_v = net(obs_v)[0]
+            action = mu_v.squeeze(dim=0).data.cpu().numpy()
+            action = np.clip(action, -1, 1)
+            obs, reward, done, _ = env.step(action)
+            rewards += reward
+            steps += 1
+            if done:
+                break
+    return rewards / count, steps / count
+
 
 
 def calc_logprob(mu_v, var_v, actions_v):
