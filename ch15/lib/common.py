@@ -33,7 +33,7 @@ def unpack_batch_a2c(batch, net, last_val_gamma, cuda=False):
     rewards_np = np.array(rewards, dtype=np.float32)
     if not_done_idx:
         last_states_v = ptan.agent.float32_preprocessor(last_states, cuda=cuda)
-        last_vals_v = net(last_states_v)[2]
+        last_vals_v = net(last_states_v)
         last_vals_np = last_vals_v.data.cpu().numpy()[:, 0]
         rewards_np[not_done_idx] += last_val_gamma * last_vals_np
 

@@ -5,15 +5,17 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
-HID_SIZE = 128
+HID_SIZE = 64
 
 
-class ModelA2C(nn.Module):
+class ModelActor(nn.Module):
     def __init__(self, obs_size, act_size):
-        super(ModelA2C, self).__init__()
+        super(ModelActor, self).__init__()
 
         self.base = nn.Sequential(
             nn.Linear(obs_size, HID_SIZE),
+            nn.ReLU(),
+            nn.Linear(HID_SIZE, HID_SIZE),
             nn.ReLU(),
         )
         self.mu = nn.Sequential(
@@ -24,11 +26,26 @@ class ModelA2C(nn.Module):
             nn.Linear(HID_SIZE, act_size),
             nn.Softplus(),
         )
-        self.value = nn.Linear(HID_SIZE, 1)
 
     def forward(self, x):
         base_out = self.base(x)
-        return self.mu(base_out), self.var(base_out), self.value(base_out)
+        return self.mu(base_out), self.var(base_out)
+
+
+class ModelCritic(nn.Module):
+    def __init__(self, obs_size):
+        super(ModelCritic, self).__init__()
+
+        self.value = nn.Sequential(
+            nn.Linear(obs_size, HID_SIZE),
+            nn.ReLU(),
+            nn.Linear(HID_SIZE, HID_SIZE),
+            nn.ReLU(),
+            nn.Linear(HID_SIZE, 1),
+        )
+
+    def forward(self, x):
+        return self.value(x)
 
 
 class AgentA2C(ptan.agent.BaseAgent):
@@ -39,7 +56,7 @@ class AgentA2C(ptan.agent.BaseAgent):
     def __call__(self, states, agent_states):
         states_v = ptan.agent.float32_preprocessor(states, cuda=self.cuda)
 
-        mu_v, var_v, _ = self.net(states_v)
+        mu_v, var_v = self.net(states_v)
         mu = mu_v.data.cpu().numpy()
         sigma = torch.sqrt(var_v).data.cpu().numpy()
         actions = np.random.normal(mu, sigma)
