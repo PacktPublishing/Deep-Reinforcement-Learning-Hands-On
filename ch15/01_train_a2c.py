@@ -18,7 +18,7 @@ import torch.nn.functional as F
 
 ENV_ID = "RoboschoolHalfCheetah-v1"
 GAMMA = 0.99
-REWARD_STEPS = 2
+REWARD_STEPS = 5
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-5
 ENTROPY_BETA = 1e-4
@@ -43,7 +43,6 @@ def test_net(net, env, count=10, cuda=False):
             if done:
                 break
     return rewards / count, steps / count
-
 
 
 def calc_logprob(mu_v, var_v, actions_v):
