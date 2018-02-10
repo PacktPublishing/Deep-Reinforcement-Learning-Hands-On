@@ -23,6 +23,7 @@ BATCH_SIZE = 32
 LEARNING_RATE = 1e-5
 ENTROPY_BETA = 1e-4
 ENVS_COUNT = 16
+PPO_EPS = 0.3
 
 TEST_ITERS = 1000
 
@@ -117,7 +118,8 @@ if __name__ == "__main__":
                 logprob_pi_v = calc_logprob(mu_v, var_v, actions_v)
                 logprob_old_pi_v = logprob_pi_v.detach()
                 surr_obj_v = adv_v * torch.exp(logprob_pi_v - logprob_old_pi_v)
-                loss_policy_v = -surr_obj_v.mean()
+                clipped_surr_v = torch.clamp(surr_obj_v, 1.0 - PPO_EPS, 1.0 + PPO_EPS)
+                loss_policy_v = -torch.min(surr_obj_v, clipped_surr_v).mean()
                 entropy_loss_v = ENTROPY_BETA * (-(torch.log(2*math.pi*var_v) + 1)/2).mean()
 
                 loss_v = loss_policy_v + entropy_loss_v + loss_value_v
