@@ -24,7 +24,9 @@ LEARNING_RATE_ACTOR = 1e-5
 LEARNING_RATE_CRITIC = 1e-4
 ENTROPY_BETA = 1e-4
 ENVS_COUNT = 32
+
 PPO_EPS = 0.2
+PPO_EPOCHES = 10
 
 TEST_ITERS = 1000
 
@@ -120,16 +122,23 @@ if __name__ == "__main__":
                 loss_value_v.backward()
                 opt_crt.step()
 
-                opt_act.zero_grad()
-                mu_v, var_v = net_act(states_v)
                 adv_v = vals_ref_v.unsqueeze(dim=-1) - value_v.detach()
-                logprob_pi_v = calc_logprob(mu_v, var_v, actions_v)
-                logprob_old_pi_v = logprob_pi_v.detach()
-                surr_obj_v = adv_v * torch.exp(logprob_pi_v - logprob_old_pi_v)
-                clipped_surr_v = torch.clamp(surr_obj_v, 1.0 - PPO_EPS, 1.0 + PPO_EPS)
-                loss_policy_v = -torch.min(surr_obj_v, clipped_surr_v).mean()
-                loss_policy_v.backward()
-                opt_act.step()
+                logprob_old_pi_v = None
+                sum_loss_policy = 0.0
+
+                for _ in range(PPO_EPOCHES):
+                    opt_act.zero_grad()
+                    mu_v, var_v = net_act(states_v)
+                    logprob_pi_v = calc_logprob(mu_v, var_v, actions_v)
+                    if logprob_old_pi_v is None:
+                        logprob_old_pi_v = logprob_pi_v.detach()
+                    surr_obj_v = adv_v * torch.exp(logprob_pi_v - logprob_old_pi_v)
+#                clipped_surr_v = torch.clamp(surr_obj_v, 1.0 - PPO_EPS, 1.0 + PPO_EPS)
+#                loss_policy_v = -torch.min(surr_obj_v, clipped_surr_v).mean()
+                    loss_policy_v = -surr_obj_v.mean()
+                    loss_policy_v.backward()
+                    sum_loss_policy += loss_policy_v.data.cpu().numpy()[0]
+                    opt_act.step()
 #                entropy_loss_v = ENTROPY_BETA * (-(torch.log(2*math.pi*var_v) + 1)/2).mean()
 
 #                loss_v = loss_policy_v + entropy_loss_v
@@ -140,7 +149,7 @@ if __name__ == "__main__":
                 tb_tracker.track("values", value_v, step_idx)
                 tb_tracker.track("batch_rewards", vals_ref_v, step_idx)
 #                tb_tracker.track("loss_entropy", entropy_loss_v, step_idx)
-                tb_tracker.track("loss_policy", loss_policy_v, step_idx)
+                tb_tracker.track("loss_policy", sum_loss_policy / PPO_EPOCHES, step_idx)
                 tb_tracker.track("loss_value", loss_value_v, step_idx)
 #                tb_tracker.track("loss_total", loss_v, step_idx)
 
