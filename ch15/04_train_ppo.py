@@ -18,12 +18,13 @@ import torch.nn.functional as F
 
 ENV_ID = "RoboschoolHalfCheetah-v1"
 GAMMA = 0.99
-REWARD_STEPS = 16
-BATCH_SIZE = 64
-LEARNING_RATE = 1e-5
+REWARD_STEPS = 5
+BATCH_SIZE = 32
+LEARNING_RATE_ACTOR = 1e-5
+LEARNING_RATE_CRITIC = 1e-4
 ENTROPY_BETA = 1e-4
 ENVS_COUNT = 32
-PPO_EPS = 0.3
+PPO_EPS = 0.2
 
 TEST_ITERS = 1000
 
@@ -64,16 +65,20 @@ if __name__ == "__main__":
     envs = [gym.make(ENV_ID) for _ in range(ENVS_COUNT)]
     test_env = gym.make(ENV_ID)
 
-    net = model.ModelA2C(envs[0].observation_space.shape[0], envs[0].action_space.shape[0])
+    net_act = model.ModelActor(envs[0].observation_space.shape[0], envs[0].action_space.shape[0])
+    net_crt = model.ModelCritic(envs[0].observation_space.shape[0])
     if args.cuda:
-        net.cuda()
-    print(net)
+        net_act.cuda()
+        net_crt.cuda()
+    print(net_act)
+    print(net_crt)
 
     writer = SummaryWriter(comment="-ppo_" + args.name)
-    agent = model.AgentA2C(net, cuda=args.cuda)
+    agent = model.AgentA2C(net_act, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, GAMMA, steps_count=REWARD_STEPS)
 
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    opt_act = optim.Adam(net_act.parameters(), lr=LEARNING_RATE_ACTOR)
+    opt_crt = optim.Adam(net_crt.parameters(), lr=LEARNING_RATE_CRITIC)
 
     batch = []
     best_reward = None
@@ -88,7 +93,7 @@ if __name__ == "__main__":
 
                 if step_idx % TEST_ITERS == 0:
                     ts = time.time()
-                    rewards, steps = test_net(net, test_env, cuda=args.cuda)
+                    rewards, steps = test_net(net_act, test_env, cuda=args.cuda)
                     print("Test done is %.2f sec, reward %.3f, steps %d" % (
                         time.time() - ts, rewards, steps))
                     writer.add_scalar("test_reward", rewards, step_idx)
@@ -106,31 +111,36 @@ if __name__ == "__main__":
                     continue
 
                 states_v, actions_v, vals_ref_v = \
-                    common.unpack_batch_a2c(batch, net, last_val_gamma=GAMMA ** REWARD_STEPS, cuda=args.cuda)
+                    common.unpack_batch_a2c(batch, net_crt, last_val_gamma=GAMMA ** REWARD_STEPS, cuda=args.cuda)
                 batch.clear()
 
-                optimizer.zero_grad()
-                mu_v, var_v, value_v = net(states_v)
-
+                opt_crt.zero_grad()
+                value_v = net_crt(states_v)
                 loss_value_v = F.mse_loss(value_v, vals_ref_v)
+                loss_value_v.backward()
+                opt_crt.step()
 
+                opt_act.zero_grad()
+                mu_v, var_v = net_act(states_v)
                 adv_v = vals_ref_v.unsqueeze(dim=-1) - value_v.detach()
                 logprob_pi_v = calc_logprob(mu_v, var_v, actions_v)
                 logprob_old_pi_v = logprob_pi_v.detach()
                 surr_obj_v = adv_v * torch.exp(logprob_pi_v - logprob_old_pi_v)
                 clipped_surr_v = torch.clamp(surr_obj_v, 1.0 - PPO_EPS, 1.0 + PPO_EPS)
                 loss_policy_v = -torch.min(surr_obj_v, clipped_surr_v).mean()
-                entropy_loss_v = ENTROPY_BETA * (-(torch.log(2*math.pi*var_v) + 1)/2).mean()
+                loss_policy_v.backward()
+                opt_act.step()
+#                entropy_loss_v = ENTROPY_BETA * (-(torch.log(2*math.pi*var_v) + 1)/2).mean()
 
-                loss_v = loss_policy_v + entropy_loss_v + loss_value_v
-                loss_v.backward()
-                optimizer.step()
+#                loss_v = loss_policy_v + entropy_loss_v
+#                loss_v.backward()
+#                optimizer.step()
 
                 tb_tracker.track("advantage", adv_v, step_idx)
                 tb_tracker.track("values", value_v, step_idx)
                 tb_tracker.track("batch_rewards", vals_ref_v, step_idx)
-                tb_tracker.track("loss_entropy", entropy_loss_v, step_idx)
+#                tb_tracker.track("loss_entropy", entropy_loss_v, step_idx)
                 tb_tracker.track("loss_policy", loss_policy_v, step_idx)
                 tb_tracker.track("loss_value", loss_value_v, step_idx)
-                tb_tracker.track("loss_total", loss_v, step_idx)
+#                tb_tracker.track("loss_total", loss_v, step_idx)
 
