@@ -114,7 +114,7 @@ if __name__ == "__main__":
     tgt_crt_net = ptan.agent.TargetNet(crt_net)
 
     writer = SummaryWriter(comment="-d4pg_" + args.name)
-    agent = model.AgentD4PG(act_net, cuda=args.cuda)
+    agent = model.AgentDDPG(act_net, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
     buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=REPLAY_SIZE)
     act_opt = optim.Adam(act_net.parameters(), lr=LEARNING_RATE)
