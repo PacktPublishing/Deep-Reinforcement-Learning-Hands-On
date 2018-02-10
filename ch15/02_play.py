@@ -25,7 +25,7 @@ if __name__ == "__main__":
         env = gym.wrappers.Monitor(env, args.record)
 
     if args.kind == 'a2c':
-        net = model.ModelA2C(env.observation_space.shape[0], env.action_space.shape[0])
+        net = model.ModelActor(env.observation_space.shape[0], env.action_space.shape[0])
     elif args.kind == 'd4pg':
         net = model.DDPGActor(env.observation_space.shape[0], env.action_space.shape[0])
     net.load_state_dict(torch.load(args.model))
@@ -36,7 +36,7 @@ if __name__ == "__main__":
     while True:
         obs_v = Variable(torch.from_numpy(np.array([obs], dtype=np.float32)))
         if args.kind == 'a2c':
-            mu_v, var_v, val_v = net(obs_v)
+            mu_v, var_v = net(obs_v)
         else:
             mu_v = net(obs_v)
         action = mu_v.squeeze(dim=0).data.numpy()
