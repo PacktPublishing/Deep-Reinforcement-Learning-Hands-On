@@ -18,11 +18,11 @@ import torch.nn.functional as F
 
 ENV_ID = "RoboschoolHalfCheetah-v1"
 GAMMA = 0.99
-REWARD_STEPS = 2
-BATCH_SIZE = 32
+REWARD_STEPS = 16
+BATCH_SIZE = 64
 LEARNING_RATE = 1e-5
 ENTROPY_BETA = 1e-4
-ENVS_COUNT = 16
+ENVS_COUNT = 32
 PPO_EPS = 0.3
 
 TEST_ITERS = 1000
