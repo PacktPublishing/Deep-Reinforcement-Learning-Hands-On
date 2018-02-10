@@ -9,8 +9,6 @@ import numpy as np
 import torch
 from torch.autograd import Variable
 
-from PIL import Image
-
 
 ENV_ID = "RoboschoolHalfCheetah-v1"
 
@@ -21,8 +19,6 @@ if __name__ == "__main__":
     parser.add_argument("-r", "--record", help="If specified, sets the recording dir, default=Disabled")
     args = parser.parse_args()
 
-    # spec = gym.envs.registry.spec(args.env)
-    # spec._kwargs['render'] = False
     env = gym.make(args.env)
     if args.record:
         env = gym.wrappers.Monitor(env, args.record)
@@ -34,10 +30,6 @@ if __name__ == "__main__":
     total_reward = 0.0
     total_steps = 0
     while True:
-        t = env.render(mode='rgb_array')
-        img = Image.fromarray(t)
-        img.save("img_%05d.png" % total_steps)
-#        print(t.shape)
         obs_v = Variable(torch.from_numpy(np.array([obs], dtype=np.float32)))
         mu_v, var_v, val_v = net(obs_v)
         action = mu_v.squeeze(dim=0).data.numpy()
