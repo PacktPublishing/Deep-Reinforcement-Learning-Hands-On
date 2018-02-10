@@ -132,8 +132,9 @@ if __name__ == "__main__":
                     logprob_pi_v = calc_logprob(mu_v, var_v, actions_v)
                     if logprob_old_pi_v is None:
                         logprob_old_pi_v = logprob_pi_v.detach()
-                    surr_obj_v = adv_v * torch.exp(logprob_pi_v - logprob_old_pi_v)
-                    clipped_surr_v = torch.clamp(surr_obj_v, 1.0 - PPO_EPS, 1.0 + PPO_EPS)
+                    ratio_v = torch.exp(logprob_pi_v - logprob_old_pi_v)
+                    surr_obj_v = adv_v * ratio_v
+                    clipped_surr_v = adv_v * torch.clamp(ratio_v, 1.0 - PPO_EPS, 1.0 + PPO_EPS)
                     loss_policy_v = -torch.min(surr_obj_v, clipped_surr_v).mean()
                     loss_policy_v.backward()
                     sum_loss_policy += loss_policy_v.data.cpu().numpy()[0]
