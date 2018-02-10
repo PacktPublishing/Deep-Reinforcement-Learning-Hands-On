@@ -42,3 +42,24 @@ def unpack_batch_a2c(batch, net, last_val_gamma, cuda=False):
         ref_vals_v = ref_vals_v.cuda()
 
     return states_v, actions_v, ref_vals_v
+
+
+def unpack_batch_ddqn(batch, cuda=False):
+    states, actions, rewards, dones, last_states = [], [], [], [], []
+    for exp in batch:
+        states.append(exp.state)
+        actions.append(exp.action)
+        rewards.append(exp.reward)
+        dones.append(exp.last_state is None)
+        if exp.last_state is None:
+            last_states.append(exp.state)
+        else:
+            last_states.append(exp.last_state)
+    states_v = ptan.agent.float32_preprocessor(states, cuda=cuda)
+    actions_v = ptan.agent.float32_preprocessor(actions, cuda=cuda)
+    rewards_v = ptan.agent.float32_preprocessor(rewards, cuda=cuda)
+    last_states_v = ptan.agent.float32_preprocessor(last_states, cuda=cuda)
+    dones_t = torch.ByteTensor(dones)
+    if cuda:
+        dones_t = dones_t.cuda()
+    return states_v, actions_v, rewards_v, dones_t, last_states_v

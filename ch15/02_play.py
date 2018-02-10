@@ -17,13 +17,17 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--model", required=True, help="Model file to load")
     parser.add_argument("-e", "--env", default=ENV_ID, help="Environment name to use, default=" + ENV_ID)
     parser.add_argument("-r", "--record", help="If specified, sets the recording dir, default=Disabled")
+    parser.add_argument("-k", "--kind", choices=['a2c', 'd4pg'], default='a2c', help="Kind of model to load. Options: a2c or d4pg")
     args = parser.parse_args()
 
     env = gym.make(args.env)
     if args.record:
         env = gym.wrappers.Monitor(env, args.record)
 
-    net = model.ModelA2C(env.observation_space.shape[0], env.action_space.shape[0])
+    if args.kind == 'a2c':
+        net = model.ModelA2C(env.observation_space.shape[0], env.action_space.shape[0])
+    elif args.kind == 'd4pg':
+        net = model.DDPGActor(env.observation_space.shape[0], env.action_space.shape[0])
     net.load_state_dict(torch.load(args.model))
 
     obs = env.reset()
@@ -31,7 +35,10 @@ if __name__ == "__main__":
     total_steps = 0
     while True:
         obs_v = Variable(torch.from_numpy(np.array([obs], dtype=np.float32)))
-        mu_v, var_v, val_v = net(obs_v)
+        if args.kind == 'a2c':
+            mu_v, var_v, val_v = net(obs_v)
+        else:
+            mu_v = net(obs_v)
         action = mu_v.squeeze(dim=0).data.numpy()
         action = np.clip(action, -1, 1)
         obs, reward, done, _ = env.step(action)
