@@ -130,81 +130,80 @@ if __name__ == "__main__":
     trajectory = []
     best_reward = None
     with ptan.common.utils.RewardTracker(writer) as tracker:
-        with ptan.common.utils.TBMeanTracker(writer, batch_size=100) as tb_tracker:
-            for step_idx, exp in enumerate(exp_source):
-                rewards_steps = exp_source.pop_rewards_steps()
-                if rewards_steps:
-                    rewards, steps = zip(*rewards_steps)
-                    tb_tracker.track("episode_steps", np.mean(steps), step_idx)
-                    tracker.reward(np.mean(rewards), step_idx)
+        for step_idx, exp in enumerate(exp_source):
+            rewards_steps = exp_source.pop_rewards_steps()
+            if rewards_steps:
+                rewards, steps = zip(*rewards_steps)
+                writer.add_scalar("episode_steps", np.mean(steps), step_idx)
+                tracker.reward(np.mean(rewards), step_idx)
 
-                if step_idx % TEST_ITERS == 0:
-                    ts = time.time()
-                    rewards, steps = test_net(net_act, test_env, cuda=args.cuda)
-                    print("Test done is %.2f sec, reward %.3f, steps %d" % (
-                        time.time() - ts, rewards, steps))
-                    writer.add_scalar("test_reward", rewards, step_idx)
-                    writer.add_scalar("test_steps", steps, step_idx)
-                    if best_reward is None or best_reward < rewards:
-                        if best_reward is not None:
-                            print("Best reward updated: %.3f -> %.3f" % (best_reward, rewards))
-                            name = "best_%+.3f_%d.dat" % (rewards, step_idx)
-                            fname = os.path.join(save_path, name)
-                            torch.save(net_act.state_dict(), fname)
-                        best_reward = rewards
+            if step_idx % TEST_ITERS == 0:
+                ts = time.time()
+                rewards, steps = test_net(net_act, test_env, cuda=args.cuda)
+                print("Test done is %.2f sec, reward %.3f, steps %d" % (
+                    time.time() - ts, rewards, steps))
+                writer.add_scalar("test_reward", rewards, step_idx)
+                writer.add_scalar("test_steps", steps, step_idx)
+                if best_reward is None or best_reward < rewards:
+                    if best_reward is not None:
+                        print("Best reward updated: %.3f -> %.3f" % (best_reward, rewards))
+                        name = "best_%+.3f_%d.dat" % (rewards, step_idx)
+                        fname = os.path.join(save_path, name)
+                        torch.save(net_act.state_dict(), fname)
+                    best_reward = rewards
 
-                trajectory.append(exp)
-                if len(trajectory) < TRAJECTORY_SIZE:
-                    continue
+            trajectory.append(exp)
+            if len(trajectory) < TRAJECTORY_SIZE:
+                continue
 
-                traj_adv_v, traj_ref_v, old_logprob_v = calc_adv_ref(trajectory, net_crt, net_act, cuda=args.cuda)
+            traj_adv_v, traj_ref_v, old_logprob_v = calc_adv_ref(trajectory, net_crt, net_act, cuda=args.cuda)
 
-                # drop last entry from the trajectory, an our adv and ref value calculated without it
-                trajectory = trajectory[:-1]
-                old_logprob_v = old_logprob_v[:-1].detach()
-                sum_loss_value = 0.0
-                sum_loss_policy = 0.0
-                count_steps = 0
+            # drop last entry from the trajectory, an our adv and ref value calculated without it
+            trajectory = trajectory[:-1]
+            old_logprob_v = old_logprob_v[:-1].detach()
+            sum_loss_value = 0.0
+            sum_loss_policy = 0.0
+            count_steps = 0
 
-                for epoch in range(PPO_EPOCHES):
-                    for batch_ofs in range(0, len(trajectory), PPO_BATCH_SIZE):
-                        batch = trajectory[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
-                        states = [t[0].state for t in batch]
-                        actions = [t[0].action for t in batch]
-                        states_v = Variable(torch.from_numpy(np.array(states, dtype=np.float32)))
-                        actions_v = Variable(torch.from_numpy(np.array(actions, dtype=np.float32)))
-                        if args.cuda:
-                            states_v = states_v.cuda()
-                            actions_v = actions_v.cuda()
-                        batch_adv_v = traj_adv_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE].unsqueeze(-1)
-                        batch_ref_v = traj_ref_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
-                        batch_old_logprob_v = old_logprob_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
+            for epoch in range(PPO_EPOCHES):
+                for batch_ofs in range(0, len(trajectory), PPO_BATCH_SIZE):
+                    batch = trajectory[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
+                    states = [t[0].state for t in batch]
+                    actions = [t[0].action for t in batch]
+                    states_v = Variable(torch.from_numpy(np.array(states, dtype=np.float32)))
+                    actions_v = Variable(torch.from_numpy(np.array(actions, dtype=np.float32)))
+                    if args.cuda:
+                        states_v = states_v.cuda()
+                        actions_v = actions_v.cuda()
+                    batch_adv_v = traj_adv_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE].unsqueeze(-1)
+                    batch_ref_v = traj_ref_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
+                    batch_old_logprob_v = old_logprob_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
 
-                        # critic training
-                        opt_crt.zero_grad()
-                        value_v = net_crt(states_v)
-                        loss_value_v = F.mse_loss(value_v, batch_ref_v)
-                        loss_value_v.backward()
-                        opt_crt.step()
+                    # critic training
+                    opt_crt.zero_grad()
+                    value_v = net_crt(states_v)
+                    loss_value_v = F.mse_loss(value_v, batch_ref_v)
+                    loss_value_v.backward()
+                    opt_crt.step()
 
-                        # actor training
-                        opt_act.zero_grad()
-                        mu_v, var_v = net_act(states_v)
-                        logprob_pi_v = calc_logprob(mu_v, var_v, actions_v)
-                        ratio_v = torch.exp(logprob_pi_v - batch_old_logprob_v)
-                        surr_obj_v = batch_adv_v * ratio_v
-                        clipped_surr_v = batch_adv_v * torch.clamp(ratio_v, 1.0 - PPO_EPS, 1.0 + PPO_EPS)
-                        loss_policy_v = -torch.min(surr_obj_v, clipped_surr_v).mean()
-                        loss_policy_v.backward()
-                        opt_act.step()
+                    # actor training
+                    opt_act.zero_grad()
+                    mu_v, var_v = net_act(states_v)
+                    logprob_pi_v = calc_logprob(mu_v, var_v, actions_v)
+                    ratio_v = torch.exp(logprob_pi_v - batch_old_logprob_v)
+                    surr_obj_v = batch_adv_v * ratio_v
+                    clipped_surr_v = batch_adv_v * torch.clamp(ratio_v, 1.0 - PPO_EPS, 1.0 + PPO_EPS)
+                    loss_policy_v = -torch.min(surr_obj_v, clipped_surr_v).mean()
+                    loss_policy_v.backward()
+                    opt_act.step()
 
-                        sum_loss_value += loss_value_v.data.cpu().numpy()[0]
-                        sum_loss_policy += loss_policy_v.data.cpu().numpy()[0]
-                        count_steps += 1
+                    sum_loss_value += loss_value_v.data.cpu().numpy()[0]
+                    sum_loss_policy += loss_policy_v.data.cpu().numpy()[0]
+                    count_steps += 1
 
-                trajectory.clear()
-                tb_tracker.track("advantage", traj_adv_v, step_idx)
-                tb_tracker.track("values", traj_ref_v, step_idx)
-                tb_tracker.track("loss_policy", sum_loss_policy / count_steps, step_idx)
-                tb_tracker.track("loss_value", sum_loss_value / count_steps, step_idx)
+            trajectory.clear()
+            writer.add_scalar("advantage", traj_adv_v.mean().data.cpu().numpy()[0], step_idx)
+            writer.add_scalar("values", traj_ref_v.mean().data.cpu().numpy()[0], step_idx)
+            writer.add_scalar("loss_policy", sum_loss_policy / count_steps, step_idx)
+            writer.add_scalar("loss_value", sum_loss_value / count_steps, step_idx)
 
