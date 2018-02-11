@@ -159,6 +159,9 @@ if __name__ == "__main__":
 
             traj_adv_v, traj_ref_v, old_logprob_v = calc_adv_ref(trajectory, net_crt, net_act, cuda=args.cuda)
 
+            # normalize advantages
+            traj_adv_v = (traj_adv_v - torch.mean(traj_adv_v)) / torch.std(traj_adv_v)
+
             # drop last entry from the trajectory, an our adv and ref value calculated without it
             trajectory = trajectory[:-1]
             old_logprob_v = old_logprob_v[:-1].detach()
