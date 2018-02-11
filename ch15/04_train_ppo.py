@@ -51,9 +51,9 @@ def test_net(net, env, count=10, cuda=False):
     return rewards / count, steps / count
 
 
-def calc_logprob(mu_v, var_v, actions_v):
-    p1 = - ((mu_v - actions_v) ** 2) / (2*var_v.clamp(min=1e-3))
-    p2 = - torch.log(torch.sqrt(2 * math.pi * var_v))
+def calc_logprob(mu_v, logstd_v, actions_v):
+    p1 = - ((mu_v - actions_v) ** 2) / (2*torch.exp(logstd_v).clamp(min=1e-3))
+    p2 = - torch.log(torch.sqrt(2 * math.pi * torch.exp(logstd_v)))
     return p1 + p2
 
 
@@ -90,8 +90,8 @@ def calc_adv_ref(trajectory, net_crt, net_act, cuda=False):
         result_adv.append(last_gae)
         result_ref.append(last_gae + val)
 
-    mu_v, var_v = net_act(states_v)
-    logprob_v = calc_logprob(mu_v, var_v, actions_v)
+    mu_v = net_act(states_v)
+    logprob_v = calc_logprob(mu_v, net_act.logstd, actions_v)
     adv_v = Variable(torch.FloatTensor(list(reversed(result_adv))))
     ref_v = Variable(torch.FloatTensor(list(reversed(result_ref))))
     if cuda:
@@ -189,8 +189,8 @@ if __name__ == "__main__":
 
                     # actor training
                     opt_act.zero_grad()
-                    mu_v, var_v = net_act(states_v)
-                    logprob_pi_v = calc_logprob(mu_v, var_v, actions_v)
+                    mu_v = net_act(states_v)
+                    logprob_pi_v = calc_logprob(mu_v, net_act.logstd, actions_v)
                     ratio_v = torch.exp(logprob_pi_v - batch_old_logprob_v)
                     surr_obj_v = batch_adv_v * ratio_v
                     clipped_surr_v = batch_adv_v * torch.clamp(ratio_v, 1.0 - PPO_EPS, 1.0 + PPO_EPS)
