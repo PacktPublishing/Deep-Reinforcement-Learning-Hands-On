@@ -8,25 +8,27 @@ import roboschool
 import argparse
 from tensorboardX import SummaryWriter
 
-from lib import model, common
+from lib import model
 
 import numpy as np
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 
 ENV_ID = "RoboschoolHalfCheetah-v1"
 GAMMA = 0.99
-REWARD_STEPS = 5
-BATCH_SIZE = 32
-LEARNING_RATE_ACTOR = 1e-5
+GAE_LAMBDA = 0.95
+
+TRAJECTORY_SIZE = 512
+LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 1e-3
 ENTROPY_BETA = 1e-4
-ENVS_COUNT = 32
 
 PPO_EPS = 0.2
 PPO_EPOCHES = 10
+PPO_BATCH_SIZE = 64
 
 TEST_ITERS = 1000
 
@@ -55,6 +57,49 @@ def calc_logprob(mu_v, var_v, actions_v):
     return p1 + p2
 
 
+def calc_adv_ref(trajectory, net_crt, net_act, cuda=False):
+    """
+    By trajectory calculate advantage and 1-step ref value
+    :param trajectory: list of Experience objects
+    :param net_crt: critic network 
+    :param cuda: cuda flag 
+    :return: tuple with advantage numpy array and reference values 
+    """
+    # calculate values from states
+    states = [t[0].state for t in trajectory]
+    actions = [t[0].action for t in trajectory]
+    states_v = Variable(torch.from_numpy(np.array(states, dtype=np.float32)))
+    actions_v = Variable(torch.from_numpy(np.array(actions, dtype=np.float32)))
+    if cuda:
+        states_v = states_v.cuda()
+        actions_v = actions_v.cuda()
+    values_v = net_crt(states_v)
+    values = values_v.squeeze().data.cpu().numpy()
+    # generalized advantage estimator: smoothed version of the advantage
+    last_gae = 0.0
+    result_adv = []
+    result_ref = []
+    for val, next_val, (exp,) in zip(reversed(values[:-1]), reversed(values[1:]),
+                                     reversed(trajectory[:-1])):
+        if exp.done:
+            delta = exp.reward - val
+            last_gae = delta
+        else:
+            delta = exp.reward + GAMMA * next_val - val
+            last_gae = delta + GAMMA * GAE_LAMBDA * last_gae
+        result_adv.append(last_gae)
+        result_ref.append(last_gae + val)
+
+    mu_v, var_v = net_act(states_v)
+    logprob_v = calc_logprob(mu_v, var_v, actions_v)
+    adv_v = Variable(torch.FloatTensor(list(reversed(result_adv))))
+    ref_v = Variable(torch.FloatTensor(list(reversed(result_ref))))
+    if cuda:
+        adv_v = adv_v.cuda()
+        ref_v = ref_v.cuda()
+    return adv_v, ref_v, logprob_v
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action='store_true', help='Enable CUDA')
@@ -64,11 +109,11 @@ if __name__ == "__main__":
     save_path = os.path.join("saves", "ppo-" + args.name)
     os.makedirs(save_path, exist_ok=True)
 
-    envs = [gym.make(ENV_ID) for _ in range(ENVS_COUNT)]
+    env = gym.make(ENV_ID)
     test_env = gym.make(ENV_ID)
 
-    net_act = model.ModelActor(envs[0].observation_space.shape[0], envs[0].action_space.shape[0])
-    net_crt = model.ModelCritic(envs[0].observation_space.shape[0])
+    net_act = model.ModelActor(env.observation_space.shape[0], env.action_space.shape[0])
+    net_crt = model.ModelCritic(env.observation_space.shape[0])
     if args.cuda:
         net_act.cuda()
         net_crt.cuda()
@@ -77,12 +122,12 @@ if __name__ == "__main__":
 
     writer = SummaryWriter(comment="-ppo_" + args.name)
     agent = model.AgentA2C(net_act, cuda=args.cuda)
-    exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, GAMMA, steps_count=REWARD_STEPS)
+    exp_source = ptan.experience.ExperienceSource(env, agent, steps_count=1)
 
     opt_act = optim.Adam(net_act.parameters(), lr=LEARNING_RATE_ACTOR)
     opt_crt = optim.Adam(net_crt.parameters(), lr=LEARNING_RATE_CRITIC)
 
-    batch = []
+    trajectory = []
     best_reward = None
     with ptan.common.utils.RewardTracker(writer) as tracker:
         with ptan.common.utils.TBMeanTracker(writer, batch_size=100) as tb_tracker:
@@ -108,48 +153,58 @@ if __name__ == "__main__":
                             torch.save(net_act.state_dict(), fname)
                         best_reward = rewards
 
-                batch.append(exp)
-                if len(batch) < BATCH_SIZE:
+                trajectory.append(exp)
+                if len(trajectory) < TRAJECTORY_SIZE:
                     continue
 
-                states_v, actions_v, vals_ref_v = \
-                    common.unpack_batch_a2c(batch, net_crt, last_val_gamma=GAMMA ** REWARD_STEPS, cuda=args.cuda)
-                batch.clear()
+                traj_adv_v, traj_ref_v, old_logprob_v = calc_adv_ref(trajectory, net_crt, net_act, cuda=args.cuda)
 
-                opt_crt.zero_grad()
-                value_v = net_crt(states_v)
-                loss_value_v = F.mse_loss(value_v, vals_ref_v)
-                loss_value_v.backward()
-                opt_crt.step()
-
-                adv_v = vals_ref_v.unsqueeze(dim=-1) - value_v.detach()
-                logprob_old_pi_v = None
+                # drop last entry from the trajectory, an our adv and ref value calculated without it
+                trajectory = trajectory[:-1]
+                old_logprob_v = old_logprob_v[:-1].detach()
+                sum_loss_value = 0.0
                 sum_loss_policy = 0.0
+                count_steps = 0
 
-                for _ in range(PPO_EPOCHES):
-                    opt_act.zero_grad()
-                    mu_v, var_v = net_act(states_v)
-                    logprob_pi_v = calc_logprob(mu_v, var_v, actions_v)
-                    if logprob_old_pi_v is None:
-                        logprob_old_pi_v = logprob_pi_v.detach()
-                    ratio_v = torch.exp(logprob_pi_v - logprob_old_pi_v)
-                    surr_obj_v = adv_v * ratio_v
-                    clipped_surr_v = adv_v * torch.clamp(ratio_v, 1.0 - PPO_EPS, 1.0 + PPO_EPS)
-                    loss_policy_v = -torch.min(surr_obj_v, clipped_surr_v).mean()
-                    loss_policy_v.backward()
-                    sum_loss_policy += loss_policy_v.data.cpu().numpy()[0]
-                    opt_act.step()
-#                entropy_loss_v = ENTROPY_BETA * (-(torch.log(2*math.pi*var_v) + 1)/2).mean()
+                for epoch in range(PPO_EPOCHES):
+                    for batch_ofs in range(0, len(trajectory), PPO_BATCH_SIZE):
+                        batch = trajectory[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
+                        states = [t[0].state for t in batch]
+                        actions = [t[0].action for t in batch]
+                        states_v = Variable(torch.from_numpy(np.array(states, dtype=np.float32)))
+                        actions_v = Variable(torch.from_numpy(np.array(actions, dtype=np.float32)))
+                        if args.cuda:
+                            states_v = states_v.cuda()
+                            actions_v = actions_v.cuda()
+                        batch_adv_v = traj_adv_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE].unsqueeze(-1)
+                        batch_ref_v = traj_ref_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
+                        batch_old_logprob_v = old_logprob_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
 
-#                loss_v = loss_policy_v + entropy_loss_v
-#                loss_v.backward()
-#                optimizer.step()
+                        # critic training
+                        opt_crt.zero_grad()
+                        value_v = net_crt(states_v)
+                        loss_value_v = F.mse_loss(value_v, batch_ref_v)
+                        loss_value_v.backward()
+                        opt_crt.step()
 
-                tb_tracker.track("advantage", adv_v, step_idx)
-                tb_tracker.track("values", value_v, step_idx)
-                tb_tracker.track("batch_rewards", vals_ref_v, step_idx)
-#                tb_tracker.track("loss_entropy", entropy_loss_v, step_idx)
-                tb_tracker.track("loss_policy", sum_loss_policy / PPO_EPOCHES, step_idx)
-                tb_tracker.track("loss_value", loss_value_v, step_idx)
-#                tb_tracker.track("loss_total", loss_v, step_idx)
+                        # actor training
+                        opt_act.zero_grad()
+                        mu_v, var_v = net_act(states_v)
+                        logprob_pi_v = calc_logprob(mu_v, var_v, actions_v)
+                        ratio_v = torch.exp(logprob_pi_v - batch_old_logprob_v)
+                        surr_obj_v = batch_adv_v * ratio_v
+                        clipped_surr_v = batch_adv_v * torch.clamp(ratio_v, 1.0 - PPO_EPS, 1.0 + PPO_EPS)
+                        loss_policy_v = -torch.min(surr_obj_v, clipped_surr_v).mean()
+                        loss_policy_v.backward()
+                        opt_act.step()
+
+                        sum_loss_value += loss_value_v.data.cpu().numpy()[0]
+                        sum_loss_policy += loss_policy_v.data.cpu().numpy()[0]
+                        count_steps += 1
+
+                trajectory.clear()
+                tb_tracker.track("advantage", traj_adv_v, step_idx)
+                tb_tracker.track("values", traj_ref_v, step_idx)
+                tb_tracker.track("loss_policy", sum_loss_policy / count_steps, step_idx)
+                tb_tracker.track("loss_value", sum_loss_value / count_steps, step_idx)
 
