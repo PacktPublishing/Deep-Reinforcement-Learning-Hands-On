@@ -46,9 +46,9 @@ def test_net(net, env, count=10, cuda=False):
     return rewards / count, steps / count
 
 
-def calc_logprob(mu_v, var_v, actions_v):
-    p1 = - ((mu_v - actions_v) ** 2) / (2*var_v.clamp(min=1e-3))
-    p2 = - torch.log(torch.sqrt(2 * math.pi * var_v))
+def calc_logprob(mu_v, logstd_v, actions_v):
+    p1 = - ((mu_v - actions_v) ** 2) / (2*torch.exp(logstd_v).clamp(min=1e-3))
+    p2 = - torch.log(torch.sqrt(2 * math.pi * torch.exp(logstd_v)))
     return p1 + p2
 
 
@@ -120,11 +120,11 @@ if __name__ == "__main__":
                 opt_crt.step()
 
                 opt_act.zero_grad()
-                mu_v, var_v = net_act(states_v)
+                mu_v = net_act(states_v)
                 adv_v = vals_ref_v.unsqueeze(dim=-1) - value_v.detach()
-                log_prob_v = adv_v * calc_logprob(mu_v, var_v, actions_v)
+                log_prob_v = adv_v * calc_logprob(mu_v, net_act.logstd, actions_v)
                 loss_policy_v = -log_prob_v.mean()
-                entropy_loss_v = ENTROPY_BETA * (-(torch.log(2*math.pi*var_v) + 1)/2).mean()
+                entropy_loss_v = ENTROPY_BETA * (-(torch.log(2*math.pi*torch.exp(net_act.logstd)) + 1)/2).mean()
                 loss_v = loss_policy_v + entropy_loss_v
                 loss_v.backward()
                 opt_act.step()

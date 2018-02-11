@@ -35,10 +35,7 @@ if __name__ == "__main__":
     total_steps = 0
     while True:
         obs_v = Variable(torch.from_numpy(np.array([obs], dtype=np.float32)))
-        if args.kind == 'a2c':
-            mu_v, var_v = net(obs_v)
-        else:
-            mu_v = net(obs_v)
+        mu_v = net(obs_v)
         action = mu_v.squeeze(dim=0).data.numpy()
         action = np.clip(action, -1, 1)
         obs, reward, done, _ = env.step(action)
