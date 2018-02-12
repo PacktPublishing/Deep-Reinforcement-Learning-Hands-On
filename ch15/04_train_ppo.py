@@ -141,7 +141,7 @@ if __name__ == "__main__":
             if step_idx % TEST_ITERS == 0:
                 ts = time.time()
                 rewards, steps = test_net(net_act, test_env, cuda=args.cuda)
-                print("Test done is %.2f sec, reward %.3f, steps %d" % (
+                print("Test done in %.2f sec, reward %.3f, steps %d" % (
                     time.time() - ts, rewards, steps))
                 writer.add_scalar("test_reward", rewards, step_idx)
                 writer.add_scalar("test_steps", steps, step_idx)
