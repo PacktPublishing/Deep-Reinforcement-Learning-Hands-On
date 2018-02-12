@@ -56,13 +56,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action='store_true', help='Enable CUDA')
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
+    parser.add_argument("-e", "--env", default=ENV_ID, help="Environment id, default=" + ENV_ID)
     args = parser.parse_args()
 
     save_path = os.path.join("saves", "a2c-" + args.name)
     os.makedirs(save_path, exist_ok=True)
 
-    envs = [gym.make(ENV_ID) for _ in range(ENVS_COUNT)]
-    test_env = gym.make(ENV_ID)
+    envs = [gym.make(args.env) for _ in range(ENVS_COUNT)]
+    test_env = gym.make(args.env)
 
     net_act = model.ModelActor(envs[0].observation_space.shape[0], envs[0].action_space.shape[0])
     net_crt = model.ModelCritic(envs[0].observation_space.shape[0])
