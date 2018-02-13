@@ -124,7 +124,6 @@ if __name__ == "__main__":
     agent = model.AgentA2C(net_act, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSource(env, agent, steps_count=1)
 
-    opt_act = optim.Adam(net_act.parameters(), lr=LEARNING_RATE_ACTOR)
     opt_crt = optim.Adam(net_crt.parameters(), lr=LEARNING_RATE_CRITIC)
 
     trajectory = []
