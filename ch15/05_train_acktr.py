@@ -20,7 +20,7 @@ ENV_ID = "RoboschoolHalfCheetah-v1"
 GAMMA = 0.99
 REWARD_STEPS = 5
 BATCH_SIZE = 32
-LEARNING_RATE_ACTOR = 1e-5
+LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 1e-3
 ENTROPY_BETA = 1e-3
 ENVS_COUNT = 16
@@ -77,7 +77,7 @@ if __name__ == "__main__":
     agent = model.AgentA2C(net_act, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, GAMMA, steps_count=REWARD_STEPS)
 
-    opt_act = kfac.KFACOptimizer(net_act.parameters(), lr=LEARNING_RATE_ACTOR)
+    opt_act = kfac.KFACOptimizer(net_act, lr=LEARNING_RATE_ACTOR)
     opt_crt = optim.Adam(net_crt.parameters(), lr=LEARNING_RATE_CRITIC)
 
     batch = []
@@ -120,15 +120,24 @@ if __name__ == "__main__":
                 loss_value_v.backward()
                 opt_crt.step()
 
-                opt_act.zero_grad()
                 mu_v = net_act(states_v)
                 log_prob_v = calc_logprob(mu_v, net_act.logstd, actions_v)
-                loss_policy_v = -log_prob_v.mean()
+                if opt_act.steps % opt_act.Ts == 0:
+                    opt_act.zero_grad()
+                    pg_fisher_loss = -log_prob_v.mean()
+                    opt_act.acc_stats = True
+                    pg_fisher_loss.backward(retain_graph=True)
+                    opt_act.acc_stats = False
+
+                opt_act.zero_grad()
+                adv_v = vals_ref_v.unsqueeze(dim=-1) - value_v.detach()
+                loss_policy_v = -(adv_v * log_prob_v).mean()
                 entropy_loss_v = ENTROPY_BETA * (-(torch.log(2*math.pi*torch.exp(net_act.logstd)) + 1)/2).mean()
                 loss_v = loss_policy_v + entropy_loss_v
                 loss_v.backward()
                 opt_act.step()
 
+                tb_tracker.track("advantage", adv_v, step_idx)
                 tb_tracker.track("values", value_v, step_idx)
                 tb_tracker.track("batch_rewards", vals_ref_v, step_idx)
                 tb_tracker.track("loss_entropy", entropy_loss_v, step_idx)

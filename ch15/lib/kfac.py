@@ -239,12 +239,18 @@ class KFACOptimizer(optim.Optimizer):
 
         vg_sum = 0
         for p in self.model.parameters():
+            if p not in updates:
+#                print("Not found in updates: %s" % p)
+                continue
             v = updates[p]
             vg_sum += (v * p.grad.data * self.lr * self.lr).sum()
 
         nu = min(1, math.sqrt(self.kl_clip / vg_sum))
 
         for p in self.model.parameters():
+            if p not in updates:
+#                print("Not found in updates: %s" % p)
+                continue
             v = updates[p]
             p.grad.data.copy_(v)
             p.grad.data.mul_(nu)
