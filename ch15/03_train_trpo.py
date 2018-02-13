@@ -8,7 +8,7 @@ import roboschool
 import argparse
 from tensorboardX import SummaryWriter
 
-from lib import model
+from lib import model, trpo
 
 import numpy as np
 import torch
@@ -25,9 +25,9 @@ TRAJECTORY_SIZE = 2049
 LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 1e-3
 
-PPO_EPS = 0.2
-PPO_EPOCHES = 10
-PPO_BATCH_SIZE = 64
+TRPO_MAX_KL = 0.01
+TRPO_DAMPING = 0.1
+CG_EPOCHES = 10
 
 TEST_ITERS = 1000
 
@@ -106,7 +106,7 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--env", default=ENV_ID, help="Environment id, default=" + ENV_ID)
     args = parser.parse_args()
 
-    save_path = os.path.join("saves", "ppo-" + args.name)
+    save_path = os.path.join("saves", "trpo-" + args.name)
     os.makedirs(save_path, exist_ok=True)
 
     env = gym.make(args.env)
@@ -120,7 +120,7 @@ if __name__ == "__main__":
     print(net_act)
     print(net_crt)
 
-    writer = SummaryWriter(comment="-ppo_" + args.name)
+    writer = SummaryWriter(comment="-trpo_" + args.name)
     agent = model.AgentA2C(net_act, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSource(env, agent, steps_count=1)
 
@@ -168,45 +168,43 @@ if __name__ == "__main__":
             sum_loss_policy = 0.0
             count_steps = 0
 
-            for epoch in range(PPO_EPOCHES):
-                for batch_ofs in range(0, len(trajectory), PPO_BATCH_SIZE):
-                    batch = trajectory[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
-                    states = [t[0].state for t in batch]
-                    actions = [t[0].action for t in batch]
-                    states_v = Variable(torch.from_numpy(np.array(states, dtype=np.float32)))
-                    actions_v = Variable(torch.from_numpy(np.array(actions, dtype=np.float32)))
-                    if args.cuda:
-                        states_v = states_v.cuda()
-                        actions_v = actions_v.cuda()
-                    batch_adv_v = traj_adv_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE].unsqueeze(-1)
-                    batch_ref_v = traj_ref_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
-                    batch_old_logprob_v = old_logprob_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
+            states = [t[0].state for t in trajectory]
+            actions = [t[0].action for t in trajectory]
+            states_v = Variable(torch.from_numpy(np.array(states, dtype=np.float32)))
+            actions_v = Variable(torch.from_numpy(np.array(actions, dtype=np.float32)))
+            if args.cuda:
+                states_v = states_v.cuda()
+                actions_v = actions_v.cuda()
 
-                    # critic training
-                    opt_crt.zero_grad()
-                    value_v = net_crt(states_v)
-                    loss_value_v = F.mse_loss(value_v, batch_ref_v)
-                    loss_value_v.backward()
-                    opt_crt.step()
+            # critic step
+            opt_crt.zero_grad()
+            value_v = net_crt(states_v)
+            loss_value_v = F.mse_loss(value_v, traj_ref_v)
+            loss_value_v.backward()
+            opt_crt.step()
 
-                    # actor training
-                    opt_act.zero_grad()
-                    mu_v = net_act(states_v)
-                    logprob_pi_v = calc_logprob(mu_v, net_act.logstd, actions_v)
-                    ratio_v = torch.exp(logprob_pi_v - batch_old_logprob_v)
-                    surr_obj_v = batch_adv_v * ratio_v
-                    clipped_surr_v = batch_adv_v * torch.clamp(ratio_v, 1.0 - PPO_EPS, 1.0 + PPO_EPS)
-                    loss_policy_v = -torch.min(surr_obj_v, clipped_surr_v).mean()
-                    loss_policy_v.backward()
-                    opt_act.step()
+            # actor step
+            def get_loss():
+                mu_v = net_act(states_v)
+                logprob_v = calc_logprob(mu_v, net_act.logstd, actions_v)
+                action_loss_v = -traj_adv_v.unsqueeze(dim=-1) * torch.exp(logprob_v - old_logprob_v)
+                return action_loss_v.mean()
 
-                    sum_loss_value += loss_value_v.data.cpu().numpy()[0]
-                    sum_loss_policy += loss_policy_v.data.cpu().numpy()[0]
-                    count_steps += 1
+            def get_kl():
+                mu_v = net_act(states_v)
+                logstd_v = net_act.logstd
+                mu0_v = mu_v.detach()
+                logstd0_v = logstd_v.detach()
+                std_v = torch.exp(logstd_v)
+                std0_v = std_v.detach()
+                kl = logstd_v - logstd0_v + (std0_v ** 2 + ((mu0_v - mu_v) ** 2) / (2.0 * std_v ** 2)) - 0.5
+                return kl.sum(1, keepdim=True)
+
+            trpo.trpo_step(net_act, get_loss, get_kl, TRPO_MAX_KL, TRPO_DAMPING, cuda=args.cuda)
 
             trajectory.clear()
             writer.add_scalar("advantage", traj_adv_v.mean().data.cpu().numpy()[0], step_idx)
             writer.add_scalar("values", traj_ref_v.mean().data.cpu().numpy()[0], step_idx)
-            writer.add_scalar("loss_policy", sum_loss_policy / count_steps, step_idx)
-            writer.add_scalar("loss_value", sum_loss_value / count_steps, step_idx)
+#            writer.add_scalar("loss_policy", , step_idx)
+            writer.add_scalar("loss_value", loss_value_v.data.cpu().numpy()[0], step_idx)
 
