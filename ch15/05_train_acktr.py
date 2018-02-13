@@ -59,7 +59,7 @@ if __name__ == "__main__":
     parser.add_argument("-e", "--env", default=ENV_ID, help="Environment id, default=" + ENV_ID)
     args = parser.parse_args()
 
-    save_path = os.path.join("saves", "a2c-" + args.name)
+    save_path = os.path.join("saves", "acktr-" + args.name)
     os.makedirs(save_path, exist_ok=True)
 
     envs = [gym.make(args.env) for _ in range(ENVS_COUNT)]
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     print(net_act)
     print(net_crt)
 
-    writer = SummaryWriter(comment="-a2c_" + args.name)
+    writer = SummaryWriter(comment="-acktr_" + args.name)
     agent = model.AgentA2C(net_act, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, GAMMA, steps_count=REWARD_STEPS)
 
