@@ -56,22 +56,14 @@ def calc_logprob(mu_v, logstd_v, actions_v):
     return p1 + p2
 
 
-def calc_adv_ref(trajectory, net_crt, net_act, cuda=False):
+def calc_adv_ref(net_crt, states_v, cuda=False):
     """
     By trajectory calculate advantage and 1-step ref value
-    :param trajectory: list of Experience objects
     :param net_crt: critic network
+    :param states_v: states tensor
     :param cuda: cuda flag
     :return: tuple with advantage numpy array and reference values
     """
-    # calculate values from states
-    states = [t[0].state for t in trajectory]
-    actions = [t[0].action for t in trajectory]
-    states_v = Variable(torch.from_numpy(np.array(states, dtype=np.float32)))
-    actions_v = Variable(torch.from_numpy(np.array(actions, dtype=np.float32)))
-    if cuda:
-        states_v = states_v.cuda()
-        actions_v = actions_v.cuda()
     values_v = net_crt(states_v)
     values = values_v.squeeze().data.cpu().numpy()
     # generalized advantage estimator: smoothed version of the advantage
@@ -89,14 +81,12 @@ def calc_adv_ref(trajectory, net_crt, net_act, cuda=False):
         result_adv.append(last_gae)
         result_ref.append(last_gae + val)
 
-    mu_v = net_act(states_v)
-    logprob_v = calc_logprob(mu_v, net_act.logstd, actions_v)
     adv_v = Variable(torch.FloatTensor(list(reversed(result_adv))))
     ref_v = Variable(torch.FloatTensor(list(reversed(result_ref))))
     if cuda:
         adv_v = adv_v.cuda()
         ref_v = ref_v.cuda()
-    return adv_v, ref_v, logprob_v
+    return adv_v, ref_v
 
 
 if __name__ == "__main__":
@@ -156,14 +146,6 @@ if __name__ == "__main__":
             if len(trajectory) < TRAJECTORY_SIZE:
                 continue
 
-            traj_adv_v, traj_ref_v, old_logprob_v = calc_adv_ref(trajectory, net_crt, net_act, cuda=args.cuda)
-
-            # normalize advantages
-            traj_adv_v = (traj_adv_v - torch.mean(traj_adv_v)) / torch.std(traj_adv_v)
-
-            # drop last entry from the trajectory, an our adv and ref value calculated without it
-            trajectory = trajectory[:-1]
-            old_logprob_v = old_logprob_v[:-1].detach()
             traj_states = [t[0].state for t in trajectory]
             traj_actions = [t[0].action for t in trajectory]
             traj_states_v = Variable(torch.from_numpy(np.array(traj_states, dtype=np.float32)))
@@ -171,6 +153,17 @@ if __name__ == "__main__":
             if args.cuda:
                 traj_states_v = traj_states_v.cuda()
                 traj_actions_v = traj_actions_v.cuda()
+
+            traj_adv_v, traj_ref_v = calc_adv_ref(net_crt, traj_states_v, cuda=args.cuda)
+            mu_v = net_act(traj_states_v)
+            old_logprob_v = calc_logprob(mu_v, net_act.logstd, traj_actions_v)
+
+            # normalize advantages
+            traj_adv_v = (traj_adv_v - torch.mean(traj_adv_v)) / torch.std(traj_adv_v)
+
+            # drop last entry from the trajectory, an our adv and ref value calculated without it
+            trajectory = trajectory[:-1]
+            old_logprob_v = old_logprob_v[:-1].detach()
 
             sum_loss_value = 0.0
             sum_loss_policy = 0.0
