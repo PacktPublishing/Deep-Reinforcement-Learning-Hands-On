@@ -22,12 +22,10 @@ GAMMA = 0.99
 GAE_LAMBDA = 0.95
 
 TRAJECTORY_SIZE = 2049
-LEARNING_RATE_ACTOR = 1e-4
 LEARNING_RATE_CRITIC = 1e-3
 
 TRPO_MAX_KL = 0.01
 TRPO_DAMPING = 0.1
-CG_EPOCHES = 10
 
 TEST_ITERS = 1000
 
@@ -56,7 +54,7 @@ def calc_logprob(mu_v, logstd_v, actions_v):
     return p1 + p2
 
 
-def calc_adv_ref(trajectory, net_crt, net_act, cuda=False):
+def calc_adv_ref(trajectory, net_crt, states_v, cuda=False):
     """
     By trajectory calculate advantage and 1-step ref value
     :param trajectory: list of Experience objects
@@ -64,14 +62,6 @@ def calc_adv_ref(trajectory, net_crt, net_act, cuda=False):
     :param cuda: cuda flag
     :return: tuple with advantage numpy array and reference values
     """
-    # calculate values from states
-    states = [t[0].state for t in trajectory]
-    actions = [t[0].action for t in trajectory]
-    states_v = Variable(torch.from_numpy(np.array(states, dtype=np.float32)))
-    actions_v = Variable(torch.from_numpy(np.array(actions, dtype=np.float32)))
-    if cuda:
-        states_v = states_v.cuda()
-        actions_v = actions_v.cuda()
     values_v = net_crt(states_v)
     values = values_v.squeeze().data.cpu().numpy()
     # generalized advantage estimator: smoothed version of the advantage
@@ -89,14 +79,12 @@ def calc_adv_ref(trajectory, net_crt, net_act, cuda=False):
         result_adv.append(last_gae)
         result_ref.append(last_gae + val)
 
-    mu_v = net_act(states_v)
-    logprob_v = calc_logprob(mu_v, net_act.logstd, actions_v)
     adv_v = Variable(torch.FloatTensor(list(reversed(result_adv))))
     ref_v = Variable(torch.FloatTensor(list(reversed(result_ref))))
     if cuda:
         adv_v = adv_v.cuda()
         ref_v = ref_v.cuda()
-    return adv_v, ref_v, logprob_v
+    return adv_v, ref_v
 
 
 if __name__ == "__main__":
@@ -155,7 +143,16 @@ if __name__ == "__main__":
             if len(trajectory) < TRAJECTORY_SIZE:
                 continue
 
-            traj_adv_v, traj_ref_v, old_logprob_v = calc_adv_ref(trajectory, net_crt, net_act, cuda=args.cuda)
+            traj_states = [t[0].state for t in trajectory]
+            traj_actions = [t[0].action for t in trajectory]
+            traj_states_v = Variable(torch.from_numpy(np.array(traj_states, dtype=np.float32)))
+            traj_actions_v = Variable(torch.from_numpy(np.array(traj_actions, dtype=np.float32)))
+            if args.cuda:
+                traj_states_v = traj_states_v.cuda()
+                traj_actions_v = traj_actions_v.cuda()
+            traj_adv_v, traj_ref_v = calc_adv_ref(trajectory, net_crt, traj_states_v, cuda=args.cuda)
+            mu_v = net_act(traj_states_v)
+            old_logprob_v = calc_logprob(mu_v, net_act.logstd, traj_actions_v)
 
             # normalize advantages
             traj_adv_v = (traj_adv_v - torch.mean(traj_adv_v)) / torch.std(traj_adv_v)
@@ -167,30 +164,22 @@ if __name__ == "__main__":
             sum_loss_policy = 0.0
             count_steps = 0
 
-            states = [t[0].state for t in trajectory]
-            actions = [t[0].action for t in trajectory]
-            states_v = Variable(torch.from_numpy(np.array(states, dtype=np.float32)))
-            actions_v = Variable(torch.from_numpy(np.array(actions, dtype=np.float32)))
-            if args.cuda:
-                states_v = states_v.cuda()
-                actions_v = actions_v.cuda()
-
             # critic step
             opt_crt.zero_grad()
-            value_v = net_crt(states_v)
+            value_v = net_crt(traj_states_v)
             loss_value_v = F.mse_loss(value_v, traj_ref_v)
             loss_value_v.backward()
             opt_crt.step()
 
             # actor step
             def get_loss():
-                mu_v = net_act(states_v)
-                logprob_v = calc_logprob(mu_v, net_act.logstd, actions_v)
+                mu_v = net_act(traj_states_v)
+                logprob_v = calc_logprob(mu_v, net_act.logstd, traj_actions_v)
                 action_loss_v = -traj_adv_v.unsqueeze(dim=-1) * torch.exp(logprob_v - old_logprob_v)
                 return action_loss_v.mean()
 
             def get_kl():
-                mu_v = net_act(states_v)
+                mu_v = net_act(traj_states_v)
                 logstd_v = net_act.logstd
                 mu0_v = mu_v.detach()
                 logstd0_v = logstd_v.detach()
@@ -204,6 +193,5 @@ if __name__ == "__main__":
             trajectory.clear()
             writer.add_scalar("advantage", traj_adv_v.mean().data.cpu().numpy()[0], step_idx)
             writer.add_scalar("values", traj_ref_v.mean().data.cpu().numpy()[0], step_idx)
-#            writer.add_scalar("loss_policy", , step_idx)
             writer.add_scalar("loss_value", loss_value_v.data.cpu().numpy()[0], step_idx)
 

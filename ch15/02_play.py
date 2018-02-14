@@ -18,7 +18,6 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--model", required=True, help="Model file to load")
     parser.add_argument("-e", "--env", default=ENV_ID, help="Environment name to use, default=" + ENV_ID)
     parser.add_argument("-r", "--record", help="If specified, sets the recording dir, default=Disabled")
-    parser.add_argument("-k", "--kind", choices=['a2c', 'd4pg'], default='a2c', help="Kind of model to load. Options: a2c or d4pg")
     parser.add_argument("-s", "--save", type=int, help="If specified, save every N-th step as an image")
     args = parser.parse_args()
 
@@ -26,10 +25,7 @@ if __name__ == "__main__":
     if args.record:
         env = gym.wrappers.Monitor(env, args.record)
 
-    if args.kind == 'a2c':
-        net = model.ModelActor(env.observation_space.shape[0], env.action_space.shape[0])
-    elif args.kind == 'd4pg':
-        net = model.DDPGActor(env.observation_space.shape[0], env.action_space.shape[0])
+    net = model.ModelActor(env.observation_space.shape[0], env.action_space.shape[0])
     net.load_state_dict(torch.load(args.model))
 
     obs = env.reset()
