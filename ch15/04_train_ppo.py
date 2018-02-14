@@ -56,9 +56,10 @@ def calc_logprob(mu_v, logstd_v, actions_v):
     return p1 + p2
 
 
-def calc_adv_ref(net_crt, states_v, cuda=False):
+def calc_adv_ref(trajectory, net_crt, states_v, cuda=False):
     """
     By trajectory calculate advantage and 1-step ref value
+    :param trajectory: trajectory list
     :param net_crt: critic network
     :param states_v: states tensor
     :param cuda: cuda flag
@@ -154,7 +155,7 @@ if __name__ == "__main__":
                 traj_states_v = traj_states_v.cuda()
                 traj_actions_v = traj_actions_v.cuda()
 
-            traj_adv_v, traj_ref_v = calc_adv_ref(net_crt, traj_states_v, cuda=args.cuda)
+            traj_adv_v, traj_ref_v = calc_adv_ref(trajectory, net_crt, traj_states_v, cuda=args.cuda)
             mu_v = net_act(traj_states_v)
             old_logprob_v = calc_logprob(mu_v, net_act.logstd, traj_actions_v)
 
