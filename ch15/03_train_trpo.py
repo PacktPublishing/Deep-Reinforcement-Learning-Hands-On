@@ -150,6 +150,7 @@ if __name__ == "__main__":
             if args.cuda:
                 traj_states_v = traj_states_v.cuda()
                 traj_actions_v = traj_actions_v.cuda()
+
             traj_adv_v, traj_ref_v = calc_adv_ref(trajectory, net_crt, traj_states_v, cuda=args.cuda)
             mu_v = net_act(traj_states_v)
             old_logprob_v = calc_logprob(mu_v, net_act.logstd, traj_actions_v)
@@ -160,6 +161,8 @@ if __name__ == "__main__":
             # drop last entry from the trajectory, an our adv and ref value calculated without it
             trajectory = trajectory[:-1]
             old_logprob_v = old_logprob_v[:-1].detach()
+            traj_states_v = traj_states_v[:-1]
+            traj_actions_v = traj_actions_v[:-1]
             sum_loss_value = 0.0
             sum_loss_policy = 0.0
             count_steps = 0
