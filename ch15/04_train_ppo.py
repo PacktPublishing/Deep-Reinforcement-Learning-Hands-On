@@ -164,20 +164,22 @@ if __name__ == "__main__":
             # drop last entry from the trajectory, an our adv and ref value calculated without it
             trajectory = trajectory[:-1]
             old_logprob_v = old_logprob_v[:-1].detach()
+            traj_states = [t[0].state for t in trajectory]
+            traj_actions = [t[0].action for t in trajectory]
+            traj_states_v = Variable(torch.from_numpy(np.array(traj_states, dtype=np.float32)))
+            traj_actions_v = Variable(torch.from_numpy(np.array(traj_actions, dtype=np.float32)))
+            if args.cuda:
+                traj_states_v = traj_states_v.cuda()
+                traj_actions_v = traj_actions_v.cuda()
+
             sum_loss_value = 0.0
             sum_loss_policy = 0.0
             count_steps = 0
 
             for epoch in range(PPO_EPOCHES):
                 for batch_ofs in range(0, len(trajectory), PPO_BATCH_SIZE):
-                    batch = trajectory[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
-                    states = [t[0].state for t in batch]
-                    actions = [t[0].action for t in batch]
-                    states_v = Variable(torch.from_numpy(np.array(states, dtype=np.float32)))
-                    actions_v = Variable(torch.from_numpy(np.array(actions, dtype=np.float32)))
-                    if args.cuda:
-                        states_v = states_v.cuda()
-                        actions_v = actions_v.cuda()
+                    states_v = traj_states_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
+                    actions_v = traj_actions_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
                     batch_adv_v = traj_adv_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE].unsqueeze(-1)
                     batch_ref_v = traj_ref_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
                     batch_old_logprob_v = old_logprob_v[batch_ofs:batch_ofs + PPO_BATCH_SIZE]
