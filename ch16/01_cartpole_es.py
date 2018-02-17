@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import gym
+import time
 import numpy as np
 
 import torch
@@ -12,7 +13,7 @@ from tensorboardX import SummaryWriter
 MAX_BATCH_EPISODES = 1000
 MAX_BATCH_STEPS = 100000
 NOISE_STD = 0.01
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.001
 
 
 class Net(nn.Module):
@@ -48,7 +49,8 @@ def evaluate(env, net):
 def sample_noise(net):
     res = []
     for p in net.parameters():
-        res.append(torch.normal(std=torch.ones(*p.data.size())))
+        noise_t = torch.from_numpy(np.random.normal(size=p.data.size()).astype(np.float32))
+        res.append(noise_t)
     return res
 
 
@@ -75,7 +77,7 @@ def train_step(net, batch_noise, batch_reward, writer, step_idx):
                 w_n += reward * p_n
     m_updates = []
     for p, p_update in zip(net.parameters(), weighted_noise):
-        update = p_update / MAX_BATCH_EPISODES
+        update = p_update / (len(batch_reward) * NOISE_STD)
         p.data += LEARNING_RATE * update
         m_updates.append(torch.norm(update))
     writer.add_scalar("update_l2", np.mean(m_updates), step_idx)
@@ -84,15 +86,13 @@ def train_step(net, batch_noise, batch_reward, writer, step_idx):
 if __name__ == "__main__":
     writer = SummaryWriter(comment="-cartpole-es")
     env = gym.make("CartPole-v0")
-    print(env)
-    obs = env.reset()
-    print(obs)
 
     net = Net(env.observation_space.shape[0], env.action_space.n)
     print(net)
 
     step_idx = 0
     while True:
+        t_start = time.time()
         batch_noise = []
         batch_reward = []
         batch_steps = 0
@@ -106,17 +106,20 @@ if __name__ == "__main__":
                 break
 
         step_idx += 1
-
-        train_step(net, batch_noise, batch_reward, writer, step_idx)
         m_reward = np.mean(batch_reward)
-        writer.add_scalar("reward_mean", m_reward, step_idx)
-        writer.add_scalar("reward_std", np.std(batch_reward), step_idx)
-        writer.add_scalar("reward_max", np.max(batch_reward), step_idx)
-
-        print("%d: reward=%.2f" % (step_idx, m_reward))
         if m_reward > 199:
             print("Solved in %d steps" % step_idx)
             print(batch_reward)
             break
+
+        train_step(net, batch_noise, batch_reward, writer, step_idx)
+        writer.add_scalar("reward_mean", m_reward, step_idx)
+        writer.add_scalar("reward_std", np.std(batch_reward), step_idx)
+        writer.add_scalar("reward_max", np.max(batch_reward), step_idx)
+        writer.add_scalar("batch_episodes", len(batch_reward), step_idx)
+        writer.add_scalar("batch_steps", batch_steps, step_idx)
+        speed = batch_steps / (time.time() - t_start)
+        writer.add_scalar("speed", speed, step_idx)
+        print("%d: reward=%.2f, speed=%.2f f/s" % (step_idx, m_reward, speed))
 
     pass
