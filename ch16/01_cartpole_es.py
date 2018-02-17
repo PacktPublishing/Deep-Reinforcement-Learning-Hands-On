@@ -48,10 +48,12 @@ def evaluate(env, net):
 
 def sample_noise(net):
     res = []
+    neg = []
     for p in net.parameters():
         noise_t = torch.from_numpy(np.random.normal(size=p.data.size()).astype(np.float32))
         res.append(noise_t)
-    return res
+        neg.append(-noise_t)
+    return res, neg
 
 
 def eval_with_noise(env, net, noise):
@@ -97,9 +99,13 @@ if __name__ == "__main__":
         batch_reward = []
         batch_steps = 0
         for _ in range(MAX_BATCH_EPISODES):
-            noise = sample_noise(net)
+            noise, neg_noise = sample_noise(net)
             batch_noise.append(noise)
+            batch_noise.append(neg_noise)
             reward, steps = eval_with_noise(env, net, noise)
+            batch_reward.append(reward)
+            batch_steps += steps
+            reward, steps = eval_with_noise(env, net, neg_noise)
             batch_reward.append(reward)
             batch_steps += steps
             if batch_steps > MAX_BATCH_STEPS:
