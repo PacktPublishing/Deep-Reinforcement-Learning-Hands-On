@@ -10,8 +10,8 @@ from torch.autograd import Variable
 from tensorboardX import SummaryWriter
 
 
-MAX_BATCH_EPISODES = 1000
-MAX_BATCH_STEPS = 100000
+MAX_BATCH_EPISODES = 100
+MAX_BATCH_STEPS = 10000
 NOISE_STD = 0.01
 LEARNING_RATE = 0.001
 
@@ -115,7 +115,6 @@ if __name__ == "__main__":
         m_reward = np.mean(batch_reward)
         if m_reward > 199:
             print("Solved in %d steps" % step_idx)
-            print(batch_reward)
             break
 
         train_step(net, batch_noise, batch_reward, writer, step_idx)
