@@ -1,0 +1,102 @@
+% C-c C-o to insert the block
+
+% Individual equation: equation* block
+% Inline equation \begin{math}\frac{sin(x)}{x}\end{math}
+\documentclass{article}
+
+\usepackage{amsmath,amssymb}
+
+\ifdefined\ispreview
+\usepackage[active,tightpage]{preview}
+\PreviewEnvironment{math}
+\PreviewEnvironment{equation*}
+\fi
+
+\DeclareMathOperator{\E}{\mathbb{E}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\begin{document}
+
+Page 4
+
+As a quick refresher, Actor-Critic’s idea is to estimate the gradient of our policy as a 
+\begin{math}\nabla J = \nabla_\theta \log
+  \pi_\theta(a|s)(R-V_\theta(s))\end{math}. The
+policy \begin{math}\pi_\theta\end{math} is supposed to provide us the
+  probability distribution of actions given the observed state. The
+  quantity \begin{math}V_\theta(s)\end{math} called a critic and equals to the value of the state and is
+  trained using the mean square loss between the critic return and the value
+  estimated by the Bellman equation. To improve exploration, the entropy bonus
+  \begin{math}L_H=\pi_\theta(s)\log\pi_\theta(s)\end{math} is usually added to the loss.
+
+
+For N actions, it will be two vectors of size N, the first is the mean
+values \begin{math}\mu\end{math} and the second vector will contain variances
+\begin{math}\sigma^2\end{math}.
+
+
+
+By definition, the probability density function of the Gaussian distribution
+is \begin{math}f(x|\mu,\sigma^2)=\frac{1}{\sqrt{2\pi\sigma^2}}e^{-\frac{(x-\mu)^2}{2\sigma^2}} \end{math}.
+We could directly use this formula to get the probabilities, but to improve
+numerical stability it worth to do some math and simplify the expression
+for \begin{math}\log\pi_\theta(a|s)\end{math}. The final result will
+be: \begin{math}\log\pi_\theta(a|s)=-\frac{(x-\mu)^2}{2\sigma^2}-\log\sqrt{2\pi\sigma^2} \end{math}.
+The entropy of the Gaussian distribution could be obtained using the
+differential entropy definition and will be \begin{math}\ln\sqrt{2\pi e
+\sigma^2}\end{math}. Now we have everything we need to implement the
+Actor-Critic method. Let’s do it.
+
+
+Page 9
+
+We have two functions, one is actor, let’s call it \begin{math}\mu(s)\end{math}which converts the state
+into the action and another is critic, by the state and the action giving us the
+Q-value: \begin{math}Q(s, a)\end{math}. We can substitute the actor function into the critic and get
+the expression with only one input parameter of our state: \begin{math}Q(s, \mu(s))\end{math}. At the
+end, neural networks are just functions.
+
+Now, the next step. The output of the critic gives us the approximation of the
+thing we’re interested to maximize in the first place -- the discounted total
+reward. This value depends not only on the input state, but also on parameters
+of the actor \begin{math}\theta_\mu\end{math} and the critic networks \begin{math}\theta_Q\end{math}. At every step of our optimisation we
+want to change the actor’s weights to improve the total reward we want to
+get. In mathematical terms, we want the gradient of our policy.
+
+In his Deterministic Policy Gradient theorem, David Silver has proved that
+stochastic policy gradient is equivalent to the deterministic policy gradient,
+in other words, to improve the policy, we just need to calculate the gradient of
+the function \begin{math}Q(s, \mu(s))\end{math}. By applying the chain rule, we
+get the gradient: \begin{math}\nabla_aQ(s, a)\nabla_{\theta_{\mu}}\mu(s)\end{math}.
+
+
+Page 10
+
+The price we have to pay for all this goodness is that our policy is now
+deterministic, so, we have to explore the environment somehow. The answer will
+be to add the noise to the actions returned by the actor before we pass them to
+the environment. There are several options here. The simplest method is just to
+add the random noise to the
+actions \begin{math}\mu(s)+\epsilon\mathcal{N}\end{math}.
+Well use this way of exploration in
+the next method we’ll consider in the chapter. More fancy approach to the
+exploration will be to use the stochastical model, very popular in financial
+world and other domains dealing with stochastic processes: Ornstein-Uhlenbeck
+processes.
+
+This process models the velocity of the massive Brownian particle under the
+influence of the friction and is defined by this stochastic differential
+equation: \begin{math}\partial x_t=\theta(\mu-x_t)\partial t + \sigma\partial W\end{math},
+where \begin{math}\theta, \mu, \sigma\end{math} are parameters of the process and \begin{math}W_t\end{math} is the
+Wiener process. In discrete-time case, the Ornstein-Uhlenbeck process could be
+written as \begin{math}x_{t+1}=x_t + \theta(\mu - x)+\sigma\mathcal{N} \end{math}. In our exploration, we’ll add the value of the
+Ornstein-Uhlenbeck process to the action returned by the actor.
+
+
+Page 19
+
+The Bellman operator has a form of
+\begin{math}Z(x, a)\stackrel{D}{=} R(x, a) + \gamma Z(x', a')\end{math}, and supposed to transform the probability distribution as shown on the image 
+
+    
+\end{document}
