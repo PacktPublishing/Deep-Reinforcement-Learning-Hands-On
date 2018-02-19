@@ -1,0 +1,77 @@
+% C-c C-o to insert the block
+
+% Individual equation: equation* block
+% Inline equation \begin{math}\frac{sin(x)}{x}\end{math}
+\documentclass{article}
+
+\usepackage{amsmath,amssymb}
+
+\ifdefined\ispreview
+\usepackage[active,tightpage]{preview}
+\PreviewEnvironment{math}
+\PreviewEnvironment{equation*}
+\fi
+
+\DeclareMathOperator{\E}{\mathbb{E}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+\DeclareMathOperator*{\argmax}{arg\,max}
+
+\begin{document}
+
+Page 4
+
+In math form, old A3C objective could be written as
+\begin{math}J_\theta=\E_t[\nabla_\theta\log\pi_\theta(a_t|s_t)A_t]\end{math}.
+The new objective proposed by the PPO
+is \begin{math}J_\theta=\E_t[\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{old}}(a_t|s_t)}A_t]\end{math}.
+But if we just start to blindly maximize this value, it will lead to very large
+update to the policy weights. To limit the update, the clipped objective is
+used.
+If we write the ratio between the new and the old policy as
+\begin{math}r_t(\theta)=\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{old}}(a_t|s_t)}\end{math},
+the clipped objective could be written as this
+\begin{equation*}
+  J_\theta^{clip}=\E_t[\min(r_t(\theta)A_t, clip(r_t(\theta), 1-\epsilon,
+    1+\epsilon)A_t)]
+\end{equation*}
+This objective limits the ratio
+between the old and the new policy to be in the interval \begin{math}[1-\epsilon, 1+\epsilon]\end{math}, so, by
+varying \begin{math}\epsilon\end{math} we can limit the size of the update.
+
+Another difference from the A3C method, is the way we estimate the advantage.
+In the A3C paper, the advantage obtained from the finite-horizon estimation of T
+steps in the form:
+
+\begin{equation*}
+  A_t=-V(s_t)+r_t+\gamma r_{t+1} + \ldots + \gamma^{T-t+1}r_{T-1}+\gamma^{T-t}V(s_T)
+\end{equation*}
+
+In the PPO paper, the authors used more general estimation in the form of
+
+\begin{equation*}
+  A_t= \sigma_t+(\gamma\lambda)\sigma_{t+1}+(\gamma\lambda)^2\sigma_{t+2}+\ldots+(\gamma\lambda)^{T-t+1}\sigma_{T-1}
+\end{equation*}
+where \begin{math}\sigma_t=r_t+\gamma V(s_{t+1})-V(s_t)\end{math}. The original
+A3C estimation, is a special case of the proposed method with \begin{math}\lambda=1\end{math}.
+
+Page 9
+
+As the first step, TRPO method defines the discounted visitation frequencies of
+the state: \begin{math}\rho_\pi(s)=P(s_0=s)+\gamma P(s_1=s)+\gamma^2 P(s_2=s)+\ldots\end{math}.
+In this equation, \begin{math}P(s_i=s)\end{math} equals to the sampled
+probability of state s to be met at position i of the sampled trajectories.
+Then, TRPO defines the optimisation objective as
+\begin{math}L_\pi(\tilde{\pi})=\eta(\pi) +
+  \sum_s\rho_\pi(s)\sum_a\tilde{\pi}(a|s)A_\pi(s, a)\end{math},
+where \begin{math}\eta(\pi)=\E[\sum_{t=0}^{\infty}\gamma^t r(s_t)]\end{math} is
+the expected discounted reward of the policy and
+\begin{math}\tilde{\pi}=\argmax_aA_\pi(s, a)\end{math} defines the deterministic policy.
+To address the issue with large policy updates, TRPO defines the additional
+constraint on the policy update, expressed as a maximum Kullback-Leibler
+divergence between the old and the new policies, which could be written as
+\begin{math}\bar{D}_{KL}^{\rho_{\theta_{old}}}(\theta_{old},\theta) \leq \delta\end{math}
+.
+
+
+  
+\end{document}
