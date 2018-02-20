@@ -14,8 +14,8 @@ from torch import optim
 
 from tensorboardX import SummaryWriter
 
-NOISE_STD = 0.01
-LEARNING_RATE = 0.001
+NOISE_STD = 0.001
+LEARNING_RATE = 1e-3
 PROCESSES_COUNT = 3
 ITERS_PER_UPDATE = 100
 
@@ -72,7 +72,7 @@ def evaluate(env, net, cuda=False):
     reward = 0.0
     steps = 0
     while True:
-        obs_v = ptan.agent.default_states_preprocessor([obs], cuda=cuda)
+        obs_v = ptan.agent.default_states_preprocessor([obs], cuda=cuda, volatile=True)
         act_prob = net(obs_v)
         acts = act_prob.max(dim=1)[1]
         obs, r, done, _ = env.step(acts.data.cpu().numpy()[0])
@@ -89,7 +89,7 @@ def sample_noise(net, cuda=False):
     for p in net.parameters():
         noise_t = torch.from_numpy(np.random.normal(size=p.data.size()).astype(np.float32))
         if cuda:
-            noise_t = noise_t.cuda()
+            noise_t = noise_t.cuda(async=True)
         res.append(noise_t)
         neg.append(-noise_t)
     return res, neg
@@ -175,7 +175,6 @@ def worker_func(worker_id, params_queue, rewards_queue, cuda):
 
 if __name__ == "__main__":
     mp.set_start_method('spawn')
-    torch.set_num_threads(1)
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable CUDA mode")
     args = parser.parse_args()
