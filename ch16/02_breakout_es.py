@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 from torch import multiprocessing as mp
+from torch import optim
 
 from tensorboardX import SummaryWriter
 
@@ -123,14 +124,8 @@ def compute_centered_ranks(x):
     return y
 
 
-def train_step(net, batch_noise, batch_reward, writer, step_idx):
+def train_step(optimizer, net, batch_noise, batch_reward, writer, step_idx):
     weighted_noise = None
-    # norm_reward = np.array(batch_reward)
-    # norm_reward -= np.mean(norm_reward)
-    # std = np.std(norm_reward)
-    # if abs(std) > 1e-8:
-    #     norm_reward /= std
-
     norm_reward = compute_centered_ranks(np.array(batch_reward))
 
     for noise, reward in zip(batch_noise, norm_reward):
@@ -140,11 +135,13 @@ def train_step(net, batch_noise, batch_reward, writer, step_idx):
             for w_n, p_n in zip(weighted_noise, noise):
                 w_n += reward * p_n
     m_updates = []
+    optimizer.zero_grad()
     for p, p_update in zip(net.parameters(), weighted_noise):
         update = p_update / (len(batch_reward) * NOISE_STD)
-        p.data += LEARNING_RATE * update
+        p.grad = Variable(-update)
         m_updates.append(torch.norm(update))
     writer.add_scalar("update_l2", np.mean(m_updates), step_idx)
+    optimizer.step()
 
 
 def make_env():
@@ -186,7 +183,6 @@ if __name__ == "__main__":
     writer = SummaryWriter(comment="-breakout-es")
     env = make_env()
     net = Net(env.observation_space.shape, env.action_space.n)
-    net.eval()
 
     params_queues = [mp.Queue(maxsize=1) for _ in range(PROCESSES_COUNT)]
     rewards_queue = mp.Queue(maxsize=ITERS_PER_UPDATE)
@@ -198,6 +194,7 @@ if __name__ == "__main__":
         workers.append(proc)
 
     print("All started!")
+    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
     for step_idx in range(100000):
         # broadcasting network params
@@ -237,7 +234,7 @@ if __name__ == "__main__":
             print("Solved in %d steps" % step_idx)
             break
 
-        train_step(net, batch_noise, batch_reward, writer, step_idx)
+        train_step(optimizer, net, batch_noise, batch_reward, writer, step_idx)
         writer.add_scalar("reward_mean", m_reward, step_idx)
         writer.add_scalar("reward_std", np.std(batch_reward), step_idx)
         writer.add_scalar("reward_max", np.max(batch_reward), step_idx)
