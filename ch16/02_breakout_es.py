@@ -13,10 +13,11 @@ from torch import multiprocessing as mp
 
 from tensorboardX import SummaryWriter
 
+CUDA = True
 NOISE_STD = 0.01
 LEARNING_RATE = 0.001
 PROCESSES_COUNT = 4
-ITERS_PER_UPDATE = 10
+ITERS_PER_UPDATE = 50
 
 # result item from the worker to master. Fields:
 # 1. random seed used to generate noise
@@ -24,6 +25,17 @@ ITERS_PER_UPDATE = 10
 # 3. reward obtained from the negative noise
 # 4. total amount of steps done
 RewardsItem = collections.namedtuple('RewardsItem', field_names=['seed', 'pos_reward', 'neg_reward', 'steps'])
+
+
+class VBN(nn.Module):
+    """
+    Virtual batch normalization
+    """
+    def __init__(self, n_feats, epsilon=1e-5, batches_to_train=1):
+        super(VBN, self).__init__()
+        self.epsilon = epsilon
+        self.means = torch.zeros()
+
 
 
 class Net(nn.Module):
@@ -84,21 +96,43 @@ def sample_noise(net, cuda=False):
 
 
 def eval_with_noise(env, net, noise, cuda=False):
-    old_params = net.state_dict()
+#    old_params = net.state_dict()
     for p, p_n in zip(net.parameters(), noise):
         p.data += NOISE_STD * p_n
     r, s = evaluate(env, net, cuda=cuda)
-    net.load_state_dict(old_params)
+    for p, p_n in zip(net.parameters(), noise):
+        p.data -= NOISE_STD * p_n
+    #    net.load_state_dict(old_params)
     return r, s
+
+
+def compute_ranks(x):
+    """
+    Returns ranks in [0, len(x))
+    Note: This is different from scipy.stats.rankdata, which returns ranks in [1, len(x)].
+    """
+    assert x.ndim == 1
+    ranks = np.empty(len(x), dtype=int)
+    ranks[x.argsort()] = np.arange(len(x))
+    return ranks
+
+
+def compute_centered_ranks(x):
+    y = compute_ranks(x.ravel()).reshape(x.shape).astype(np.float32)
+    y /= (x.size - 1)
+    y -= .5
+    return y
 
 
 def train_step(net, batch_noise, batch_reward, writer, step_idx):
     weighted_noise = None
-    norm_reward = np.array(batch_reward)
-    norm_reward -= np.mean(norm_reward)
-    std = np.std(norm_reward)
-    if abs(std) > 1e-8:
-        norm_reward /= std
+    # norm_reward = np.array(batch_reward)
+    # norm_reward -= np.mean(norm_reward)
+    # std = np.std(norm_reward)
+    # if abs(std) > 1e-8:
+    #     norm_reward /= std
+
+    norm_reward = compute_centered_ranks(np.array(batch_reward))
 
     for noise, reward in zip(batch_noise, norm_reward):
         if weighted_noise is None:
@@ -144,6 +178,7 @@ def worker_func(worker_id, params_queue, rewards_queue, cuda):
 
 if __name__ == "__main__":
     mp.set_start_method('spawn')
+    torch.set_num_threads(1)
     writer = SummaryWriter(comment="-breakout-es")
     env = make_env()
     net = Net(env.observation_space.shape, env.action_space.n)
@@ -153,7 +188,7 @@ if __name__ == "__main__":
     workers = []
 
     for idx, (params_queue, rewards_queue) in enumerate(zip(params_queues, rewards_queues)):
-        proc = mp.Process(target=worker_func, args=(idx, params_queue, rewards_queue, True))
+        proc = mp.Process(target=worker_func, args=(idx, params_queue, rewards_queue, CUDA))
         proc.start()
         workers.append(proc)
 

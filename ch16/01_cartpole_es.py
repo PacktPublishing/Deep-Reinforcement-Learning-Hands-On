@@ -6,6 +6,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+from torch import optim
 
 from tensorboardX import SummaryWriter
 
@@ -78,10 +79,14 @@ def train_step(net, batch_noise, batch_reward, writer, step_idx):
             for w_n, p_n in zip(weighted_noise, noise):
                 w_n += reward * p_n
     m_updates = []
+    opt = optim.SGD(net.parameters(), lr=LEARNING_RATE)
+    opt.zero_grad()
     for p, p_update in zip(net.parameters(), weighted_noise):
         update = p_update / (len(batch_reward) * NOISE_STD)
-        p.data += LEARNING_RATE * update
-        m_updates.append(torch.norm(update))
+        p.grad = Variable(update)
+#        p.data += LEARNING_RATE * update
+#        m_updates.append(torch.norm(update))
+    opt.step()
     writer.add_scalar("update_l2", np.mean(m_updates), step_idx)
 
 
