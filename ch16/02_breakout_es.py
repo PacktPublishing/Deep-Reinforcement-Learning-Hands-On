@@ -18,6 +18,7 @@ NOISE_STD = 0.001
 LEARNING_RATE = 1e-3
 PROCESSES_COUNT = 3
 ITERS_PER_UPDATE = 100
+MAX_ITERS = 100000
 
 # result item from the worker to master. Fields:
 # 1. random seed used to generate noise
@@ -35,7 +36,6 @@ class VBN(nn.Module):
         super(VBN, self).__init__()
         self.epsilon = epsilon
         self.means = torch.zeros()
-
 
 
 class Net(nn.Module):
@@ -95,13 +95,13 @@ def sample_noise(net, cuda=False):
     return res, neg
 
 
-def eval_with_noise(env, net, noise, cuda=False):
+def eval_with_noise(env, net, noise, noise_std, cuda=False):
 #    old_params = net.state_dict()
     for p, p_n in zip(net.parameters(), noise):
-        p.data += NOISE_STD * p_n
+        p.data += noise_std * p_n
     r, s = evaluate(env, net, cuda=cuda)
     for p, p_n in zip(net.parameters(), noise):
-        p.data -= NOISE_STD * p_n
+        p.data -= noise_std * p_n
     #    net.load_state_dict(old_params)
     return r, s
 
@@ -124,7 +124,7 @@ def compute_centered_ranks(x):
     return y
 
 
-def train_step(optimizer, net, batch_noise, batch_reward, writer, step_idx):
+def train_step(optimizer, net, batch_noise, batch_reward, writer, step_idx, noise_std):
     weighted_noise = None
     norm_reward = compute_centered_ranks(np.array(batch_reward))
 
@@ -137,7 +137,7 @@ def train_step(optimizer, net, batch_noise, batch_reward, writer, step_idx):
     m_updates = []
     optimizer.zero_grad()
     for p, p_update in zip(net.parameters(), weighted_noise):
-        update = p_update / (len(batch_reward) * NOISE_STD)
+        update = p_update / (len(batch_reward) * noise_std)
         p.grad = Variable(-update)
         m_updates.append(torch.norm(update))
     writer.add_scalar("update_l2", np.mean(m_updates), step_idx)
@@ -149,7 +149,7 @@ def make_env():
     return ptan.common.wrappers.wrap_dqn(env)
 
 
-def worker_func(worker_id, params_queue, rewards_queue, cuda):
+def worker_func(worker_id, params_queue, rewards_queue, cuda, noise_std):
     env = make_env()
     net = Net(env.observation_space.shape, env.action_space.n)
     net.eval()
@@ -166,8 +166,8 @@ def worker_func(worker_id, params_queue, rewards_queue, cuda):
             seed = np.random.randint(low=0, high=65535)
             np.random.seed(seed)
             noise, neg_noise = sample_noise(net, cuda=cuda)
-            pos_reward, pos_steps = eval_with_noise(env, net, noise, cuda=cuda)
-            neg_reward, neg_steps = eval_with_noise(env, net, neg_noise, cuda=cuda)
+            pos_reward, pos_steps = eval_with_noise(env, net, noise, noise_std, cuda=cuda)
+            neg_reward, neg_steps = eval_with_noise(env, net, neg_noise, noise_std, cuda=cuda)
             rewards_queue.put(RewardsItem(seed=seed, pos_reward=pos_reward,
                                           neg_reward=neg_reward, steps=pos_steps+neg_steps))
     pass
@@ -177,9 +177,12 @@ if __name__ == "__main__":
     mp.set_start_method('spawn')
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable CUDA mode")
+    parser.add_argument("--lr", type=float, default=LEARNING_RATE)
+    parser.add_argument("--noise-std", type=float, default=NOISE_STD)
+    parser.add_argument("--iters", type=int, default=MAX_ITERS)
     args = parser.parse_args()
 
-    writer = SummaryWriter(comment="-breakout-es")
+    writer = SummaryWriter(comment="-breakout-es_lr=%.3e_sigma=%.3e" % (args.lr, args.noise_std))
     env = make_env()
     net = Net(env.observation_space.shape, env.action_space.n)
 
@@ -188,14 +191,14 @@ if __name__ == "__main__":
     workers = []
 
     for idx, params_queue in enumerate(params_queues):
-        proc = mp.Process(target=worker_func, args=(idx, params_queue, rewards_queue, args.cuda))
+        proc = mp.Process(target=worker_func, args=(idx, params_queue, rewards_queue, args.cuda, args.noise_std))
         proc.start()
         workers.append(proc)
 
     print("All started!")
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    optimizer = optim.Adam(net.parameters(), lr=args.lr)
 
-    for step_idx in range(100000):
+    for step_idx in range(args.iters):
         # broadcasting network params
         params = net.state_dict()
         for q in params_queues:
@@ -229,11 +232,7 @@ if __name__ == "__main__":
 
         dt_data = time.time() - t_start
         m_reward = np.mean(batch_reward)
-        if m_reward > 18:
-            print("Solved in %d steps" % step_idx)
-            break
-
-        train_step(optimizer, net, batch_noise, batch_reward, writer, step_idx)
+        train_step(optimizer, net, batch_noise, batch_reward, writer, step_idx, args.noise_std)
         writer.add_scalar("reward_mean", m_reward, step_idx)
         writer.add_scalar("reward_std", np.std(batch_reward), step_idx)
         writer.add_scalar("reward_max", np.max(batch_reward), step_idx)
@@ -246,3 +245,7 @@ if __name__ == "__main__":
         print("%d: reward=%.2f, speed=%.2f f/s, data_gather=%.3f, train=%.3f, steps_mean=%.2f, min=%.2f, max=%.2f, steps_std=%.2f" % (
             step_idx, m_reward, speed, dt_data, dt_step, np.mean(batch_steps_data),
             np.min(batch_steps_data), np.max(batch_steps_data), np.std(batch_steps_data)))
+
+    for worker, p_queue in zip(workers, params_queues):
+        p_queue.put(None)
+        worker.join()
