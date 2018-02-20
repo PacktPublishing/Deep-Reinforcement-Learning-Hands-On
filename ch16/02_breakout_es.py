@@ -15,8 +15,8 @@ from tensorboardX import SummaryWriter
 
 NOISE_STD = 0.01
 LEARNING_RATE = 0.001
-PROCESSES_COUNT = 4
-ITERS_PER_UPDATE = 50
+PROCESSES_COUNT = 3
+ITERS_PER_UPDATE = 100
 
 # result item from the worker to master. Fields:
 # 1. random seed used to generate noise
@@ -189,10 +189,10 @@ if __name__ == "__main__":
     net.eval()
 
     params_queues = [mp.Queue(maxsize=1) for _ in range(PROCESSES_COUNT)]
-    rewards_queues = [mp.Queue(maxsize=ITERS_PER_UPDATE) for _ in range(PROCESSES_COUNT)]
+    rewards_queue = mp.Queue(maxsize=ITERS_PER_UPDATE)
     workers = []
 
-    for idx, (params_queue, rewards_queue) in enumerate(zip(params_queues, rewards_queues)):
+    for idx, params_queue in enumerate(params_queues):
         proc = mp.Process(target=worker_func, args=(idx, params_queue, rewards_queue, args.cuda))
         proc.start()
         workers.append(proc)
@@ -213,24 +213,23 @@ if __name__ == "__main__":
         batch_steps = 0
         batch_steps_data = []
         while True:
-            for idx, q in enumerate(rewards_queues):
-                if not q.empty():
-                    reward = q.get_nowait()
-                    np.random.seed(reward.seed)
-                    noise, neg_noise = sample_noise(net)
-                    batch_noise.append(noise)
-                    batch_reward.append(reward.pos_reward)
-                    batch_noise.append(neg_noise)
-                    batch_reward.append(reward.neg_reward)
-                    results += 1
-                    batch_steps += reward.steps
-                    batch_steps_data.append(reward.steps)
+            while not rewards_queue.empty():
+                reward = rewards_queue.get_nowait()
+                np.random.seed(reward.seed)
+                noise, neg_noise = sample_noise(net)
+                batch_noise.append(noise)
+                batch_reward.append(reward.pos_reward)
+                batch_noise.append(neg_noise)
+                batch_reward.append(reward.neg_reward)
+                results += 1
+                batch_steps += reward.steps
+                batch_steps_data.append(reward.steps)
                     # print("Result from %d: %s, noise: %s" % (
                     #     idx, reward, noise[0][0, 0, 0:1]))
 
             if results == PROCESSES_COUNT * ITERS_PER_UPDATE:
                 break
-            time.sleep(0.1)
+            time.sleep(0.01)
 
         dt_data = time.time() - t_start
         m_reward = np.mean(batch_reward)
