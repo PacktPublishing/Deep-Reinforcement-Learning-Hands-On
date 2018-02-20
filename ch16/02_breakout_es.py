@@ -13,7 +13,6 @@ from torch import multiprocessing as mp
 
 from tensorboardX import SummaryWriter
 
-CUDA = True
 NOISE_STD = 0.01
 LEARNING_RATE = 0.001
 PROCESSES_COUNT = 4
@@ -156,6 +155,7 @@ def make_env():
 def worker_func(worker_id, params_queue, rewards_queue, cuda):
     env = make_env()
     net = Net(env.observation_space.shape, env.action_space.n)
+    net.eval()
     if cuda:
         net.cuda()
 
@@ -179,16 +179,21 @@ def worker_func(worker_id, params_queue, rewards_queue, cuda):
 if __name__ == "__main__":
     mp.set_start_method('spawn')
     torch.set_num_threads(1)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--cuda", default=False, action='store_true', help="Enable CUDA mode")
+    args = parser.parse_args()
+
     writer = SummaryWriter(comment="-breakout-es")
     env = make_env()
     net = Net(env.observation_space.shape, env.action_space.n)
+    net.eval()
 
     params_queues = [mp.Queue(maxsize=1) for _ in range(PROCESSES_COUNT)]
     rewards_queues = [mp.Queue(maxsize=ITERS_PER_UPDATE) for _ in range(PROCESSES_COUNT)]
     workers = []
 
     for idx, (params_queue, rewards_queue) in enumerate(zip(params_queues, rewards_queues)):
-        proc = mp.Process(target=worker_func, args=(idx, params_queue, rewards_queue, CUDA))
+        proc = mp.Process(target=worker_func, args=(idx, params_queue, rewards_queue, args.cuda))
         proc.start()
         workers.append(proc)
 
@@ -206,6 +211,7 @@ if __name__ == "__main__":
         batch_reward = []
         results = 0
         batch_steps = 0
+        batch_steps_data = []
         while True:
             for idx, q in enumerate(rewards_queues):
                 if not q.empty():
@@ -218,6 +224,7 @@ if __name__ == "__main__":
                     batch_reward.append(reward.neg_reward)
                     results += 1
                     batch_steps += reward.steps
+                    batch_steps_data.append(reward.steps)
                     # print("Result from %d: %s, noise: %s" % (
                     #     idx, reward, noise[0][0, 0, 0:1]))
 
@@ -225,6 +232,7 @@ if __name__ == "__main__":
                 break
             time.sleep(0.1)
 
+        dt_data = time.time() - t_start
         m_reward = np.mean(batch_reward)
         if m_reward > 18:
             print("Solved in %d steps" % step_idx)
@@ -238,4 +246,8 @@ if __name__ == "__main__":
         writer.add_scalar("batch_steps", batch_steps, step_idx)
         speed = batch_steps / (time.time() - t_start)
         writer.add_scalar("speed", speed, step_idx)
-        print("%d: reward=%.2f, speed=%.2f f/s" % (step_idx, m_reward, speed))
+        dt_step = time.time() - t_start - dt_data
+
+        print("%d: reward=%.2f, speed=%.2f f/s, data_gather=%.3f, train=%.3f, steps_mean=%.2f, min=%.2f, max=%.2f, steps_std=%.2f" % (
+            step_idx, m_reward, speed, dt_data, dt_step, np.mean(batch_steps_data),
+            np.min(batch_steps_data), np.max(batch_steps_data), np.std(batch_steps_data)))
