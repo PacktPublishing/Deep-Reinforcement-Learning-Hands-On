@@ -4,10 +4,10 @@ import random
 
 LEARNING_RATE_EXP = (-5, -2)
 NOISE_STD_EXP = (-5, -0.5)
-ITERS = 20
+ITERS = 50
 
 if __name__ == "__main__":
-    random.seed(1235)
+    random.seed(1237)
     while True:
         lr_exp = random.uniform(LEARNING_RATE_EXP[0], LEARNING_RATE_EXP[1])
         std_exp = random.uniform(NOISE_STD_EXP[0], NOISE_STD_EXP[1])

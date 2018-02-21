@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import gym
+import roboschool
 import ptan
 import time
 import argparse
@@ -28,44 +29,25 @@ MAX_ITERS = 100000
 RewardsItem = collections.namedtuple('RewardsItem', field_names=['seed', 'pos_reward', 'neg_reward', 'steps'])
 
 
-class VBN(nn.Module):
-    """
-    Virtual batch normalization
-    """
-    def __init__(self, n_feats, epsilon=1e-5, batches_to_train=1):
-        super(VBN, self).__init__()
-        self.epsilon = epsilon
-        self.means = torch.zeros()
+def make_env():
+    return gym.make("RoboschoolHalfCheetah-v1")
 
 
 class Net(nn.Module):
-    def __init__(self, input_shape, n_actions):
+    def __init__(self, obs_size, act_size, hid_size=64):
         super(Net, self).__init__()
-        self.conv = nn.Sequential(
-            nn.Conv2d(input_shape[0], 32, kernel_size=3, stride=2),
-            nn.ReLU(),
-            nn.Conv2d(32, 32, kernel_size=3, stride=2),
-            nn.ReLU(),
-            nn.Conv2d(32, 32, kernel_size=3, stride=2),
-            nn.ReLU()
-        )
 
-        conv_out_size = self._get_conv_out(input_shape)
-        self.fc = nn.Sequential(
-            nn.Linear(conv_out_size, 256),
-            nn.ReLU(),
-            nn.Linear(256, n_actions),
-            nn.Softmax()
+        self.mu = nn.Sequential(
+            nn.Linear(obs_size, hid_size),
+            nn.Tanh(),
+            nn.Linear(hid_size, hid_size),
+            nn.Tanh(),
+            nn.Linear(hid_size, act_size),
+            nn.Tanh(),
         )
-
-    def _get_conv_out(self, shape):
-        o = self.conv(Variable(torch.zeros(1, *shape)))
-        return int(np.prod(o.size()))
 
     def forward(self, x):
-        fx = x.float() / 256
-        conv_out = self.conv(fx).view(fx.size()[0], -1)
-        return self.fc(conv_out)
+        return self.mu(x)
 
 
 def evaluate(env, net, cuda=False):
@@ -73,10 +55,10 @@ def evaluate(env, net, cuda=False):
     reward = 0.0
     steps = 0
     while True:
-        obs_v = ptan.agent.default_states_preprocessor([obs], cuda=cuda, volatile=True)
-        act_prob = net(obs_v)
-        acts = act_prob.max(dim=1)[1]
-        obs, r, done, _ = env.step(acts.data.cpu().numpy()[0])
+        obs_v = ptan.agent.default_states_preprocessor([obs], cuda=cuda)
+        action_v = net(obs_v)
+        action = action_v.data.cpu().numpy()[0]
+        obs, r, done, _ = env.step(action)
         reward += r
         steps += 1
         if done:
@@ -145,14 +127,9 @@ def train_step(optimizer, net, batch_noise, batch_reward, writer, step_idx, nois
     optimizer.step()
 
 
-def make_env():
-    env = gym.make("PongNoFrameskip-v4")
-    return ptan.common.wrappers.wrap_dqn(env)
-
-
 def worker_func(worker_id, params_queue, rewards_queue, cuda, noise_std):
     env = make_env()
-    net = Net(env.observation_space.shape, env.action_space.n)
+    net = Net(env.observation_space.shape[0], env.action_space.shape[0])
     net.eval()
     if cuda:
         net.cuda()
@@ -183,9 +160,9 @@ if __name__ == "__main__":
     parser.add_argument("--iters", type=int, default=MAX_ITERS)
     args = parser.parse_args()
 
-    writer = SummaryWriter(comment="-breakout-es_lr=%.3e_sigma=%.3e" % (args.lr, args.noise_std))
+    writer = SummaryWriter(comment="-cheetah-es_lr=%.3e_sigma=%.3e" % (args.lr, args.noise_std))
     env = make_env()
-    net = Net(env.observation_space.shape, env.action_space.n)
+    net = Net(env.observation_space.shape[0], env.action_space.shape[0])
     print(net)
 
     params_queues = [mp.Queue(maxsize=1) for _ in range(PROCESSES_COUNT)]
