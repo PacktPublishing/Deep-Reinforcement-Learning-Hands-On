@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import gym
+import roboschool
 import copy
 import numpy as np
 
@@ -9,23 +10,26 @@ from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
-NOISE_STD = 0.01
-POPULATION_SIZE = 50
-PARENTS_COUNT = 10
+NOISE_STD = 0.005
+POPULATION_SIZE = 2000
+PARENTS_COUNT = 200
 
 
 class Net(nn.Module):
-    def __init__(self, obs_size, action_size):
+    def __init__(self, obs_size, act_size, hid_size=64):
         super(Net, self).__init__()
-        self.net = nn.Sequential(
-            nn.Linear(obs_size, 32),
-            nn.ReLU(),
-            nn.Linear(32, action_size),
-            nn.Softmax()
+
+        self.mu = nn.Sequential(
+            nn.Linear(obs_size, hid_size),
+            nn.Tanh(),
+            nn.Linear(hid_size, hid_size),
+            nn.Tanh(),
+            nn.Linear(hid_size, act_size),
+            nn.Tanh(),
         )
 
     def forward(self, x):
-        return self.net(x)
+        return self.mu(x)
 
 
 def evaluate(env, net):
@@ -33,9 +37,8 @@ def evaluate(env, net):
     reward = 0.0
     while True:
         obs_v = Variable(torch.from_numpy(np.array([obs], dtype=np.float32)), volatile=True)
-        act_prob = net(obs_v)
-        acts = act_prob.max(dim=1)[1]
-        obs, r, done, _ = env.step(acts.data.numpy()[0])
+        action_v = net(obs_v)
+        obs, r, done, _ = env.step(action_v.data.numpy()[0])
         reward += r
         if done:
             break
@@ -51,12 +54,12 @@ def mutate_parent(net):
 
 
 if __name__ == "__main__":
-    writer = SummaryWriter(comment="-cartpole-ga")
-    env = gym.make("CartPole-v0")
+    writer = SummaryWriter(comment="-cheetah-ga")
+    env = gym.make("RoboschoolHalfCheetah-v1")
 
     gen_idx = 0
     nets = [
-        Net(env.observation_space.shape[0], env.action_space.n)
+        Net(env.observation_space.shape[0], env.action_space.shape[0])
         for _ in range(POPULATION_SIZE)
     ]
     population = [
@@ -69,15 +72,11 @@ if __name__ == "__main__":
         reward_mean = np.mean(rewards)
         reward_max = np.max(rewards)
         reward_std = np.std(rewards)
-
         writer.add_scalar("reward_mean", reward_mean, gen_idx)
         writer.add_scalar("reward_std", reward_std, gen_idx)
         writer.add_scalar("reward_max", reward_max, gen_idx)
         print("%d: reward_mean=%.2f, reward_max=%.2f, reward_std=%.2f" % (
             gen_idx, reward_mean, reward_max, reward_std))
-        if reward_mean > 199:
-            print("Solved in %d steps" % gen_idx)
-            break
 
         # generate next population
         prev_population = population
