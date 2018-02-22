@@ -47,13 +47,13 @@ def evaluate(env, net):
 
 
 def sample_noise(net):
-    res = []
+    pos = []
     neg = []
     for p in net.parameters():
         noise_t = torch.from_numpy(np.random.normal(size=p.data.size()).astype(np.float32))
-        res.append(noise_t)
+        pos.append(noise_t)
         neg.append(-noise_t)
-    return res, neg
+    return pos, neg
 
 
 def eval_with_noise(env, net, noise):
