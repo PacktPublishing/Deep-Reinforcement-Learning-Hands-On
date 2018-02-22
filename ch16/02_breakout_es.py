@@ -15,7 +15,7 @@ from torch import optim
 from tensorboardX import SummaryWriter
 
 NOISE_STD = 0.05
-LEARNING_RATE = 0.01
+LEARNING_RATE = 0.001
 PROCESSES_COUNT = 3
 ITERS_PER_UPDATE = 10
 MAX_ITERS = 100000

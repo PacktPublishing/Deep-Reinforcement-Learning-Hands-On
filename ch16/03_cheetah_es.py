@@ -79,13 +79,11 @@ def sample_noise(net, cuda=False):
 
 
 def eval_with_noise(env, net, noise, noise_std, cuda=False):
-#    old_params = net.state_dict()
     for p, p_n in zip(net.parameters(), noise):
         p.data += noise_std * p_n
     r, s = evaluate(env, net, cuda=cuda)
     for p, p_n in zip(net.parameters(), noise):
         p.data -= noise_std * p_n
-    #    net.load_state_dict(old_params)
     return r, s
 
 
@@ -202,8 +200,6 @@ if __name__ == "__main__":
                 results += 1
                 batch_steps += reward.steps
                 batch_steps_data.append(reward.steps)
-                    # print("Result from %d: %s, noise: %s" % (
-                    #     idx, reward, noise[0][0, 0, 0:1]))
 
             if results == PROCESSES_COUNT * ITERS_PER_UPDATE:
                 break
