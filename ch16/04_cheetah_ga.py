@@ -16,10 +16,11 @@ from tensorboardX import SummaryWriter
 
 
 NOISE_STD = 0.005
-POPULATION_SIZE = 2000
-PARENTS_COUNT = 10
+POPULATION_SIZE = 15000
+PARENTS_COUNT = 20
 WORKERS_COUNT = 6
 SEEDS_PER_WORKER = POPULATION_SIZE // WORKERS_COUNT
+MAX_SEED = 2**32 - 1
 
 
 class Net(nn.Module):
@@ -110,7 +111,7 @@ if __name__ == "__main__":
         input_queues.append(input_queue)
         w = mp.Process(target=worker_func, args=(input_queue, output_queue))
         w.start()
-        seeds = [(np.random.randint(65536),) for _ in range(SEEDS_PER_WORKER)]
+        seeds = [(np.random.randint(MAX_SEED),) for _ in range(SEEDS_PER_WORKER)]
         input_queue.put(seeds)
 
     gen_idx = 0
@@ -145,7 +146,7 @@ if __name__ == "__main__":
             seeds = []
             for _ in range(SEEDS_PER_WORKER):
                 parent = np.random.randint(PARENTS_COUNT)
-                next_seed = np.random.randint(65536)
+                next_seed = np.random.randint(MAX_SEED)
                 seeds.append(tuple(list(population[parent][0]) + [next_seed]))
             worker_queue.put(seeds)
         gen_idx += 1
