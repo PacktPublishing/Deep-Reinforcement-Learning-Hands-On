@@ -5,3 +5,4 @@ records
 *.dat
 __pycache__
 *.png
+*.pyc
