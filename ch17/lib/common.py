@@ -96,12 +96,9 @@ def unpack_batch(batch, net, cuda=False):
     return states_v, actions_t, ref_vals_v
 
 
-def train_on_batch(step_idx, batch, net, optimizer, tb_tracker, cuda=False):
-    assert isinstance(batch, list)
-    assert len(batch) == BATCH_SIZE
-
-    states_v, actions_t, vals_ref_v = unpack_batch(batch, net, cuda=cuda)
-
+def train_on_batch(step_idx, net, optimizer, tb_tracker,
+                   states_v, actions_t, vals_ref_v,
+                   cuda=False):
     optimizer.zero_grad()
     logits_v, value_v = net(states_v)
 
@@ -139,3 +136,5 @@ def train_on_batch(step_idx, batch, net, optimizer, tb_tracker, cuda=False):
     tb_tracker.track("grad_l2", np.sqrt(np.mean(np.square(grads))), step_idx)
     tb_tracker.track("grad_max", np.max(np.abs(grads)), step_idx)
     tb_tracker.track("grad_var", np.var(grads), step_idx)
+
+    return logits_v

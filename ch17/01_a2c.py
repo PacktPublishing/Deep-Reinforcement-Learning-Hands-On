@@ -52,7 +52,10 @@ if __name__ == "__main__":
 
                 if len(batch) < common.BATCH_SIZE:
                     continue
-                common.train_on_batch(step_idx, batch, net, optimizer, tb_tracker, cuda=args.cuda)
+                states_v, actions_t, vals_ref_v = common.unpack_batch(batch, net, cuda=args.cuda)
+                common.train_on_batch(step_idx, net, optimizer, tb_tracker,
+                                      states_v, actions_t, vals_ref_v,
+                                      cuda=args.cuda)
                 batch.clear()
 
 
