@@ -9,8 +9,9 @@ from torch.autograd import Variable
 GAMMA = 0.99
 REWARD_STEPS = 5
 ENTROPY_BETA = 0.01
-BATCH_SIZE = 128
-CLIP_GRAD = 0.1
+VALUE_LOSS_COEF = 0.5
+BATCH_SIZE = REWARD_STEPS * 16
+CLIP_GRAD = 0.5
 
 
 class AtariA2C(nn.Module):
@@ -18,31 +19,22 @@ class AtariA2C(nn.Module):
         super(AtariA2C, self).__init__()
 
         self.conv = nn.Sequential(
-            nn.Conv2d(input_shape[0], 32, kernel_size=5, stride=1, padding=1),
+            nn.Conv2d(input_shape[0], 32, kernel_size=8, stride=4),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, padding=1),
-            nn.Conv2d(32, 32, kernel_size=5, stride=1, padding=1),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, padding=1),
-            nn.Conv2d(32, 64, kernel_size=4, stride=1, padding=1),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
             nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
-            nn.ReLU()
         )
 
         conv_out_size = self._get_conv_out(input_shape)
-        self.policy = nn.Sequential(
-            nn.Linear(conv_out_size, 512),
-            nn.ReLU(),
-            nn.Linear(512, n_actions)
-        )
 
-        self.value = nn.Sequential(
+        self.fc = nn.Sequential(
             nn.Linear(conv_out_size, 512),
-            nn.ReLU(),
-            nn.Linear(512, 1)
+            nn.ReLU()
         )
+        self.policy = nn.Linear(512, n_actions)
+        self.value = nn.Linear(512, 1)
 
     def _get_conv_out(self, shape):
         o = self.conv(Variable(torch.zeros(1, *shape)))
@@ -51,7 +43,8 @@ class AtariA2C(nn.Module):
     def forward(self, x):
         fx = x.float() / 256
         conv_out = self.conv(fx).view(fx.size()[0], -1)
-        return self.policy(conv_out), self.value(conv_out)
+        fc_out = self.fc(conv_out)
+        return self.policy(fc_out), self.value(fc_out)
 
 
 def unpack_batch(batch, net, cuda=False):
@@ -110,9 +103,9 @@ def train_on_batch(step_idx, net, optimizer, tb_tracker,
     loss_policy_v = -log_prob_actions_v.mean()
 
     prob_v = F.softmax(logits_v)
-    entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
+    entropy_loss_v = (prob_v * log_prob_v).sum(dim=1).mean()
 
-    loss_v = entropy_loss_v + loss_value_v + loss_policy_v
+    loss_v = ENTROPY_BETA * entropy_loss_v + VALUE_LOSS_COEF * loss_value_v + loss_policy_v
     loss_v.backward()
     nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
     optimizer.step()

@@ -9,8 +9,8 @@ import torch.optim as optim
 from lib import common
 
 
-LEARNING_RATE = 0.001
-NUM_ENVS = 50
+LEARNING_RATE = 7e-4
+NUM_ENVS = 16
 
 REWARD_BOUND = 400
 
@@ -33,7 +33,7 @@ if __name__ == "__main__":
     agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], apply_softmax=True, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=common.GAMMA, steps_count=common.REWARD_STEPS)
 
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
+    optimizer = optim.RMSprop(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
 
     batch = []
 
