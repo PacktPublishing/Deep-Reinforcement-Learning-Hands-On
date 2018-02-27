@@ -10,8 +10,9 @@ import torch.nn.functional as F
 from lib import common, i2a
 
 
-LEARNING_RATE = 0.001
-NUM_ENVS = 50
+IMAG_POLICY_LR = 1e-3
+LEARNING_RATE = 7e-4
+NUM_ENVS = 16
 
 REWARD_BOUND = 400
 
@@ -36,8 +37,8 @@ if __name__ == "__main__":
     agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], apply_softmax=True, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=common.GAMMA, steps_count=common.REWARD_STEPS)
 
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
-    opt_imag_policy = optim.Adam(net_imag_policy.parameters(), lr=LEARNING_RATE)
+    optimizer = optim.RMSprop(net.parameters(), lr=LEARNING_RATE, eps=1e-5)
+    opt_imag_policy = optim.Adam(net_imag_policy.parameters(), lr=IMAG_POLICY_LR)
 
     batch = []
 
@@ -65,6 +66,8 @@ if __name__ == "__main__":
                 imag_policy_logits_v = net_imag_policy(states_v)
                 imag_policy_loss_v = -F.log_softmax(imag_policy_logits_v) * F.softmax(policy_logits_v.detach())
                 imag_policy_loss_v = imag_policy_loss_v.sum(dim=1).mean()
+                imag_policy_loss_v.backward()
+                opt_imag_policy.step()
                 tb_tracker.track("imag_policy_loss", imag_policy_loss_v, step_idx)
 
                 batch.clear()
