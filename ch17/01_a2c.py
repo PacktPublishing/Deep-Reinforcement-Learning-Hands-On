@@ -17,8 +17,6 @@ from lib import common
 
 LEARNING_RATE = 7e-4
 NUM_ENVS = 16
-
-REWARD_BOUND = 400
 TEST_EVERY_BATCH = 100
 
 
@@ -31,7 +29,7 @@ def discount_with_dones(rewards, dones, gamma):
     return discounted[::-1]
 
 
-def iterate_train_batches(envs, net, cuda=False):
+def iterate_batches(envs, net, cuda=False):
     act_selector = ptan.actions.ProbabilityActionSelector()
     obs = [e.reset() for e in envs]
     cur_dones = [False] * NUM_ENVS
@@ -97,7 +95,7 @@ def iterate_train_batches(envs, net, cuda=False):
 def test_model(env, net, rounds=3, cuda=False):
     total_reward = 0.0
     total_steps = 0
-    agent = ptan.agent.PolicyAgent(lambda x: net(x)[1], cuda=cuda, apply_softmax=True)
+    agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=cuda, apply_softmax=True)
 
     for _ in range(rounds):
         obs = env.reset()
@@ -123,7 +121,7 @@ if __name__ == "__main__":
     make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"))
     envs = [make_env() for _ in range(NUM_ENVS)]
     test_env = make_env()
-    writer = SummaryWriter(comment="-breakout-a2c_" + args.name)
+    writer = SummaryWriter(comment="-01_a2c_" + args.name)
 
     net = common.AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
     if args.cuda:
@@ -135,7 +133,7 @@ if __name__ == "__main__":
     best_reward = None
     best_test_reward = None
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
-        for mb_obs, mb_rewards, mb_actions, mb_values, done_rewards, done_steps in iterate_train_batches(envs, net, cuda=args.cuda):
+        for mb_obs, mb_rewards, mb_actions, mb_values, done_rewards, done_steps in iterate_batches(envs, net, cuda=args.cuda):
             if len(done_rewards) > 0:
                 if best_reward is None:
                     best_reward = done_rewards.max()
