@@ -13,6 +13,8 @@ VALUE_LOSS_COEF = 0.5
 BATCH_SIZE = REWARD_STEPS * 16
 CLIP_GRAD = 0.5
 
+IMG_SHAPE = (4, 84, 84)
+
 
 class AtariA2C(nn.Module):
     def __init__(self, input_shape, n_actions):
