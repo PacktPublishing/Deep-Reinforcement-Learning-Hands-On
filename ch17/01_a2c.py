@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import os
 import gym
 import ptan
 import argparse
@@ -18,6 +19,7 @@ LEARNING_RATE = 7e-4
 NUM_ENVS = 16
 
 REWARD_BOUND = 400
+TEST_EVERY_BATCH = 100
 
 
 def discount_with_dones(rewards, dones, gamma):
@@ -92,6 +94,22 @@ def iterate_train_batches(envs, net, cuda=False):
         yield out_mb_obs, out_mb_rewards, out_mb_actions, out_mb_values, np.array(done_rewards), np.array(done_steps)
 
 
+def test_model(env, net, rounds=3, cuda=False):
+    total_reward = 0.0
+    total_steps = 0
+    agent = ptan.agent.PolicyAgent(lambda x: net(x)[1], cuda=cuda, apply_softmax=True)
+
+    for _ in range(rounds):
+        obs = env.reset()
+        while True:
+            action = agent([obs])[0][0]
+            obs, r, done, _ = env.step(action)
+            total_reward += r
+            total_steps += 1
+            if done:
+                break
+    return total_reward / rounds, total_steps / rounds
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -99,8 +117,12 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
 
+    saves_path = os.path.join("saves", "01_a2c_" + args.name)
+    os.makedirs(saves_path, exist_ok=True)
+
     make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"))
     envs = [make_env() for _ in range(NUM_ENVS)]
+    test_env = make_env()
     writer = SummaryWriter(comment="-breakout-a2c_" + args.name)
 
     net = common.AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
@@ -111,6 +133,7 @@ if __name__ == "__main__":
 
     step_idx = 0
     best_reward = None
+    best_test_reward = None
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
         for mb_obs, mb_rewards, mb_actions, mb_values, done_rewards, done_steps in iterate_train_batches(envs, net, cuda=args.cuda):
             if len(done_rewards) > 0:
@@ -121,8 +144,8 @@ if __name__ == "__main__":
                 tb_tracker.track("total_reward_max", best_reward, step_idx)
                 tb_tracker.track("total_reward", done_rewards, step_idx)
                 tb_tracker.track("total_steps", done_steps, step_idx)
-                print("%d: done %d episodes, mean_reward=%.2f, max_reward=%.2f" % (
-                    step_idx, len(done_rewards), done_rewards.mean(), done_rewards.max()))
+                print("%d: done %d episodes, mean_reward=%.2f, best_reward=%.2f" % (
+                    step_idx, len(done_rewards), done_rewards.mean(), best_reward))
 
             optimizer.zero_grad()
             mb_adv = mb_rewards - mb_values
@@ -158,3 +181,15 @@ if __name__ == "__main__":
             tb_tracker.track("loss_total", loss_v, step_idx)
 
             step_idx += 1
+
+            if step_idx % TEST_EVERY_BATCH == 0:
+                test_reward, test_steps = test_model(test_env, net, cuda=args.cuda)
+                tb_tracker.track("test_reward", test_reward, step_idx)
+                tb_tracker.track("test_steps", test_steps, step_idx)
+                if best_test_reward is None or best_test_reward < test_reward:
+                    if best_test_reward is not None:
+                        fname = os.path.join(saves_path, "best_%08.3f_%d.dat" % (test_reward, step_idx))
+                        torch.save(net.state_dict(), fname)
+                    best_test_reward = test_reward
+                print("%d: test reward=%.2f, steps=%.2f, best_reward=%.2f" % (
+                    step_idx, test_reward, test_steps, best_test_reward))
