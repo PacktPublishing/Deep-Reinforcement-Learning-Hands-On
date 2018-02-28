@@ -13,20 +13,16 @@ class ImagPolicy(nn.Module):
         super(ImagPolicy, self).__init__()
 
         self.conv = nn.Sequential(
-            nn.Conv2d(input_shape[0], 32, kernel_size=5, stride=1, padding=1),
+            nn.Conv2d(input_shape[0], 32, kernel_size=8, stride=4),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, padding=1),
-            nn.Conv2d(32, 32, kernel_size=5, stride=1, padding=1),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
             nn.ReLU(),
-            nn.MaxPool2d(kernel_size=2, padding=1),
-            nn.Conv2d(32, 64, kernel_size=4, stride=1, padding=1),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
             nn.ReLU(),
-            nn.MaxPool2d(2, 2),
-            nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1),
-            nn.ReLU()
         )
 
         conv_out_size = self._get_conv_out(input_shape)
+
         self.policy = nn.Sequential(
             nn.Linear(conv_out_size, 512),
             nn.ReLU(),
