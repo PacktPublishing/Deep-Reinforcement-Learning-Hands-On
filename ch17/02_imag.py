@@ -14,7 +14,7 @@ from torch.autograd import Variable
 from lib import common, i2a
 
 
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 5e-4
 NUM_ENVS = 16
 BATCH_SIZE = 64
 
@@ -44,7 +44,7 @@ def iterate_batches(envs, net, cuda=False):
 
             batch_idx = (batch_idx + 1) % BATCH_SIZE
             if batch_idx == 0:
-                yield mb_obs, mb_probs
+                yield mb_obs, mb_probs, mb_actions
             if done:
                 o = e.reset()
             obs[e_idx] = o
@@ -67,30 +67,33 @@ if __name__ == "__main__":
     writer = SummaryWriter(comment="-02_env_" + args.name)
 
     net = common.AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
-    net_imag_policy = i2a.ImagPolicy(envs[0].observation_space.shape, envs[0].action_space.n)
-    net.load_state_dict(torch.load(args.model))
+    net_em = i2a.EnvironmentModel(envs[0].observation_space.shape, envs[0].action_space.n)
+#    net.load_state_dict(torch.load(args.model))
     if args.cuda:
         net.cuda()
-        net_imag_policy.cuda()
-    print(net_imag_policy)
-    optimizer = optim.Adam(net_imag_policy.parameters(), lr=LEARNING_RATE)
+        net_em.cuda()
+    print(net_em)
+    optimizer = optim.Adam(net_em.parameters(), lr=LEARNING_RATE)
 
     step_idx = 0
     best_reward = None
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
-        for mb_obs, mb_probs in iterate_batches(envs, net, cuda=args.cuda):
+        for mb_obs, mb_probs, mb_actions in iterate_batches(envs, net, cuda=args.cuda):
             obs_v = Variable(torch.from_numpy(mb_obs))
             probs_v = Variable(torch.from_numpy(mb_probs))
+            actions_t = torch.LongTensor(mb_actions.tolist())
             if args.cuda:
                 obs_v = obs_v.cuda()
                 probs_v = probs_v.cuda()
+                actions_t = actions_t.cuda()
 
             optimizer.zero_grad()
-            imag_policy_logits_v = net_imag_policy(obs_v)
-            imag_policy_loss_v = -F.log_softmax(imag_policy_logits_v) * probs_v
-            imag_policy_loss_v = imag_policy_loss_v.sum(dim=1).mean()
-            imag_policy_loss_v.backward()
+            o = net_em(obs_v, actions_t)
+            # imag_policy_logits_v = net_imag_policy(obs_v)
+            # imag_policy_loss_v = -F.log_softmax(imag_policy_logits_v) * probs_v
+            # imag_policy_loss_v = imag_policy_loss_v.sum(dim=1).mean()
+            # imag_policy_loss_v.backward()
             optimizer.step()
-            tb_tracker.track("imag_policy_loss", imag_policy_loss_v, step_idx)
+#            tb_tracker.track("imag_policy_loss", imag_policy_loss_v, step_idx)
 
             step_idx += 1

@@ -39,4 +39,33 @@ class ImagPolicy(nn.Module):
         return self.policy(conv_out)
 
 
+class EnvironmentModel(nn.Module):
+    def __init__(self, input_shape, n_actions):
+        super(EnvironmentModel, self).__init__()
+
+        self.input_shape = input_shape
+        self.n_actions = n_actions
+
+        # input color planes will be equal to frames plus one-hot encoded actions
+        n_planes = input_shape[0] + n_actions
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(n_planes, 32, kernel_size=4, stride=4, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(32, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+        )
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(32, 32, kernel_size=3, padding=1),
+            nn.ReLU()
+        )
+        self.deconv = nn.ConvTranspose2d(32, input_shape[0], kernel_size=4, stride=4, padding=1)
+
+    def forward(self, imgs, actions):
+        batch_size = actions.size()[0]
+        act_planes_v = Variable(torch.ByteTensor(batch_size, self.n_actions, *self.input_shape[1:]).zero_())
+        if actions.is_cuda:
+            act_planes_v = act_planes_v.cuda()
+        act_planes_v[range(batch_size), actions] = 1
+        comb_input_v = torch.cat((imgs, act_planes_v), dim=1)
+        pass
 
