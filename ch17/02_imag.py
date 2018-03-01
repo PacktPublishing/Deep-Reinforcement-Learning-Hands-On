@@ -116,8 +116,8 @@ if __name__ == "__main__":
                 rewards_v = rewards_v.cuda()
 
             optimizer.zero_grad()
-            out_obs_next_v, out_reward_v = net_em(obs_v, actions_t)
-            loss_obs_v = F.mse_loss(out_obs_next_v, obs_next_v.float() / 255)
+            out_obs_next_v, out_reward_v = net_em(obs_v.float()/255, actions_t)
+            loss_obs_v = F.mse_loss(out_obs_next_v, obs_next_v.float()/255)
             loss_rew_v = F.mse_loss(out_reward_v, rewards_v)
             loss_total_v = loss_obs_v + loss_rew_v
             loss_total_v.backward()
