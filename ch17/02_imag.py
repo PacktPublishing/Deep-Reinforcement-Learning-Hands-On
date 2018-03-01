@@ -27,9 +27,13 @@ def iterate_batches(envs, net, cuda=False):
     mb_actions = np.zeros((BATCH_SIZE, ), dtype=np.int32)
     mb_rewards = np.zeros((BATCH_SIZE, ), dtype=np.float32)
     obs = [e.reset() for e in envs]
+    total_reward = [0.0] * NUM_ENVS
+    total_steps = [0] * NUM_ENVS
     batch_idx = 0
 
     while True:
+        done_rewards = []
+        done_steps = []
         obs_v = ptan.agent.default_states_preprocessor(obs, cuda=cuda)
         logits_v, values_v = net(obs_v)
         probs_v = F.softmax(logits_v)
@@ -44,11 +48,18 @@ def iterate_batches(envs, net, cuda=False):
             mb_actions[batch_idx] = actions[e_idx]
             mb_rewards[batch_idx] = r
 
+            total_reward[e_idx] += r
+            total_steps[e_idx] += 1
+
             batch_idx = (batch_idx + 1) % BATCH_SIZE
             if batch_idx == 0:
-                yield mb_obs, mb_probs, mb_obs_next, mb_actions, mb_rewards
+                yield mb_obs, mb_probs, mb_obs_next, mb_actions, mb_rewards, done_rewards, done_steps
             if done:
                 o = e.reset()
+                done_rewards.append(total_reward[e_idx])
+                done_steps.append(total_steps[e_idx])
+                total_reward[e_idx] = 0.0
+                total_steps[e_idx] = 0
             obs[e_idx] = o
 
     pass
@@ -70,7 +81,7 @@ if __name__ == "__main__":
 
     net = common.AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
     net_em = i2a.EnvironmentModel(envs[0].observation_space.shape, envs[0].action_space.n)
-#    net.load_state_dict(torch.load(args.model))
+    net.load_state_dict(torch.load(args.model))
     if args.cuda:
         net.cuda()
         net_em.cuda()
@@ -80,7 +91,15 @@ if __name__ == "__main__":
     step_idx = 0
     best_reward = None
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
-        for mb_obs, mb_probs, mb_obs_next, mb_actions, mb_rewards in iterate_batches(envs, net, cuda=args.cuda):
+        for mb_obs, mb_probs, mb_obs_next, mb_actions, mb_rewards, done_rewards, done_steps in iterate_batches(envs, net, cuda=args.cuda):
+            if len(done_rewards) > 0:
+                m_reward = np.mean(done_rewards)
+                m_steps = np.mean(done_steps)
+                print("%d: done %d episodes, mean reward=%.2f, steps=%.2f" % (
+                    step_idx, len(done_rewards), m_reward, m_steps))
+                tb_tracker.track("total_reward", m_reward, step_idx)
+                tb_tracker.track("total_steps", m_steps, step_idx)
+
             obs_v = Variable(torch.from_numpy(mb_obs))
             probs_v = Variable(torch.from_numpy(mb_probs))
             obs_next_v = Variable(torch.from_numpy(mb_obs_next))
