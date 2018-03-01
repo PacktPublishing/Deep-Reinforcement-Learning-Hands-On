@@ -17,6 +17,7 @@ from lib import common, i2a
 LEARNING_RATE = 5e-4
 NUM_ENVS = 16
 BATCH_SIZE = 64
+SAVE_EVERY_BATCH = 1000
 
 
 def iterate_batches(envs, net, cuda=False):
@@ -129,3 +130,7 @@ if __name__ == "__main__":
 #            tb_tracker.track("imag_policy_loss", imag_policy_loss_v, step_idx)
 
             step_idx += 1
+            if step_idx % SAVE_EVERY_BATCH == 0:
+                loss = loss_total_v.data.cpu().numpy()
+                fname = os.path.join(saves_path, "em_%05d_%.4e.dat" % (step_idx, loss))
+                torch.save(net_em.state_dict(), fname)
