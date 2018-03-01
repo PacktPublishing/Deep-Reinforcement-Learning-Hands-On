@@ -1,7 +1,9 @@
+import ptan
 import numpy as np
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.autograd import Variable
 
 ROLLOUT_HIDDEN = 256
@@ -102,8 +104,11 @@ class RolloutEncoder(nn.Module):
 
 
 class I2A(nn.Module):
-    def __init__(self, input_shape, n_actions):
+    def __init__(self, input_shape, n_actions, net_em, net_policy, rollout_steps):
         super(I2A, self).__init__()
+
+        self.n_actions = n_actions
+        self.rollout_steps = rollout_steps
 
         self.conv = nn.Sequential(
             nn.Conv2d(input_shape[0], 32, kernel_size=8, stride=4),
@@ -124,13 +129,53 @@ class I2A(nn.Module):
         self.policy = nn.Linear(512, n_actions)
         self.value = nn.Linear(512, 1)
 
+        # used for rollouts
+        self.encoder = RolloutEncoder(input_shape)
+        self.action_selector = ptan.actions.ProbabilityActionSelector()
+        # save refs without registering
+        object.__setattr__(self, "net_em", net_em)
+        object.__setattr__(self, "net_policy", net_policy)
+
+
     def _get_conv_out(self, shape):
         o = self.conv(Variable(torch.zeros(1, *shape)))
         return int(np.prod(o.size()))
 
-    def forward(self, x, enc_rollout):
+    def forward(self, x):
         fx = x.float() / 256
+        enc_rollouts = self.batch_rollouts(fx)
         conv_out = self.conv(fx).view(fx.size()[0], -1)
-        fc_in = torch.cat((conv_out, enc_rollout), dim=1)
+        fc_in = torch.cat((conv_out, enc_rollouts), dim=1)
         fc_out = self.fc(fc_in)
         return self.policy(fc_out), self.value(fc_out)
+
+    def batch_rollouts(self, batch):
+        rolls = []
+        for idx in range(batch.size()[0]):
+            item = batch[idx]
+            enc = self.rollout(item)
+            rolls.append(enc)
+        return torch.stack(rolls)
+
+    def rollout(self, obs):
+        obs_v = obs.expand(self.n_actions, *obs.size())
+        actions = np.arange(0, self.n_actions, dtype=np.int64)
+        step_obs, step_rewards = [], []
+
+        for step_idx in range(self.rollout_steps):
+            actions_t = torch.from_numpy(actions)
+            if obs.is_cuda:
+                actions_t = actions_t.cuda()
+            obs_next_v, reward_v = self.net_em(obs_v, actions_t)
+            step_obs.append(obs_next_v.detach())
+            step_rewards.append(reward_v.detach())
+            obs_v = obs_next_v
+            # select actions
+            logits_v, _ = self.net_policy(obs_v)
+            probs_v = F.softmax(logits_v)
+            probs = probs_v.data.cpu().numpy()
+            actions = self.action_selector(probs)
+
+        step_obs_v = torch.stack(step_obs)
+        step_rewards_v = torch.stack(step_rewards)
+        return self.encoder(step_obs_v, step_rewards_v)
