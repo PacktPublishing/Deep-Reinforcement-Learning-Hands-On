@@ -58,14 +58,18 @@ class EnvironmentModel(nn.Module):
             nn.Conv2d(32, 32, kernel_size=3, padding=1),
             nn.ReLU()
         )
-        self.deconv = nn.ConvTranspose2d(32, input_shape[0], kernel_size=4, stride=4, padding=1)
+        self.deconv = nn.ConvTranspose2d(32, input_shape[0], kernel_size=4, stride=4, padding=0)
 
     def forward(self, imgs, actions):
         batch_size = actions.size()[0]
         act_planes_v = Variable(torch.ByteTensor(batch_size, self.n_actions, *self.input_shape[1:]).zero_())
         if actions.is_cuda:
             act_planes_v = act_planes_v.cuda()
-        act_planes_v[range(batch_size), actions] = 1
+        act_planes_v[range(batch_size), actions] = 255
         comb_input_v = torch.cat((imgs, act_planes_v), dim=1)
-        pass
+        c1_out = self.conv1(comb_input_v.float() / 255)
+        c2_out = self.conv2(c1_out)
+        c2_out += c1_out
+        img_out = self.deconv(c2_out)
+        return img_out
 
