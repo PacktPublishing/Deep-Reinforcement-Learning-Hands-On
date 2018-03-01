@@ -60,6 +60,27 @@ class EnvironmentModel(nn.Module):
         )
         self.deconv = nn.ConvTranspose2d(32, input_shape[0], kernel_size=4, stride=4, padding=0)
 
+        self.reward_conv = nn.Sequential(
+            nn.Conv2d(32, 32, kernel_size=3),
+            nn.MaxPool2d(2),
+            nn.ReLU(),
+            nn.Conv2d(32, 32, kernel_size=3),
+            nn.MaxPool2d(2),
+            nn.ReLU()
+        )
+
+        rw_conv_out = self._get_reward_conv_out((n_planes, ) + input_shape[1:])
+        self.reward_fc = nn.Sequential(
+            nn.Linear(rw_conv_out, 128),
+            nn.ReLU(),
+            nn.Linear(128, 1)
+        )
+
+    def _get_reward_conv_out(self, shape):
+        o = self.conv1(Variable(torch.zeros(1, *shape)))
+        o = self.reward_conv(o)
+        return int(np.prod(o.size()))
+
     def forward(self, imgs, actions):
         batch_size = actions.size()[0]
         act_planes_v = Variable(torch.ByteTensor(batch_size, self.n_actions, *self.input_shape[1:]).zero_())
@@ -71,5 +92,7 @@ class EnvironmentModel(nn.Module):
         c2_out = self.conv2(c1_out)
         c2_out += c1_out
         img_out = self.deconv(c2_out)
-        return img_out
+        rew_conv = self.reward_conv(c2_out).view(batch_size, -1)
+        rew_out = self.reward_fc(rew_conv)
+        return img_out, rew_out
 
