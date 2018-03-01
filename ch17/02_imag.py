@@ -31,10 +31,10 @@ def iterate_batches(envs, net, cuda=False):
     total_reward = [0.0] * NUM_ENVS
     total_steps = [0] * NUM_ENVS
     batch_idx = 0
+    done_rewards = []
+    done_steps = []
 
     while True:
-        done_rewards = []
-        done_steps = []
         obs_v = ptan.agent.default_states_preprocessor(obs, cuda=cuda)
         logits_v, values_v = net(obs_v)
         probs_v = F.softmax(logits_v)
@@ -55,6 +55,8 @@ def iterate_batches(envs, net, cuda=False):
             batch_idx = (batch_idx + 1) % BATCH_SIZE
             if batch_idx == 0:
                 yield mb_obs, mb_probs, mb_obs_next, mb_actions, mb_rewards, done_rewards, done_steps
+                done_rewards.clear()
+                done_steps.clear()
             if done:
                 o = e.reset()
                 done_rewards.append(total_reward[e_idx])
