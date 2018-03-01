@@ -13,17 +13,20 @@ import torchvision
 ROLLOUTS_STEPS = 20
 
 
-def rollouts(n_actions, obs, net_policy, net_em, cuda=False, save=False):
+def encode_rollouts(n_actions, obs, net_policy, net_em, net_encoder, cuda=False, save=False):
     act_selector = ptan.actions.ProbabilityActionSelector()
     obs_v = ptan.agent.default_states_preprocessor([obs]*n_actions, cuda=cuda)
     obs_v = obs_v.float() / 255
     actions = np.arange(0, n_actions, dtype=np.int64)
+    step_obs, step_rewards = [], []
 
     for step_idx in range(ROLLOUTS_STEPS):
         actions_t = torch.from_numpy(actions)
         if cuda:
             actions_t = actions_t.cuda()
         obs_next_v, reward_v = net_em(obs_v, actions_t)
+        step_obs.append(obs_next_v)
+        step_rewards.append(reward_v)
         if save:
             in_images = [obs_v.data[i, 0].t().numpy() for i in range(n_actions)]
             in_images = torch.from_numpy(np.array(in_images, dtype=np.float32)).unsqueeze(1)
@@ -38,7 +41,9 @@ def rollouts(n_actions, obs, net_policy, net_em, cuda=False, save=False):
         probs = probs_v.data.cpu().numpy()
         actions = act_selector(probs)
 
-    pass
+    step_obs_v = torch.stack(step_obs)
+    step_rewards_v = torch.stack(step_rewards)
+    return net_encoder(step_obs_v, step_rewards_v)
 
 
 if __name__ == "__main__":
@@ -58,11 +63,14 @@ if __name__ == "__main__":
     net_em = i2a.EnvironmentModel(env.observation_space.shape, env.action_space.n)
     net_em.load_state_dict(torch.load(args.em, map_location=lambda storage, loc: storage))
 
+    net_encoder = i2a.RolloutEncoder(env.observation_space.shape)
+
     if args.cuda:
         net_policy.cuda()
         net_em.cuda()
+        net_encoder.cuda()
 
     obs = env.reset()
-    rollouts(env.action_space.n, obs, net_policy, net_em, args.cuda, save=True)
+    encoded = encode_rollouts(env.action_space.n, obs, net_policy, net_em, net_encoder, args.cuda, save=False)
 
     pass

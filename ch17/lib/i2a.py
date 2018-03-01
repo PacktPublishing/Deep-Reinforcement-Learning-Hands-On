@@ -4,6 +4,8 @@ import torch
 import torch.nn as nn
 from torch.autograd import Variable
 
+ROLLOUT_HIDDEN = 256
+
 
 class EnvironmentModel(nn.Module):
     def __init__(self, input_shape, n_actions):
@@ -62,3 +64,73 @@ class EnvironmentModel(nn.Module):
         rew_out = self.reward_fc(rew_conv)
         return img_out, rew_out
 
+
+class RolloutEncoder(nn.Module):
+    def __init__(self, input_shape, hidden_size=ROLLOUT_HIDDEN):
+        super(RolloutEncoder, self).__init__()
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(input_shape[0], 32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.ReLU(),
+        )
+
+        conv_out_size = self._get_conv_out(input_shape)
+
+        self.rnn = nn.LSTM(input_size=conv_out_size+1, hidden_size=hidden_size, batch_first=False)
+
+    def _get_conv_out(self, shape):
+        o = self.conv(Variable(torch.zeros(1, *shape)))
+        return int(np.prod(o.size()))
+
+    def forward(self, obs_v, reward_v):
+        """
+        Input is in (time, batch, *) order
+        """
+        n_time = obs_v.size()[0]
+        n_batch = obs_v.size()[1]
+        n_items = n_time * n_batch
+        obs_flat_v = obs_v.view(n_items, *obs_v.size()[2:])
+        conv_out = self.conv(obs_flat_v)
+        conv_out = conv_out.view(n_time, n_batch, -1)
+        rnn_in = torch.cat((conv_out, reward_v), dim=2)
+        _, (rnn_hid, _) = self.rnn(rnn_in)
+        return rnn_hid.view(-1)
+
+
+class I2A(nn.Module):
+    def __init__(self, input_shape, n_actions):
+        super(I2A, self).__init__()
+
+        self.conv = nn.Sequential(
+            nn.Conv2d(input_shape[0], 32, kernel_size=8, stride=4),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=4, stride=2),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, kernel_size=3, stride=1),
+            nn.ReLU(),
+        )
+
+        conv_out_size = self._get_conv_out(input_shape)
+        fc_input = conv_out_size + ROLLOUT_HIDDEN * n_actions
+
+        self.fc = nn.Sequential(
+            nn.Linear(fc_input, 512),
+            nn.ReLU()
+        )
+        self.policy = nn.Linear(512, n_actions)
+        self.value = nn.Linear(512, 1)
+
+    def _get_conv_out(self, shape):
+        o = self.conv(Variable(torch.zeros(1, *shape)))
+        return int(np.prod(o.size()))
+
+    def forward(self, x, enc_rollout):
+        fx = x.float() / 256
+        conv_out = self.conv(fx).view(fx.size()[0], -1)
+        fc_in = torch.cat((conv_out, enc_rollout), dim=1)
+        fc_out = self.fc(fc_in)
+        return self.policy(fc_out), self.value(fc_out)
