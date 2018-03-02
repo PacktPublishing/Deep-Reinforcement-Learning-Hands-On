@@ -24,7 +24,7 @@ if __name__ == "__main__":
     saves_path = os.path.join("saves", "01_a2c_" + args.name)
     os.makedirs(saves_path, exist_ok=True)
 
-    make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"))
+    make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"), stack_frames=common.FRAMES_COUNT)
     envs = [make_env() for _ in range(common.NUM_ENVS)]
     test_env = make_env()
     writer = SummaryWriter(comment="-01_a2c_" + args.name)
