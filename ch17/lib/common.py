@@ -64,22 +64,21 @@ def discount_with_dones(rewards, dones, gamma):
 def iterate_batches(envs, net, cuda=False):
     act_selector = ptan.actions.ProbabilityActionSelector()
     obs = [e.reset() for e in envs]
-    cur_dones = [False] * NUM_ENVS
+    batch_dones = [[False] for _ in range(NUM_ENVS)]
     total_reward = [0.0] * NUM_ENVS
     total_steps = [0] * NUM_ENVS
     mb_obs = np.zeros((NUM_ENVS, REWARD_STEPS) + IMG_SHAPE, dtype=np.uint8)
     mb_rewards = np.zeros((NUM_ENVS, REWARD_STEPS), dtype=np.float32)
     mb_values = np.zeros((NUM_ENVS, REWARD_STEPS), dtype=np.float32)
-    mb_dones = np.zeros((NUM_ENVS, REWARD_STEPS), dtype=np.bool)
     mb_actions = np.zeros((NUM_ENVS, REWARD_STEPS), dtype=np.int32)
 
     while True:
+        batch_dones = [[dones[-1]] for dones in batch_dones]
         done_rewards = []
         done_steps = []
         for n in range(REWARD_STEPS):
             obs_v = ptan.agent.default_states_preprocessor(obs)
             mb_obs[:, n] = obs_v.data.numpy()
-            mb_dones[:,  n] = cur_dones
             if cuda:
                 obs_v = obs_v.cuda()
             logits_v, values_v = net(obs_v)
@@ -99,22 +98,18 @@ def iterate_batches(envs, net, cuda=False):
                     total_steps[e_idx] = 0
                 obs[e_idx] = o
                 mb_rewards[e_idx, n] = r
-                cur_dones[e_idx] = done
+                batch_dones[e_idx].append(done)
         # obtain values for the last observation
         obs_v = ptan.agent.default_states_preprocessor(obs, cuda)
         _, values_v = net(obs_v)
         values_last = values_v.squeeze().data.cpu().numpy()
-        # prepare before rollouts calculation
-        mb_dones = np.roll(mb_dones, -1, axis=1)
-        mb_dones[:, -1] = cur_dones
 
-        for e_idx, (rewards, dones, value) in enumerate(zip(mb_rewards, mb_dones, values_last)):
+        for e_idx, (rewards, dones, value) in enumerate(zip(mb_rewards, batch_dones, values_last)):
             rewards = rewards.tolist()
-            dones = dones.tolist()
             if not dones[-1]:
-                rewards = discount_with_dones(rewards + [value], dones + [False], GAMMA)[:-1]
+                rewards = discount_with_dones(rewards + [value], dones[1:] + [False], GAMMA)[:-1]
             else:
-                rewards = discount_with_dones(rewards, dones, GAMMA)
+                rewards = discount_with_dones(rewards, dones[1:], GAMMA)
             mb_rewards[e_idx] = rewards
 
         out_mb_obs = mb_obs.reshape((-1,) + IMG_SHAPE)
