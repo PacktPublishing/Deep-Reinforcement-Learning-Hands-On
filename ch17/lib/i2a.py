@@ -6,7 +6,11 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 
+from . import common
+
 ROLLOUT_HIDDEN = 256
+
+EM_OUT_SHAPE = (1, ) + common.IMG_SHAPE[1:]
 
 
 class EnvironmentModel(nn.Module):
@@ -28,7 +32,8 @@ class EnvironmentModel(nn.Module):
             nn.Conv2d(32, 32, kernel_size=3, padding=1),
             nn.ReLU()
         )
-        self.deconv = nn.ConvTranspose2d(32, input_shape[0], kernel_size=4, stride=4, padding=0)
+        # output is one single frame with delta from the current frame
+        self.deconv = nn.ConvTranspose2d(32, 1, kernel_size=4, stride=4, padding=0)
 
         self.reward_conv = nn.Sequential(
             nn.Conv2d(32, 32, kernel_size=3),

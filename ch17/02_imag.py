@@ -20,11 +20,19 @@ BATCH_SIZE = 64
 SAVE_EVERY_BATCH = 1000
 
 
+def get_obs_diff(prev_obs, cur_obs):
+    prev = np.array(prev_obs)[-1]
+    cur = np.array(cur_obs)[-1]
+    prev = prev.astype(np.float32) / 255.0
+    cur = cur.astype(np.float32) / 255.0
+    return cur - prev
+
+
 def iterate_batches(envs, net, cuda=False):
     act_selector = ptan.actions.ProbabilityActionSelector()
     mb_obs = np.zeros((BATCH_SIZE, ) + common.IMG_SHAPE, dtype=np.uint8)
     mb_probs = np.zeros((BATCH_SIZE, envs[0].action_space.n), dtype=np.float32)
-    mb_obs_next = np.zeros((BATCH_SIZE, ) + common.IMG_SHAPE, dtype=np.uint8)
+    mb_obs_next = np.zeros((BATCH_SIZE, ) + i2a.EM_OUT_SHAPE, dtype=np.float32)
     mb_actions = np.zeros((BATCH_SIZE, ), dtype=np.int32)
     mb_rewards = np.zeros((BATCH_SIZE, ), dtype=np.float32)
     obs = [e.reset() for e in envs]
@@ -45,7 +53,7 @@ def iterate_batches(envs, net, cuda=False):
             o, r, done, _ = e.step(actions[e_idx])
             mb_obs[batch_idx] = obs[e_idx]
             mb_probs[batch_idx] = probs[e_idx]
-            mb_obs_next[batch_idx] = o
+            mb_obs_next[batch_idx] = get_obs_diff(obs[e_idx], o)
             mb_actions[batch_idx] = actions[e_idx]
             mb_rewards[batch_idx] = r
 
@@ -78,13 +86,14 @@ if __name__ == "__main__":
     saves_path = os.path.join("saves", "02_env_" + args.name)
     os.makedirs(saves_path, exist_ok=True)
 
-    make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"))
+    make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"),
+                                                     stack_frames=common.FRAMES_COUNT)
     envs = [make_env() for _ in range(NUM_ENVS)]
     writer = SummaryWriter(comment="-02_env_" + args.name)
 
     net = common.AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
     net_em = i2a.EnvironmentModel(envs[0].observation_space.shape, envs[0].action_space.n)
-    net.load_state_dict(torch.load(args.model))
+    net.load_state_dict(torch.load(args.model, map_location=lambda storage, loc: storage))
     if args.cuda:
         net.cuda()
         net_em.cuda()
@@ -117,7 +126,7 @@ if __name__ == "__main__":
 
             optimizer.zero_grad()
             out_obs_next_v, out_reward_v = net_em(obs_v.float()/255, actions_t)
-            loss_obs_v = F.mse_loss(out_obs_next_v, obs_next_v.float()/255)
+            loss_obs_v = F.mse_loss(out_obs_next_v, obs_next_v)
             loss_rew_v = F.mse_loss(out_reward_v, rewards_v)
             loss_total_v = loss_obs_v + loss_rew_v
             loss_total_v.backward()
