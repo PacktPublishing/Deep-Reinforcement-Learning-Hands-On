@@ -18,7 +18,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
-    parser.add_argument("--seed", type=int, default=0, help="Random seed to use, default=disabled")
+    parser.add_argument("--seed", type=int, default=common.DEFAULT_SEED, help="Random seed to use, default=%d" % common.DEFAULT_SEED)
     parser.add_argument("--steps", type=int, default=None, help="Limit of training steps, default=disabled")
     args = parser.parse_args()
 

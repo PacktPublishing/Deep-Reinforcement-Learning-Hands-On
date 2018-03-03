@@ -8,6 +8,8 @@ import torch.nn.functional as F
 import torch.nn.utils as nn_utils
 from torch.autograd import Variable
 
+DEFAULT_SEED = 20
+
 NUM_ENVS = 16
 GAMMA = 0.99
 REWARD_STEPS = 5
