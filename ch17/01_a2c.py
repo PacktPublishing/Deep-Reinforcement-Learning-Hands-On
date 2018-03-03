@@ -44,7 +44,7 @@ if __name__ == "__main__":
     step_idx = 0
     best_reward = None
     best_test_reward = None
-    with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
+    with ptan.common.utils.TBMeanTracker(writer, batch_size=100) as tb_tracker:
         for mb_obs, mb_rewards, mb_actions, mb_values, done_rewards, done_steps in common.iterate_batches(envs, net, cuda=args.cuda):
             if len(done_rewards) > 0:
                 if best_reward is None:
