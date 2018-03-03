@@ -60,7 +60,7 @@ if __name__ == "__main__":
             common.train_a2c(net, mb_obs, mb_rewards, mb_actions, mb_values,
                              optimizer, tb_tracker, step_idx, cuda=args.cuda)
             step_idx += 1
-            if args.steps is not None and args.steps > step_idx:
+            if args.steps is not None and args.steps < step_idx:
                 break
 
             if step_idx % TEST_EVERY_BATCH == 0:
