@@ -135,12 +135,11 @@ class I2A(nn.Module):
         self.value = nn.Linear(512, 1)
 
         # used for rollouts
-        self.encoder = RolloutEncoder(input_shape)
+        self.encoder = RolloutEncoder(EM_OUT_SHAPE)
         self.action_selector = ptan.actions.ProbabilityActionSelector()
         # save refs without registering
         object.__setattr__(self, "net_em", net_em)
         object.__setattr__(self, "net_policy", net_policy)
-
 
     def _get_conv_out(self, shape):
         o = self.conv(Variable(torch.zeros(1, *shape)))
@@ -174,7 +173,10 @@ class I2A(nn.Module):
             obs_next_v, reward_v = self.net_em(obs_v, actions_t)
             step_obs.append(obs_next_v.detach())
             step_rewards.append(reward_v.detach())
-            obs_v = obs_next_v
+            # combine the delta from EM into new observation
+            cur_plane_v = obs_v[:, 1:2]
+            new_plane_v = cur_plane_v + obs_next_v
+            obs_v = torch.cat((cur_plane_v, new_plane_v), dim=1)
             # select actions
             logits_v, _ = self.net_policy(obs_v)
             probs_v = F.softmax(logits_v)
