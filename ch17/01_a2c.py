@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import os
-import gym
 import ptan
 import argparse
 from tensorboardX import SummaryWriter
@@ -24,11 +23,8 @@ if __name__ == "__main__":
     saves_path = os.path.join("saves", "01_a2c_" + args.name)
     os.makedirs(saves_path, exist_ok=True)
 
-    make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"),
-                                                     stack_frames=common.FRAMES_COUNT,
-                                                     reward_clipping=False)
-    envs = [make_env() for _ in range(common.NUM_ENVS)]
-    test_env = make_env()
+    envs = [common.make_env() for _ in range(common.NUM_ENVS)]
+    test_env = common.make_env(test=True)
     writer = SummaryWriter(comment="-01_a2c_" + args.name)
 
     net = common.AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)

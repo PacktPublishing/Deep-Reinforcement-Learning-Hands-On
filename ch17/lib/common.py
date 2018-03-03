@@ -1,3 +1,4 @@
+import gym
 import ptan
 import numpy as np
 
@@ -17,6 +18,12 @@ CLIP_GRAD = 0.5
 
 FRAMES_COUNT = 2
 IMG_SHAPE = (FRAMES_COUNT, 84, 84)
+
+
+def make_env(test=False):
+    return ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"),
+                                         stack_frames=FRAMES_COUNT,
+                                         reward_clipping=not test)
 
 
 class AtariA2C(nn.Module):
