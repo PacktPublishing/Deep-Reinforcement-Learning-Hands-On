@@ -2,6 +2,7 @@
 import ptan
 import gym
 import argparse
+import numpy as np
 
 from lib import common
 
@@ -14,10 +15,15 @@ if __name__ == "__main__":
     parser.add_argument("-m", "--model", required=True, help="Model file name")
     parser.add_argument("-w", "--write", required=True, help="Monitor directory name")
     parser.add_argument("--cuda", default=False, action="store_true")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed")
     args = parser.parse_args()
 
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+
     make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"),
-                                                     stack_frames=common.FRAMES_COUNT)
+                                                     stack_frames=common.FRAMES_COUNT,
+                                                     episodic_life=True, reward_clipping=False)
     env = make_env()
     env = gym.wrappers.Monitor(env, args.write)
     net = common.AtariA2C(env.observation_space.shape, env.action_space.n)
@@ -30,6 +36,7 @@ if __name__ == "__main__":
     obs = env.reset()
     total_reward = 0.0
     total_steps = 0
+    episodes = 0
 
     while True:
         obs_v = ptan.agent.default_states_preprocessor([obs], cuda=args.cuda)
@@ -37,11 +44,15 @@ if __name__ == "__main__":
         probs_v = F.softmax(logits_v)
         probs = probs_v.data.cpu().numpy()
         actions = act_selector(probs)
-        o, r, done, _ = env.step(actions[0])
+        obs, r, done, _ = env.step(actions[0])
         total_reward += r
         total_steps += 1
         if done:
-            break
+            obs = env.reset()
+            print("Episode %d is over, reward so far %.2f" % (episodes, total_reward))
+            episodes += 1
+            if episodes >= 10:
+                break
 
     print("Done in %d steps, reward %.2f" % (total_steps, total_reward))
 

@@ -87,7 +87,8 @@ if __name__ == "__main__":
     os.makedirs(saves_path, exist_ok=True)
 
     make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"),
-                                                     stack_frames=common.FRAMES_COUNT)
+                                                     stack_frames=common.FRAMES_COUNT,
+                                                     reward_clipping=False)
     envs = [make_env() for _ in range(NUM_ENVS)]
     writer = SummaryWriter(comment="-02_env_" + args.name)
 
