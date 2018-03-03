@@ -26,6 +26,17 @@ def make_env(test=False):
                                          reward_clipping=not test)
 
 
+def set_seed(seed, envs=None, cuda=False):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if cuda:
+        torch.cuda.manual_seed(seed)
+
+    if envs:
+        for idx, env in enumerate(envs):
+            env.seed(seed + idx)
+
+
 class AtariA2C(nn.Module):
     def __init__(self, input_shape, n_actions):
         super(AtariA2C, self).__init__()

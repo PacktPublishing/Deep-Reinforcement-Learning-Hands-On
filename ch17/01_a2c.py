@@ -18,14 +18,22 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed to use, default=disabled")
+    parser.add_argument("--steps", type=int, default=None, help="Limit of training steps, default=disabled")
     args = parser.parse_args()
 
     saves_path = os.path.join("saves", "01_a2c_" + args.name)
     os.makedirs(saves_path, exist_ok=True)
 
     envs = [common.make_env() for _ in range(common.NUM_ENVS)]
+    if args.seed:
+        common.set_seed(args.seed, envs, cuda=args.cuda)
+        suffix = "-seed=%d" % args.seed
+    else:
+        suffix = ""
+
     test_env = common.make_env(test=True)
-    writer = SummaryWriter(comment="-01_a2c_" + args.name)
+    writer = SummaryWriter(comment="-01_a2c_" + args.name + suffix)
 
     net = common.AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
     if args.cuda:
