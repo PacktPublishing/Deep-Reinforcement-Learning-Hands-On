@@ -22,10 +22,15 @@ FRAMES_COUNT = 2
 IMG_SHAPE = (FRAMES_COUNT, 84, 84)
 
 
-def make_env(test=False):
+def make_env(test=False, clip=True):
+    if test:
+        args = {'reward_clipping': False,
+                'episodic_life': False}
+    else:
+        args = {'reward_clipping': clip}
     return ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"),
                                          stack_frames=FRAMES_COUNT,
-                                         reward_clipping=not test)
+                                         **args)
 
 
 def set_seed(seed, envs=None, cuda=False):
