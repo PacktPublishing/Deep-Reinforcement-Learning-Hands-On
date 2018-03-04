@@ -22,6 +22,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable CUDA")
     parser.add_argument("--em", required=True, help="Environment model file name")
     parser.add_argument("--policy", required=True, help="Initial policy network")
+    parser.add_argument("--seed", type=int, default=common.DEFAULT_SEED, help="Random seed to use, default=%d" % common.DEFAULT_SEED)
     args = parser.parse_args()
 
     saves_path = os.path.join("saves", "03_i2a_" + args.name)
@@ -29,7 +30,13 @@ if __name__ == "__main__":
 
     envs = [common.make_env() for _ in range(common.NUM_ENVS)]
     test_env = common.make_env(test=True)
-    writer = SummaryWriter(comment="-03_i2a_" + args.name)
+
+    if args.seed:
+        common.set_seed(args.seed, envs, cuda=args.cuda)
+        suffix = "-seed=%d" % args.seed
+    else:
+        suffix = ""
+    writer = SummaryWriter(comment="-03_i2a_" + args.name + suffix)
 
     obs_shape = envs[0].observation_space.shape
     act_n = envs[0].action_space.n
