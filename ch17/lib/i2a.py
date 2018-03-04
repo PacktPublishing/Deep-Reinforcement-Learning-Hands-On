@@ -146,8 +146,9 @@ class I2A(nn.Module):
         return int(np.prod(o.size()))
 
     def forward(self, x):
-        fx = x.float() / 256
-        enc_rollouts = self.batch_rollouts(fx)
+        fx = x.float() / 255
+#        enc_rollouts = self.batch_rollouts(fx)
+        enc_rollouts = self.rollouts_batch(fx)
         conv_out = self.conv(fx).view(fx.size()[0], -1)
         fc_in = torch.cat((conv_out, enc_rollouts), dim=1)
         fc_out = self.fc(fc_in)
@@ -160,6 +161,42 @@ class I2A(nn.Module):
             enc = self.rollout(item)
             rolls.append(enc)
         return torch.stack(rolls)
+
+    def rollouts_batch(self, batch):
+        batch_size = batch.size()[0]
+        batch_rest = batch.size()[1:]
+        if batch_size == 1:
+            obs_batch_v = batch.expand(batch_size * self.n_actions, *batch_rest)
+        else:
+            obs_batch_v = batch.unsqueeze(1)
+            obs_batch_v = obs_batch_v.expand(batch_size, self.n_actions, *batch_rest)
+            obs_batch_v = obs_batch_v.contiguous().view(-1, *batch_rest)
+        actions = np.tile(np.arange(0, self.n_actions, dtype=np.int64), batch_size)
+        step_obs, step_rewards = [], []
+
+        for step_idx in range(self.rollout_steps):
+            actions_t = torch.from_numpy(actions)
+            if batch.is_cuda:
+                actions_t = actions_t.cuda()
+            obs_next_v, reward_v = self.net_em(obs_batch_v, actions_t)
+            step_obs.append(obs_next_v.detach())
+            step_rewards.append(reward_v.detach())
+            # don't need actions for the last step
+            if step_idx == self.rollout_steps-1:
+                break
+            # combine the delta from EM into new observation
+            cur_plane_v = obs_batch_v[:, 1:2]
+            new_plane_v = cur_plane_v + obs_next_v
+            obs_batch_v = torch.cat((cur_plane_v, new_plane_v), dim=1)
+            # select actions
+            logits_v, _ = self.net_policy(obs_batch_v)
+            probs_v = F.softmax(logits_v)
+            probs = probs_v.data.cpu().numpy()
+            actions = self.action_selector(probs)
+        step_obs_v = torch.stack(step_obs)
+        step_rewards_v = torch.stack(step_rewards)
+        flat_enc_v = self.encoder(step_obs_v, step_rewards_v)
+        return flat_enc_v.view(batch_size, -1)
 
     def rollout(self, obs):
         obs_v = obs.expand(self.n_actions, *obs.size())
