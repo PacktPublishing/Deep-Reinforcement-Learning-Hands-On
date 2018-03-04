@@ -97,6 +97,7 @@ def iterate_batches(envs, net, cuda=False):
     mb_rewards = np.zeros((NUM_ENVS, REWARD_STEPS), dtype=np.float32)
     mb_values = np.zeros((NUM_ENVS, REWARD_STEPS), dtype=np.float32)
     mb_actions = np.zeros((NUM_ENVS, REWARD_STEPS), dtype=np.int32)
+    mb_probs = np.zeros((NUM_ENVS, REWARD_STEPS), dtype=np.float32)
 
     while True:
         batch_dones = [[dones[-1]] for dones in batch_dones]
@@ -109,7 +110,9 @@ def iterate_batches(envs, net, cuda=False):
                 obs_v = obs_v.cuda()
             logits_v, values_v = net(obs_v)
             probs_v = F.softmax(logits_v)
-            actions = act_selector(probs_v.data.cpu().numpy())
+            probs = probs_v.data.cpu().numpy()
+            actions = act_selector(probs)
+            mb_probs[:, n] = probs
             mb_actions[:, n] = actions
             mb_values[:, n] = values_v.squeeze().data.cpu().numpy()
             for e_idx, e in enumerate(envs):
@@ -142,7 +145,9 @@ def iterate_batches(envs, net, cuda=False):
         out_mb_rewards = mb_rewards.flatten()
         out_mb_actions = mb_actions.flatten()
         out_mb_values = mb_values.flatten()
-        yield out_mb_obs, out_mb_rewards, out_mb_actions, out_mb_values, np.array(done_rewards), np.array(done_steps)
+        out_mb_probs = mb_probs.flatten()
+        yield out_mb_obs, out_mb_rewards, out_mb_actions, out_mb_values, out_mb_probs, \
+              np.array(done_rewards), np.array(done_steps)
 
 
 def train_a2c(net, mb_obs, mb_rewards, mb_actions, mb_values, optimizer, tb_tracker, step_idx, cuda=False):
@@ -178,6 +183,7 @@ def train_a2c(net, mb_obs, mb_rewards, mb_actions, mb_values, optimizer, tb_trac
     tb_tracker.track("loss_policy", loss_policy_v, step_idx)
     tb_tracker.track("loss_value", loss_value_v, step_idx)
     tb_tracker.track("loss_total", loss_v, step_idx)
+    return obs_v
 
 
 def test_model(env, net, rounds=3, cuda=False):

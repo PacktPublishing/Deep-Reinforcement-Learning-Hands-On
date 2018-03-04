@@ -48,7 +48,7 @@ if __name__ == "__main__":
     ts_start = time.time()
     best_test_reward = None
     with ptan.common.utils.TBMeanTracker(writer, batch_size=100) as tb_tracker:
-        for mb_obs, mb_rewards, mb_actions, mb_values, done_rewards, done_steps in common.iterate_batches(envs, net, cuda=args.cuda):
+        for mb_obs, mb_rewards, mb_actions, mb_values, _, done_rewards, done_steps in common.iterate_batches(envs, net, cuda=args.cuda):
             if len(done_rewards) > 0:
                 total_steps += sum(done_steps)
                 speed = total_steps / (time.time() - ts_start)

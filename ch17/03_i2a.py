@@ -9,11 +9,14 @@ from lib import common, i2a
 
 import torch.optim as optim
 import torch
+import torch.nn.functional as F
+
 from tensorboardX import SummaryWriter
 
 
 ROLLOUTS_STEPS = 2
 LEARNING_RATE = 1e-4
+POLICY_LR = 1e-4
 TEST_EVERY_BATCH = 100
 
 
@@ -22,7 +25,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable CUDA")
     parser.add_argument("--em", required=True, help="Environment model file name")
-    parser.add_argument("--policy", required=True, help="Initial policy network")
+#    parser.add_argument("--policy", required=True, help="Initial policy network")
     parser.add_argument("--seed", type=int, default=common.DEFAULT_SEED, help="Random seed to use, default=%d" % common.DEFAULT_SEED)
     args = parser.parse_args()
 
@@ -43,7 +46,7 @@ if __name__ == "__main__":
     act_n = envs[0].action_space.n
 
     net_policy = common.AtariA2C(obs_shape, act_n)
-    net_policy.load_state_dict(torch.load(args.policy, map_location=lambda storage, loc: storage))
+#    net_policy.load_state_dict(torch.load(args.policy, map_location=lambda storage, loc: storage))
 
     net_em = i2a.EnvironmentModel(obs_shape, act_n)
     net_em.load_state_dict(torch.load(args.em, map_location=lambda storage, loc: storage))
@@ -62,6 +65,7 @@ if __name__ == "__main__":
     res = net_i2a(obs_v)
 
     optimizer = optim.RMSprop(net_i2a.parameters(), lr=LEARNING_RATE, eps=1e-5)
+    policy_opt = optim.Adam(net_policy.parameters(), lr=POLICY_LR)
 
     step_idx = 0
     total_steps = 0
@@ -69,7 +73,8 @@ if __name__ == "__main__":
     best_reward = None
     best_test_reward = None
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
-        for mb_obs, mb_rewards, mb_actions, mb_values, done_rewards, done_steps in common.iterate_batches(envs, net_i2a, cuda=args.cuda):
+        for mb_obs, mb_rewards, mb_actions, mb_values, mb_probs, done_rewards, done_steps in \
+                common.iterate_batches(envs, net_i2a, cuda=args.cuda):
             if len(done_rewards) > 0:
                 total_steps += sum(done_steps)
                 speed = total_steps / (time.time() - ts_start)
@@ -83,8 +88,20 @@ if __name__ == "__main__":
                 print("%d: done %d episodes, mean_reward=%.2f, best_reward=%.2f, speed=%.2f f/s" % (
                     step_idx, len(done_rewards), done_rewards.mean(), best_reward, speed))
 
-            common.train_a2c(net_i2a, mb_obs, mb_rewards, mb_actions, mb_values,
-                             optimizer, tb_tracker, step_idx, cuda=args.cuda)
+            obs_v = common.train_a2c(net_i2a, mb_obs, mb_rewards, mb_actions, mb_values,
+                                     optimizer, tb_tracker, step_idx, cuda=args.cuda)
+            # policy distillation
+            probs_v = torch.from_numpy(mb_probs)
+            if args.cuda:
+                probs_v = probs_v.cuda()
+            policy_opt.zero_grad()
+            logits_v, _ = net_policy(obs_v)
+            policy_loss_v = -F.log_softmax(logits_v) * probs_v
+            policy_loss_v = policy_loss_v.sum(dim=1).mean()
+            policy_loss_v.backward()
+            policy_opt.step()
+            tb_tracker.track("loss_distill", policy_loss_v, step_idx)
+
             step_idx += 1
 
             if step_idx % TEST_EVERY_BATCH == 0:
