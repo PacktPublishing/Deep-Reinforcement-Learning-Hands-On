@@ -25,7 +25,7 @@ if __name__ == "__main__":
     saves_path = os.path.join("saves", "01_a2c_" + args.name)
     os.makedirs(saves_path, exist_ok=True)
 
-    envs = [common.make_env(clip=False) for _ in range(common.NUM_ENVS)]
+    envs = [common.make_env() for _ in range(common.NUM_ENVS)]
     if args.seed:
         common.set_seed(args.seed, envs, cuda=args.cuda)
         suffix = "-seed=%d" % args.seed
