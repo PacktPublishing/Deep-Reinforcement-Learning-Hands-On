@@ -10,6 +10,7 @@ from lib import common, i2a
 import torch.optim as optim
 import torch
 import torch.nn.functional as F
+from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
@@ -91,7 +92,7 @@ if __name__ == "__main__":
             obs_v = common.train_a2c(net_i2a, mb_obs, mb_rewards, mb_actions, mb_values,
                                      optimizer, tb_tracker, step_idx, cuda=args.cuda)
             # policy distillation
-            probs_v = torch.from_numpy(mb_probs)
+            probs_v = Variable(torch.from_numpy(mb_probs))
             if args.cuda:
                 probs_v = probs_v.cuda()
             policy_opt.zero_grad()

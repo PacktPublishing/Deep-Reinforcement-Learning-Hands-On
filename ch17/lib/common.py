@@ -88,6 +88,7 @@ def discount_with_dones(rewards, dones, gamma):
 
 
 def iterate_batches(envs, net, cuda=False):
+    n_actions = envs[0].action_space.n
     act_selector = ptan.actions.ProbabilityActionSelector()
     obs = [e.reset() for e in envs]
     batch_dones = [[False] for _ in range(NUM_ENVS)]
@@ -97,7 +98,7 @@ def iterate_batches(envs, net, cuda=False):
     mb_rewards = np.zeros((NUM_ENVS, REWARD_STEPS), dtype=np.float32)
     mb_values = np.zeros((NUM_ENVS, REWARD_STEPS), dtype=np.float32)
     mb_actions = np.zeros((NUM_ENVS, REWARD_STEPS), dtype=np.int32)
-    mb_probs = np.zeros((NUM_ENVS, REWARD_STEPS), dtype=np.float32)
+    mb_probs = np.zeros((NUM_ENVS, REWARD_STEPS, n_actions), dtype=np.float32)
 
     while True:
         batch_dones = [[dones[-1]] for dones in batch_dones]
