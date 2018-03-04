@@ -106,8 +106,8 @@ if __name__ == "__main__":
             if len(done_rewards) > 0:
                 m_reward = np.mean(done_rewards)
                 m_steps = np.mean(done_steps)
-                print("%d: done %d episodes, mean reward=%.2f, steps=%.2f, best_loss=%.4e" % (
-                    step_idx, len(done_rewards), m_reward, m_steps, best_loss))
+                print("%d: done %d episodes, mean reward=%.2f, steps=%.2f" % (
+                    step_idx, len(done_rewards), m_reward, m_steps))
                 tb_tracker.track("total_reward", m_reward, step_idx)
                 tb_tracker.track("total_steps", m_steps, step_idx)
 

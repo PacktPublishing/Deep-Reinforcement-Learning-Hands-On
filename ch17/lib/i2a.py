@@ -23,23 +23,23 @@ class EnvironmentModel(nn.Module):
         # input color planes will be equal to frames plus one-hot encoded actions
         n_planes = input_shape[0] + n_actions
         self.conv1 = nn.Sequential(
-            nn.Conv2d(n_planes, 32, kernel_size=4, stride=4, padding=1),
+            nn.Conv2d(n_planes, 64, kernel_size=4, stride=4, padding=1),
             nn.ReLU(),
-            nn.Conv2d(32, 32, kernel_size=3, padding=1),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1),
             nn.ReLU(),
         )
         self.conv2 = nn.Sequential(
-            nn.Conv2d(32, 32, kernel_size=3, padding=1),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1),
             nn.ReLU()
         )
         # output is one single frame with delta from the current frame
-        self.deconv = nn.ConvTranspose2d(32, 1, kernel_size=4, stride=4, padding=0)
+        self.deconv = nn.ConvTranspose2d(64, 1, kernel_size=4, stride=4, padding=0)
 
         self.reward_conv = nn.Sequential(
-            nn.Conv2d(32, 32, kernel_size=3),
+            nn.Conv2d(64, 64, kernel_size=3),
             nn.MaxPool2d(2),
             nn.ReLU(),
-            nn.Conv2d(32, 32, kernel_size=3),
+            nn.Conv2d(64, 64, kernel_size=3),
             nn.MaxPool2d(2),
             nn.ReLU()
         )
