@@ -12,7 +12,7 @@ from tensorboardX import SummaryWriter
 
 
 ROLLOUTS_STEPS = 5
-LEARNING_RATE = 7e-4
+LEARNING_RATE = 1e-4
 TEST_EVERY_BATCH = 100
 
 
@@ -27,10 +27,8 @@ if __name__ == "__main__":
     saves_path = os.path.join("saves", "03_i2a_" + args.name)
     os.makedirs(saves_path, exist_ok=True)
 
-    make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"),
-                                                     stack_frames=common.FRAMES_COUNT)
-    envs = [make_env() for _ in range(common.NUM_ENVS)]
-    test_env = make_env()
+    envs = [common.make_env() for _ in range(common.NUM_ENVS)]
+    test_env = common.make_env(test=True)
     writer = SummaryWriter(comment="-03_i2a_" + args.name)
 
     obs_shape = envs[0].observation_space.shape
