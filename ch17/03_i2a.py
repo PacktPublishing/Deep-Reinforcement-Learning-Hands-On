@@ -90,8 +90,8 @@ if __name__ == "__main__":
 
             if step_idx % TEST_EVERY_BATCH == 0:
                 test_reward, test_steps = common.test_model(test_env, net_i2a, cuda=args.cuda)
-                tb_tracker.track("test_reward", test_reward, step_idx)
-                tb_tracker.track("test_steps", test_steps, step_idx)
+                writer.add_scalar("test_reward", test_reward, step_idx)
+                writer.add_scalar("test_steps", test_steps, step_idx)
                 if best_test_reward is None or best_test_reward < test_reward:
                     if best_test_reward is not None:
                         fname = os.path.join(saves_path, "best_%08.3f_%d.dat" % (test_reward, step_idx))
