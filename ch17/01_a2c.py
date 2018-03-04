@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import ptan
+import time
 import argparse
 from tensorboardX import SummaryWriter
 
@@ -42,11 +43,15 @@ if __name__ == "__main__":
     optimizer = optim.RMSprop(net.parameters(), lr=LEARNING_RATE, eps=1e-5)
 
     step_idx = 0
+    total_steps = 0
     best_reward = None
+    ts_start = time.time()
     best_test_reward = None
     with ptan.common.utils.TBMeanTracker(writer, batch_size=100) as tb_tracker:
         for mb_obs, mb_rewards, mb_actions, mb_values, done_rewards, done_steps in common.iterate_batches(envs, net, cuda=args.cuda):
             if len(done_rewards) > 0:
+                total_steps += sum(done_steps)
+                speed = total_steps / (time.time() - ts_start)
                 if best_reward is None:
                     best_reward = done_rewards.max()
                 elif best_reward < done_rewards.max():
@@ -54,8 +59,9 @@ if __name__ == "__main__":
                 tb_tracker.track("total_reward_max", best_reward, step_idx)
                 tb_tracker.track("total_reward", done_rewards, step_idx)
                 tb_tracker.track("total_steps", done_steps, step_idx)
-                print("%d: done %d episodes, mean_reward=%.2f, best_reward=%.2f" % (
-                    step_idx, len(done_rewards), done_rewards.mean(), best_reward))
+                tb_tracker.track("speed", speed, step_idx)
+                print("%d: done %d episodes, mean_reward=%.2f, best_reward=%.2f, speed=%.2f" % (
+                    step_idx, len(done_rewards), done_rewards.mean(), best_reward, speed))
 
             common.train_a2c(net, mb_obs, mb_rewards, mb_actions, mb_values,
                              optimizer, tb_tracker, step_idx, cuda=args.cuda)
