@@ -18,7 +18,8 @@ LEARNING_RATE = 5e-4
 NUM_ENVS = 16
 BATCH_SIZE = 64
 SAVE_EVERY_BATCH = 1000
-
+OBS_WEIGHT = 10.0
+REWARD_WEIGHT = 1.0
 
 def get_obs_diff(prev_obs, cur_obs):
     prev = np.array(prev_obs)[-1]
@@ -126,7 +127,7 @@ if __name__ == "__main__":
             out_obs_next_v, out_reward_v = net_em(obs_v.float()/255, actions_t)
             loss_obs_v = F.mse_loss(out_obs_next_v, obs_next_v)
             loss_rew_v = F.mse_loss(out_reward_v, rewards_v)
-            loss_total_v = loss_obs_v + loss_rew_v
+            loss_total_v = OBS_WEIGHT * loss_obs_v + REWARD_WEIGHT * loss_rew_v
             loss_total_v.backward()
             # imag_policy_logits_v = net_imag_policy(obs_v)
             # imag_policy_loss_v = -F.log_softmax(imag_policy_logits_v) * probs_v

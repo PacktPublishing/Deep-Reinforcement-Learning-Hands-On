@@ -23,7 +23,7 @@ if __name__ == "__main__":
 
     make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"),
                                                      stack_frames=common.FRAMES_COUNT,
-                                                     episodic_life=True, reward_clipping=False)
+                                                     episodic_life=False, reward_clipping=False)
     env = make_env()
     env = gym.wrappers.Monitor(env, args.write)
     net = common.AtariA2C(env.observation_space.shape, env.action_space.n)
@@ -36,7 +36,6 @@ if __name__ == "__main__":
     obs = env.reset()
     total_reward = 0.0
     total_steps = 0
-    episodes = 0
 
     while True:
         obs_v = ptan.agent.default_states_preprocessor([obs], cuda=args.cuda)
@@ -48,11 +47,7 @@ if __name__ == "__main__":
         total_reward += r
         total_steps += 1
         if done:
-            obs = env.reset()
-            print("Episode %d is over, reward so far %.2f" % (episodes, total_reward))
-            episodes += 1
-            if episodes >= 10:
-                break
+            break
 
     print("Done in %d steps, reward %.2f" % (total_steps, total_reward))
 
