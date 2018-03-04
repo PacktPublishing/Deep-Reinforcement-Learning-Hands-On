@@ -59,7 +59,6 @@ if __name__ == "__main__":
                 tb_tracker.track("total_reward_max", best_reward, step_idx)
                 tb_tracker.track("total_reward", done_rewards, step_idx)
                 tb_tracker.track("total_steps", done_steps, step_idx)
-                tb_tracker.track("speed", speed, step_idx)
                 print("%d: done %d episodes, mean_reward=%.2f, best_reward=%.2f, speed=%.2f" % (
                     step_idx, len(done_rewards), done_rewards.mean(), best_reward, speed))
 
