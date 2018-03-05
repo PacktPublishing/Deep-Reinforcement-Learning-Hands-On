@@ -147,20 +147,11 @@ class I2A(nn.Module):
 
     def forward(self, x):
         fx = x.float() / 255
-#        enc_rollouts = self.batch_rollouts(fx)
         enc_rollouts = self.rollouts_batch(fx)
         conv_out = self.conv(fx).view(fx.size()[0], -1)
         fc_in = torch.cat((conv_out, enc_rollouts), dim=1)
         fc_out = self.fc(fc_in)
         return self.policy(fc_out), self.value(fc_out)
-
-    def batch_rollouts(self, batch):
-        rolls = []
-        for idx in range(batch.size()[0]):
-            item = batch[idx]
-            enc = self.rollout(item)
-            rolls.append(enc)
-        return torch.stack(rolls)
 
     def rollouts_batch(self, batch):
         batch_size = batch.size()[0]
@@ -197,29 +188,3 @@ class I2A(nn.Module):
         step_rewards_v = torch.stack(step_rewards)
         flat_enc_v = self.encoder(step_obs_v, step_rewards_v)
         return flat_enc_v.view(batch_size, -1)
-
-    def rollout(self, obs):
-        obs_v = obs.expand(self.n_actions, *obs.size())
-        actions = np.arange(0, self.n_actions, dtype=np.int64)
-        step_obs, step_rewards = [], []
-
-        for step_idx in range(self.rollout_steps):
-            actions_t = torch.from_numpy(actions)
-            if obs.is_cuda:
-                actions_t = actions_t.cuda()
-            obs_next_v, reward_v = self.net_em(obs_v, actions_t)
-            step_obs.append(obs_next_v.detach())
-            step_rewards.append(reward_v.detach())
-            # combine the delta from EM into new observation
-            cur_plane_v = obs_v[:, 1:2]
-            new_plane_v = cur_plane_v + obs_next_v
-            obs_v = torch.cat((cur_plane_v, new_plane_v), dim=1)
-            # select actions
-            logits_v, _ = self.net_policy(obs_v)
-            probs_v = F.softmax(logits_v)
-            probs = probs_v.data.cpu().numpy()
-            actions = self.action_selector(probs)
-
-        step_obs_v = torch.stack(step_obs)
-        step_rewards_v = torch.stack(step_rewards)
-        return self.encoder(step_obs_v, step_rewards_v)

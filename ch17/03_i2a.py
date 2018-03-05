@@ -15,7 +15,7 @@ from torch.autograd import Variable
 from tensorboardX import SummaryWriter
 
 
-ROLLOUTS_STEPS = 2
+ROLLOUTS_STEPS = 5
 LEARNING_RATE = 1e-4
 POLICY_LR = 1e-4
 TEST_EVERY_BATCH = 100
@@ -26,7 +26,6 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable CUDA")
     parser.add_argument("--em", required=True, help="Environment model file name")
-#    parser.add_argument("--policy", required=True, help="Initial policy network")
     parser.add_argument("--seed", type=int, default=common.DEFAULT_SEED, help="Random seed to use, default=%d" % common.DEFAULT_SEED)
     args = parser.parse_args()
 
@@ -47,7 +46,6 @@ if __name__ == "__main__":
     act_n = envs[0].action_space.n
 
     net_policy = common.AtariA2C(obs_shape, act_n)
-#    net_policy.load_state_dict(torch.load(args.policy, map_location=lambda storage, loc: storage))
 
     net_em = i2a.EnvironmentModel(obs_shape, act_n)
     net_em.load_state_dict(torch.load(args.em, map_location=lambda storage, loc: storage))
