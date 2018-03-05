@@ -8,7 +8,7 @@ from torch.autograd import Variable
 
 from . import common
 
-ROLLOUT_HIDDEN = 256
+ROLLOUT_HIDDEN = 64
 
 EM_OUT_SHAPE = (1, ) + common.IMG_SHAPE[1:]
 
