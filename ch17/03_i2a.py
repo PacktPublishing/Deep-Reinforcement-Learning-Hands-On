@@ -15,7 +15,7 @@ from torch.autograd import Variable
 from tensorboardX import SummaryWriter
 
 
-ROLLOUTS_STEPS = 5
+ROLLOUTS_STEPS = 1
 LEARNING_RATE = 1e-4
 POLICY_LR = 1e-4
 TEST_EVERY_BATCH = 100
