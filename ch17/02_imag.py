@@ -32,7 +32,6 @@ def get_obs_diff(prev_obs, cur_obs):
 def iterate_batches(envs, net, cuda=False):
     act_selector = ptan.actions.ProbabilityActionSelector()
     mb_obs = np.zeros((BATCH_SIZE, ) + common.IMG_SHAPE, dtype=np.uint8)
-    mb_probs = np.zeros((BATCH_SIZE, envs[0].action_space.n), dtype=np.float32)
     mb_obs_next = np.zeros((BATCH_SIZE, ) + i2a.EM_OUT_SHAPE, dtype=np.float32)
     mb_actions = np.zeros((BATCH_SIZE, ), dtype=np.int32)
     mb_rewards = np.zeros((BATCH_SIZE, ), dtype=np.float32)
@@ -53,7 +52,6 @@ def iterate_batches(envs, net, cuda=False):
         for e_idx, e in enumerate(envs):
             o, r, done, _ = e.step(actions[e_idx])
             mb_obs[batch_idx] = obs[e_idx]
-            mb_probs[batch_idx] = probs[e_idx]
             mb_obs_next[batch_idx] = get_obs_diff(obs[e_idx], o)
             mb_actions[batch_idx] = actions[e_idx]
             mb_rewards[batch_idx] = r
@@ -63,7 +61,7 @@ def iterate_batches(envs, net, cuda=False):
 
             batch_idx = (batch_idx + 1) % BATCH_SIZE
             if batch_idx == 0:
-                yield mb_obs, mb_probs, mb_obs_next, mb_actions, mb_rewards, done_rewards, done_steps
+                yield mb_obs, mb_obs_next, mb_actions, mb_rewards, done_rewards, done_steps
                 done_rewards.clear()
                 done_steps.clear()
             if done:
@@ -102,7 +100,7 @@ if __name__ == "__main__":
     step_idx = 0
     best_loss = np.inf
     with ptan.common.utils.TBMeanTracker(writer, batch_size=100) as tb_tracker:
-        for mb_obs, mb_probs, mb_obs_next, mb_actions, mb_rewards, done_rewards, done_steps in iterate_batches(envs, net, cuda=args.cuda):
+        for mb_obs, mb_obs_next, mb_actions, mb_rewards, done_rewards, done_steps in iterate_batches(envs, net, cuda=args.cuda):
             if len(done_rewards) > 0:
                 m_reward = np.mean(done_rewards)
                 m_steps = np.mean(done_steps)
@@ -112,13 +110,11 @@ if __name__ == "__main__":
                 tb_tracker.track("total_steps", m_steps, step_idx)
 
             obs_v = Variable(torch.from_numpy(mb_obs))
-            probs_v = Variable(torch.from_numpy(mb_probs))
             obs_next_v = Variable(torch.from_numpy(mb_obs_next))
             actions_t = torch.LongTensor(mb_actions.tolist())
             rewards_v = Variable(torch.from_numpy(mb_rewards))
             if args.cuda:
                 obs_v = obs_v.cuda()
-                probs_v = probs_v.cuda()
                 actions_t = actions_t.cuda()
                 obs_next_v = obs_next_v.cuda()
                 rewards_v = rewards_v.cuda()
