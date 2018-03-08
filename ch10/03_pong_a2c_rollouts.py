@@ -121,10 +121,13 @@ if __name__ == "__main__":
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
 
+    step_idx = 0
 
     with common.RewardTracker(writer, stop_reward=18) as tracker:
         with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
-            for step_idx, (mb_states, mb_rewards, mb_actions, mb_values) in enumerate(exp_source):
+            for mb_states, mb_rewards, mb_actions, mb_values in exp_source:
+                step_idx += REWARD_STEPS
+
                 # handle new rewards
                 new_rewards = exp_source.pop_total_rewards()
                 if new_rewards:
