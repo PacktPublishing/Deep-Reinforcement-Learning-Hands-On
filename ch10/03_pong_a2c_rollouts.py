@@ -126,7 +126,7 @@ if __name__ == "__main__":
     with common.RewardTracker(writer, stop_reward=18) as tracker:
         with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
             for mb_states, mb_rewards, mb_actions, mb_values in exp_source:
-                step_idx += REWARD_STEPS
+                step_idx += REWARD_STEPS * NUM_ENVS
 
                 # handle new rewards
                 new_rewards = exp_source.pop_total_rewards()
