@@ -15,7 +15,7 @@ from torch.autograd import Variable
 from lib import common
 
 GAMMA = 0.99
-LEARNING_RATE = 0.001
+LEARNING_RATE = 5e-4
 ENTROPY_BETA = 0.01
 NUM_ENVS = 16
 
@@ -101,15 +101,27 @@ def unpack_batch(batch, net, cuda=False):
     return states_v, actions_t, ref_vals_v
 
 
+def set_seed(seed, envs=None, cuda=False):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if cuda:
+        torch.cuda.manual_seed(seed)
+
+    if envs:
+        for idx, env in enumerate(envs):
+            env.seed(seed + idx)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
 
-    make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
+    make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"))
     envs = [make_env() for _ in range(NUM_ENVS)]
     writer = SummaryWriter(comment="-pong-a2c-rollouts_" + args.name)
+    set_seed(20, envs, cuda=args.cuda)
 
     net = AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
     if args.cuda:
@@ -119,21 +131,19 @@ if __name__ == "__main__":
     agent = ptan.agent.ActorCriticAgent(net, apply_softmax=True, cuda=args.cuda)
     exp_source = ptan.experience.ExperienceSourceRollouts(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
+    optimizer = optim.RMSprop(net.parameters(), lr=LEARNING_RATE, eps=1e-5)
 
     step_idx = 0
 
     with common.RewardTracker(writer, stop_reward=18) as tracker:
         with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
             for mb_states, mb_rewards, mb_actions, mb_values in exp_source:
-                step_idx += REWARD_STEPS * NUM_ENVS
-
                 # handle new rewards
                 new_rewards = exp_source.pop_total_rewards()
                 if new_rewards:
-                    if tracker.reward(np.mean(new_rewards), step_idx):
-                        break
+                    tracker.reward(np.mean(new_rewards), step_idx)
 
+                optimizer.zero_grad()
                 states_v = ptan.agent.default_states_preprocessor(mb_states, cuda=args.cuda)
                 mb_adv = mb_rewards - mb_values
                 adv_v = Variable(torch.from_numpy(mb_adv))
@@ -144,9 +154,7 @@ if __name__ == "__main__":
                     actions_t = actions_t.cuda()
                     vals_ref_v = vals_ref_v.cuda()
 
-                optimizer.zero_grad()
                 logits_v, value_v = net(states_v)
-
                 loss_value_v = F.mse_loss(value_v, vals_ref_v)
 
                 log_prob_v = F.log_softmax(logits_v)
@@ -154,13 +162,13 @@ if __name__ == "__main__":
                 loss_policy_v = -log_prob_actions_v.mean()
 
                 prob_v = F.softmax(logits_v)
-                entropy_loss_v = ENTROPY_BETA * (prob_v * log_prob_v).sum(dim=1).mean()
+                entropy_loss_v = (prob_v * log_prob_v).sum(dim=1).mean()
 
                 # apply entropy and value gradients
-                loss_v = loss_policy_v + entropy_loss_v + loss_value_v
+                loss_v = loss_policy_v + ENTROPY_BETA * entropy_loss_v + loss_value_v
                 loss_v.backward()
                 nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
-                optimizer.step()
+#                optimizer.step()
 
                 tb_tracker.track("advantage",       adv_v, step_idx)
                 tb_tracker.track("values",          value_v, step_idx)
@@ -169,3 +177,4 @@ if __name__ == "__main__":
                 tb_tracker.track("loss_policy",     loss_policy_v, step_idx)
                 tb_tracker.track("loss_value",      loss_value_v, step_idx)
                 tb_tracker.track("loss_total",      loss_v, step_idx)
+                step_idx += 1
