@@ -159,7 +159,7 @@ def train_a2c(net, mb_obs, mb_rewards, mb_actions, mb_values, optimizer, tb_trac
     loss_v = ENTROPY_BETA * entropy_loss_v + loss_value_v + loss_policy_v
     loss_v.backward()
     nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
-#    optimizer.step()
+    optimizer.step()
 
     tb_tracker.track("advantage", mb_adv, step_idx)
     tb_tracker.track("values", values_v, step_idx)
