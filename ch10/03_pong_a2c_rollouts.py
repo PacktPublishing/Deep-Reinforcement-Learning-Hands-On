@@ -141,7 +141,8 @@ if __name__ == "__main__":
                 # handle new rewards
                 new_rewards = exp_source.pop_total_rewards()
                 if new_rewards:
-                    tracker.reward(np.mean(new_rewards), step_idx)
+                    if tracker.reward(np.mean(new_rewards), step_idx):
+                        break
 
                 optimizer.zero_grad()
                 states_v = Variable(torch.from_numpy(mb_states))
@@ -178,4 +179,4 @@ if __name__ == "__main__":
                 tb_tracker.track("loss_policy",     loss_policy_v, step_idx)
                 tb_tracker.track("loss_value",      loss_value_v, step_idx)
                 tb_tracker.track("loss_total",      loss_v, step_idx)
-                step_idx += 1
+                step_idx += NUM_ENVS * REWARD_STEPS
