@@ -15,7 +15,7 @@ from torch.autograd import Variable
 from lib import common
 
 GAMMA = 0.99
-LEARNING_RATE = 5e-4
+LEARNING_RATE = 1e-4
 ENTROPY_BETA = 0.01
 NUM_ENVS = 16
 
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
 
-    make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"))
+    make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
     envs = [make_env() for _ in range(NUM_ENVS)]
     writer = SummaryWriter(comment="-pong-a2c-rollouts_" + args.name)
     set_seed(20, envs, cuda=args.cuda)
