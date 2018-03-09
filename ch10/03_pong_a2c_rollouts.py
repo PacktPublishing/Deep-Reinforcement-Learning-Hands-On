@@ -144,12 +144,13 @@ if __name__ == "__main__":
                     tracker.reward(np.mean(new_rewards), step_idx)
 
                 optimizer.zero_grad()
-                states_v = ptan.agent.default_states_preprocessor(mb_states, cuda=args.cuda)
+                states_v = Variable(torch.from_numpy(mb_states))
                 mb_adv = mb_rewards - mb_values
                 adv_v = Variable(torch.from_numpy(mb_adv))
                 actions_t = torch.from_numpy(mb_actions)
                 vals_ref_v = Variable(torch.from_numpy(mb_rewards))
                 if args.cuda:
+                    states_v = states_v.cuda()
                     adv_v = adv_v.cuda()
                     actions_t = actions_t.cuda()
                     vals_ref_v = vals_ref_v.cuda()
@@ -168,7 +169,7 @@ if __name__ == "__main__":
                 loss_v = loss_policy_v + ENTROPY_BETA * entropy_loss_v + loss_value_v
                 loss_v.backward()
                 nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
-#                optimizer.step()
+                optimizer.step()
 
                 tb_tracker.track("advantage",       adv_v, step_idx)
                 tb_tracker.track("values",          value_v, step_idx)

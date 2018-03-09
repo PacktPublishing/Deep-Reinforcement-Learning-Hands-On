@@ -199,7 +199,6 @@ if __name__ == "__main__":
         net.cuda()
     print(net)
 
-#    agent = ptan.agent.ActorCriticAgent(net, apply_softmax=True, cuda=args.cuda)
     optimizer = optim.RMSprop(net.parameters(), lr=LEARNING_RATE, eps=1e-5)
 
     step_idx = 0
