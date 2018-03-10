@@ -51,6 +51,9 @@ But tests could become broken.
 GAME_ROWS = 6
 GAME_COLS = 7
 BITS_IN_LEN = 3
+PLAYER_BLACK = 1
+PLAYER_WHITE = 0
+COUNT_TO_WIN = 4
 
 
 def bits_to_int(bits):
@@ -89,13 +92,14 @@ def encode_lists(field_lists):
     return bits_to_int(bits)
 
 
-def decode_binary(num):
+def decode_binary(state_int):
     """
     Decode binary representation into the list view
-    :param num: integer representing the field 
+    :param state_int: integer representing the field 
     :return: list of GAME_COLS lists 
     """
-    bits = int_to_bits(num, bits=GAME_COLS*GAME_ROWS + GAME_COLS*BITS_IN_LEN)
+    assert isinstance(state_int, int)
+    bits = int_to_bits(state_int, bits=GAME_COLS*GAME_ROWS + GAME_COLS*BITS_IN_LEN)
     res = []
     len_bits = bits[GAME_COLS*GAME_ROWS:]
     for col in range(GAME_COLS):
@@ -105,3 +109,75 @@ def decode_binary(num):
             vals = vals[:-lens]
         res.append(vals)
     return res
+
+
+def possible_moves(state_int):
+    """
+    This function could be calculated directly from bits, but I'm too lazy
+    :param state_int: field representation
+    :return: the list of columns which we can make a move
+    """
+    assert isinstance(state_int, int)
+    field = decode_binary(state_int)
+    return [idx for idx, col in enumerate(field) if len(col) < GAME_ROWS]
+
+
+def _check_won(field, col, delta_row):
+    """
+    Check for horisontal/diagonal win condition for the last player moved in the column
+    :param field: list of lists
+    :param col: column index
+    :param delta_row: if 0, checks for horisonal won, 1 for rising diagonal, -1 for falling
+    :return: True if won, False if not
+    """
+    player = field[col][-1]
+    coord = len(field[col])-1
+    total = 1
+    # negative dir
+    cur_coord = coord - delta_row
+    for c in range(col-1, -1, -1):
+        if len(field[c]) <= cur_coord or cur_coord < 0 or cur_coord >= GAME_ROWS:
+            break
+        if field[c][cur_coord] != player:
+            break
+        total += 1
+        if total == COUNT_TO_WIN:
+            return True
+        cur_coord -= delta_row
+    # positive dir
+    cur_coord = coord + delta_row
+    for c in range(col+1, GAME_COLS):
+        if len(field[c]) <= cur_coord or cur_coord < 0 or cur_coord >= GAME_ROWS:
+            break
+        if field[c][cur_coord] != player:
+            break
+        total += 1
+        if total == COUNT_TO_WIN:
+            return True
+        cur_coord += delta_row
+    return False
+
+
+def move(state_int, col, player):
+    """
+    Perform move into given column. Assume the move could be performed, otherwise, assertion will be raised
+    :param state_int: current state
+    :param col: column to make a move
+    :param player: player index (PLAYER_WHITE or PLAYER_BLACK  
+    :return: tuple of (state_new, won). Value won is bool, True if this move lead 
+    to victory or False otherwise (but it could be a draw) 
+    """
+    assert isinstance(state_int, int)
+    assert isinstance(col, int)
+    assert 0 <= col < GAME_COLS
+    assert player == PLAYER_BLACK or player == PLAYER_WHITE
+    field = decode_binary(state_int)
+    assert len(field[col]) < GAME_ROWS
+    field[col].append(player)
+    # check for victory: the simplest vertical case
+    suff = field[col][-COUNT_TO_WIN:]
+    won = suff == [player] * COUNT_TO_WIN
+    if not won:
+        won = _check_won(field, col, 0) or _check_won(field, col, 1) or _check_won(field, col, -1)
+    state_new = encode_lists(field)
+    return state_new, won
