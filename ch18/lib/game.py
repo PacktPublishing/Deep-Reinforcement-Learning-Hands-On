@@ -55,6 +55,10 @@ PLAYER_BLACK = 1
 PLAYER_WHITE = 0
 COUNT_TO_WIN = 4
 
+# declared after encode_lists
+# INITIAL_STATE = encode_lists([[]] * GAME_COLS)
+
+
 
 def bits_to_int(bits):
     res = 0
@@ -90,6 +94,9 @@ def encode_lists(field_lists):
         len_bits.extend(int_to_bits(free_len, bits=BITS_IN_LEN))
     bits.extend(len_bits)
     return bits_to_int(bits)
+
+
+INITIAL_STATE = encode_lists([[]] * GAME_COLS)
 
 
 def decode_binary(state_int):
@@ -181,3 +188,13 @@ def move(state_int, col, player):
         won = _check_won(field, col, 0) or _check_won(field, col, 1) or _check_won(field, col, -1)
     state_new = encode_lists(field)
     return state_new, won
+
+
+def render(state_int):
+    state_list = decode_binary(state_int)
+    data = [[' '] * GAME_COLS for _ in range(GAME_ROWS)]
+    for col_idx, col in enumerate(state_list):
+        for rev_row_idx, cell in enumerate(col):
+            row_idx = GAME_ROWS - rev_row_idx - 1
+            data[row_idx][col_idx] = str(cell)
+    return [''.join(row) for row in data]
