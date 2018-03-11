@@ -24,6 +24,9 @@ class MCTS:
         # prior probability of actions, state_int -> [P(s,a)]
         self.probs = {}
 
+    def __len__(self):
+        return len(self.value)
+
     def search(self, state_int, player, net, cuda=False):
         """
         Performs one round of MCTS search, including the leaf expansion and backfill
@@ -86,26 +89,17 @@ class MCTS:
             self.visit_count[state_int][action] += 1
             self.value[state_int][action] += value
             self.value_avg[state_int][action] = self.value[state_int][action] / self.visit_count[state_int][action]
-        #
-        # # calculate the action probabilities for the root node
-        # root_counts = [count ** (1.0/tau) for count in self.visit_count[state_int]]
-        # root_total = sum(root_counts)
-        # if root_total > 0:
-        #     root_probs = [count / root_total for count in root_counts]
-        # else:
-        #     root_probs = [1 / game.GAME_COLS] * game.GAME_COLS
-        # return root_probs
 
     def is_leaf(self, state_int):
         return state_int not in self.probs
 
-    def search_batch(self, count, state_int, player, net):
+    def search_batch(self, count, state_int, player, net, cuda=False):
         """
         Perform several MCTS searches. 
         TODO: optimize this using one single NN pass
         """
         for _ in range(count):
-            self.search(state_int, player, net)
+            self.search(state_int, player, net, cuda)
 
     def get_policy_value(self, state_int, tau=1):
         """
