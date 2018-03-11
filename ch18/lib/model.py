@@ -86,11 +86,11 @@ class Net(nn.Module):
     def forward(self, x):
         batch_size = x.size()[0]
         v = self.conv_in(x)
-        v += self.conv_1(v)
-        v += self.conv_2(v)
-        v += self.conv_3(v)
-        v += self.conv_4(v)
-        v += self.conv_5(v)
+        v = v + self.conv_1(v)
+        v = v + self.conv_2(v)
+        v = v + self.conv_3(v)
+        v = v + self.conv_4(v)
+        v = v + self.conv_5(v)
         val = self.conv_val(v)
         val = self.value(val.view(batch_size, -1))
         pol = self.conv_policy(v)
