@@ -35,6 +35,7 @@ def play_game(replay_buffer, net1, net2, cuda=False):
     :return: value for the game in respect to player1 (+1 if p1 won, -1 if lost, 0 if draw)
     """
     assert isinstance(replay_buffer, (collections.deque, type(None)))
+    mcts_store = mcts.MCTS()
     state = game.INITIAL_STATE
     nets = [net1, net2]
     cur_player = np.random.choice(2)
@@ -73,7 +74,6 @@ if __name__ == "__main__":
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
 
-    mcts_store = mcts.MCTS()
     replay_buffer = collections.deque(maxlen=REPLAY_BUFFER)
     cur_net_scores = collections.deque(maxlen=BEST_SCORES_HIST)
     step_idx = 0
@@ -81,17 +81,16 @@ if __name__ == "__main__":
 
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
         while True:
+            step_idx += 1
             r = play_game(replay_buffer, net, best_net.target_model, cuda=args.cuda)
             cur_net_scores.append(r)
             if len(cur_net_scores) < BEST_SCORES_HIST:
                 mean_score = -np.inf
             else:
                 mean_score = np.mean(cur_net_scores)
-            print("Game %d, score %4.1f, mean %.2f, mcts %d" % (
-                step_idx, r, mean_score, len(mcts_store)))
-
-            writer.add_scalar("mcts_store", len(mcts_store), step_idx)
-            writer.add_scalar("score_mean", mean_score, step_idx)
+                writer.add_scalar("score_mean", mean_score, step_idx)
+            print("Game %d, score %4.1f, mean %.2f" % (
+                step_idx, r, mean_score))
 
             if len(replay_buffer) < MIN_REPLAY_TO_TRAIN:
                 continue
@@ -133,5 +132,3 @@ if __name__ == "__main__":
                 best_idx += 1
                 file_name = os.path.join(saves_path, "best_%03d.dat" % best_idx)
                 torch.save(net.state_dict(), file_name)
-
-            step_idx += 1
