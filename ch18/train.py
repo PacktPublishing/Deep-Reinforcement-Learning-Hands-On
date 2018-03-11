@@ -130,5 +130,5 @@ if __name__ == "__main__":
                 best_net.sync()
                 cur_net_scores.clear()
                 best_idx += 1
-                file_name = os.path.join(saves_path, "best_%03d.dat" % best_idx)
+                file_name = os.path.join(saves_path, "best_%03d_%05d.dat" % (best_idx, step_idx))
                 torch.save(net.state_dict(), file_name)
