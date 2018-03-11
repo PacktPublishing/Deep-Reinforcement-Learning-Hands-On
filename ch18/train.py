@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import time
 import ptan
 import random
 import argparse
@@ -39,7 +40,9 @@ def play_game(replay_buffer, net1, net2, cuda=False):
     state = game.INITIAL_STATE
     nets = [net1, net2]
     cur_player = np.random.choice(2)
-    while True:
+    step = 0
+    result = None
+    while result is None:
         mcts_store.search_batch(MCTS_SEARCHES, state, cur_player, nets[cur_player], cuda=cuda)
         probs, values = mcts_store.get_policy_value(state)
         if replay_buffer is not None:
@@ -49,11 +52,13 @@ def play_game(replay_buffer, net1, net2, cuda=False):
             print("Impossible action selected")
         state, won = game.move(state, action, cur_player)
         if won:
-            return 1.0 if cur_player == 0 else -1
+            result = 1.0 if cur_player == 0 else -1
         cur_player = 1-cur_player
         # check the draw case
         if len(game.possible_moves(state)) == 0:
-            return 0.0
+            result = 0.0
+        step += 1
+    return result, step, len(mcts_store)
 
 
 if __name__ == "__main__":
@@ -72,7 +77,7 @@ if __name__ == "__main__":
     best_net = ptan.agent.TargetNet(net)
     print(net)
 
-    optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
+    optimizer = optim.SGD(net.parameters(), lr=LEARNING_RATE, momentum=0.9)
 
     replay_buffer = collections.deque(maxlen=REPLAY_BUFFER)
     cur_net_scores = collections.deque(maxlen=BEST_SCORES_HIST)
@@ -82,15 +87,21 @@ if __name__ == "__main__":
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
         while True:
             step_idx += 1
-            r = play_game(replay_buffer, net, best_net.target_model, cuda=args.cuda)
-            cur_net_scores.append(r)
+            t = time.time()
+            game_res, game_steps, game_nodes = play_game(replay_buffer, net, best_net.target_model, cuda=args.cuda)
+            dt = time.time() - t
+            cur_net_scores.append(game_res)
             if len(cur_net_scores) < BEST_SCORES_HIST:
                 mean_score = -np.inf
             else:
                 mean_score = np.mean(cur_net_scores)
-                writer.add_scalar("score_mean", mean_score, step_idx)
-            print("Game %d, score %4.1f, mean %.2f" % (
-                step_idx, r, mean_score))
+                tb_tracker.track("score_mean", mean_score, step_idx)
+            speed_steps = game_steps / dt
+            speed_nodes = game_nodes / dt
+            tb_tracker.track("speed_steps", speed_steps, step_idx)
+            tb_tracker.track("speed_nodes", speed_nodes, step_idx)
+            print("Game %d, score %4.1f, mean %.2f, steps/s %.2f, nodes/s %.2f" % (
+                step_idx, game_res, mean_score, speed_steps, speed_nodes))
 
             if len(replay_buffer) < MIN_REPLAY_TO_TRAIN:
                 continue
