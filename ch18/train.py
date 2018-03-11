@@ -100,7 +100,7 @@ if __name__ == "__main__":
             speed_nodes = game_nodes / dt
             tb_tracker.track("speed_steps", speed_steps, step_idx)
             tb_tracker.track("speed_nodes", speed_nodes, step_idx)
-            print("Game %d, steps %d, score %4.1f, mean %.2f, steps/s %.2f, nodes/s %.2f" % (
+            print("Game %d, steps %3d, score %4.1f, mean %5.2f, steps/s %5.2f, nodes/s %6.2f" % (
                 step_idx, game_steps, game_res, mean_score, speed_steps, speed_nodes))
 
             if len(replay_buffer) < MIN_REPLAY_TO_TRAIN:
