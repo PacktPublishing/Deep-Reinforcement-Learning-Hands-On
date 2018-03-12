@@ -17,19 +17,19 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 
-MCTS_SEARCHES = 10
-MCTS_BATCH_SIZE = 10
+MCTS_SEARCHES = 5
+MCTS_BATCH_SIZE = 16
 REPLAY_BUFFER = 10000
 LEARNING_RATE = 1e-4
 BATCH_SIZE = 128
 TRAIN_ROUNDS = 10
-MIN_REPLAY_TO_TRAIN = TRAIN_ROUNDS * BATCH_SIZE
+MIN_REPLAY_TO_TRAIN = 200
 
 BEST_SCORES_HIST = 30
 BEST_NET_WIN_RATIO = 0.55
 
 EVALUATE_EVERY_STEP = 50
-EVALUATION_ROUNDS = 20
+EVALUATION_ROUNDS = 100
 
 
 def play_game(replay_buffer, net1, net2, cuda=False):
@@ -112,8 +112,8 @@ if __name__ == "__main__":
             speed_nodes = game_nodes / dt
             tb_tracker.track("speed_steps", speed_steps, step_idx)
             tb_tracker.track("speed_nodes", speed_nodes, step_idx)
-            print("Game %d, steps %3d, score %4.1f, steps/s %5.2f, nodes/s %6.2f, best_idx %d" % (
-                step_idx, game_steps, game_res, speed_steps, speed_nodes, best_idx))
+            print("Game %d, steps %3d, steps/s %5.2f, nodes/s %6.2f, best_idx %d" % (
+                step_idx, game_steps, speed_steps, speed_nodes, best_idx))
 
             if len(replay_buffer) < MIN_REPLAY_TO_TRAIN:
                 continue
