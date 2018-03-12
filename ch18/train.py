@@ -29,6 +29,7 @@ BEST_SCORES_HIST = 30
 BEST_NET_WIN_RATIO = 0.55
 
 EVALUATE_EVERY_STEP = 50
+EVALUATION_ROUNDS = 20
 
 
 def play_game(replay_buffer, net1, net2, cuda=False):
@@ -103,7 +104,6 @@ if __name__ == "__main__":
 
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
         while True:
-            step_idx += 1
             t = time.time()
             game_res, game_steps, game_nodes = play_game(replay_buffer, best_net.target_model,
                                                          best_net.target_model, cuda=args.cuda)
@@ -117,6 +117,8 @@ if __name__ == "__main__":
 
             if len(replay_buffer) < MIN_REPLAY_TO_TRAIN:
                 continue
+
+            step_idx += 1
 
             # train
             sum_loss = 0.0
@@ -154,10 +156,11 @@ if __name__ == "__main__":
             tb_tracker.track("loss_total", sum_loss / TRAIN_ROUNDS, step_idx)
             tb_tracker.track("loss_value", sum_value_loss / TRAIN_ROUNDS, step_idx)
             tb_tracker.track("loss_policy", sum_policy_loss / TRAIN_ROUNDS, step_idx)
+            tb_tracker.track("replay_size", len(replay_buffer), step_idx)
 
             # evaluate net
             if step_idx % EVALUATE_EVERY_STEP == 0:
-                win_ratio = evaluate(net, best_net.target_model, rounds=20, cuda=args.cuda)
+                win_ratio = evaluate(net, best_net.target_model, rounds=EVALUATION_ROUNDS, cuda=args.cuda)
                 print("Net evaluated, win ratio = %.2f" % win_ratio)
                 writer.add_scalar("eval_win_ratio", win_ratio, step_idx)
                 if win_ratio > BEST_NET_WIN_RATIO:
@@ -166,3 +169,4 @@ if __name__ == "__main__":
                     best_idx += 1
                     file_name = os.path.join(saves_path, "best_%03d_%05d.dat" % (best_idx, step_idx))
                     torch.save(net.state_dict(), file_name)
+                    replay_buffer.clear()
