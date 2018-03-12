@@ -62,7 +62,7 @@ def play_game(mcts_store, replay_buffer, net1, net2, cuda=False):
         if len(game.possible_moves(state)) == 0:
             result = 0.0
         step += 1
-    return result, step, len(mcts_store)
+    return result, step
 
 
 def evaluate(net1, net2, rounds, cuda=False):
@@ -105,15 +105,17 @@ if __name__ == "__main__":
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
         while True:
             t = time.time()
-            game_res, game_steps, game_nodes = play_game(mcts_store, replay_buffer, best_net.target_model,
-                                                         best_net.target_model, cuda=args.cuda)
+            prev_nodes = len(mcts_store)
+            game_res, game_steps = play_game(mcts_store, replay_buffer, best_net.target_model,
+                                             best_net.target_model, cuda=args.cuda)
+            game_nodes = len(mcts_store) - prev_nodes
             dt = time.time() - t
             speed_steps = game_steps / dt
             speed_nodes = game_nodes / dt
             tb_tracker.track("speed_steps", speed_steps, step_idx)
             tb_tracker.track("speed_nodes", speed_nodes, step_idx)
-            print("Game %d, steps %3d, steps/s %5.2f, nodes/s %6.2f, best_idx %d" % (
-                step_idx, game_steps, speed_steps, speed_nodes, best_idx))
+            print("Game %d, steps %3d, leafs %4d, steps/s %5.2f, nodes/s %6.2f, best_idx %d" % (
+                step_idx, game_steps, game_nodes, speed_steps, speed_nodes, best_idx))
 
             if len(replay_buffer) < MIN_REPLAY_TO_TRAIN:
                 continue
