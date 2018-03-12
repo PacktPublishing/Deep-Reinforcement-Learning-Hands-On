@@ -17,7 +17,7 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 
-MCTS_SEARCHES = 50
+MCTS_SEARCHES = 20
 REPLAY_BUFFER = 10000
 LEARNING_RATE = 1e-4
 BATCH_SIZE = 128
