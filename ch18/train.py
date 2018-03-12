@@ -17,7 +17,8 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 
-MCTS_SEARCHES = 20
+MCTS_SEARCHES = 5
+MCTS_BATCH_SIZE = 8
 REPLAY_BUFFER = 10000
 LEARNING_RATE = 1e-4
 BATCH_SIZE = 128
@@ -43,7 +44,7 @@ def play_game(replay_buffer, net1, net2, cuda=False):
     step = 0
     result = None
     while result is None:
-        mcts_store.search_batch(MCTS_SEARCHES, state, cur_player, nets[cur_player], cuda=cuda)
+        mcts_store.search_batch(MCTS_SEARCHES, MCTS_BATCH_SIZE, state, cur_player, nets[cur_player], cuda=cuda)
         probs, values = mcts_store.get_policy_value(state)
         if replay_buffer is not None:
             replay_buffer.append((state, cur_player, probs, values))

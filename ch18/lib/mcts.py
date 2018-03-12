@@ -27,15 +27,20 @@ class MCTS:
     def __len__(self):
         return len(self.value)
 
-    def search(self, state_int, player, net, cuda=False):
+    def find_leaf(self, state_int, player):
         """
-        Performs one round of MCTS search, including the leaf expansion and backfill
-        :param state_int: root node to start the search
+        Traverse the tree until the end of game or leaf node
+        :param state_int: root node state
         :param player: player to move
-        :param net: network with model used for leaf expansion
+        :return: tuple of (value, leaf_state, player, states, actions)
+        1. value: None if leaf node, otherwise equals to the game outcome
+        2. leaf_state: state_int of the last state
+        3. player: player at the leaf node
+        4. states: list of states traversed
+        5. list of actions taken
         """
-        actions = []
         states = []
+        actions = []
         cur_state = state_int
         cur_player = player
         value = None
@@ -69,37 +74,58 @@ class MCTS:
                 value = 0.0
                 break
 
-        # haven't reached the end of match, expand leaf node
-        if value is None:
-            # we have a leaf node in cur_state, expand it
-            state_list = game.decode_binary(cur_state)
-            batch_v = model.state_lists_to_batch([state_list], [cur_player], cuda)
-            logits_v, values_v = net(batch_v)
-            probs_v = F.softmax(logits_v)
-            value = values_v[0].data.cpu().numpy()[0]
-
-            # save the node
-            self.visit_count[cur_state] = [0] * game.GAME_COLS
-            self.value[cur_state] = [0.0] * game.GAME_COLS
-            self.value_avg[cur_state] = [0.0] * game.GAME_COLS
-            self.probs[cur_state] = probs_v[0].data.cpu().numpy().tolist()
-
-        # back up the obtained value
-        for state_int, action in zip(states, actions):
-            self.visit_count[state_int][action] += 1
-            self.value[state_int][action] += value
-            self.value_avg[state_int][action] = self.value[state_int][action] / self.visit_count[state_int][action]
+        return value, cur_state, cur_player, states, actions
 
     def is_leaf(self, state_int):
         return state_int not in self.probs
 
-    def search_batch(self, count, state_int, player, net, cuda=False):
-        """
-        Perform several MCTS searches. 
-        TODO: optimize this using one single NN pass
-        """
+    def search_batch(self, count, batch_size, state_int, player, net, cuda=False):
         for _ in range(count):
-            self.search(state_int, player, net, cuda)
+            self.search_minibatch(batch_size, state_int, player, net, cuda)
+
+    def search_minibatch(self, count, state_int, player, net, cuda=False):
+        """
+        Perform several MCTS searches.
+        """
+        backup_queue = []
+        expand_states = []
+        expand_players = []
+        expand_queue = []
+        planned = set()
+        for _ in range(count):
+            value, leaf_state, leaf_player, states, actions = self.find_leaf(state_int, player)
+            if value is not None:
+                backup_queue.append((value, states, actions))
+            else:
+                if leaf_state not in planned:
+                    planned.add(leaf_state)
+                    leaf_state_lists = game.decode_binary(leaf_state)
+                    expand_states.append(leaf_state_lists)
+                    expand_players.append(leaf_player)
+                    expand_queue.append((leaf_state, states, actions))
+
+        # do expansion of nodes
+        if expand_queue:
+            batch_v = model.state_lists_to_batch(expand_states, expand_players, cuda)
+            logits_v, values_v = net(batch_v)
+            probs_v = F.softmax(logits_v)
+            values = values_v.data.cpu().numpy()[:, 0]
+            probs = probs_v.data.cpu().numpy()
+
+            # create the nodes
+            for (leaf_state, states, actions), value, prob in zip(expand_queue, values, probs):
+                self.visit_count[leaf_state] = [0] * game.GAME_COLS
+                self.value[leaf_state] = [0.0] * game.GAME_COLS
+                self.value_avg[leaf_state] = [0.0] * game.GAME_COLS
+                self.probs[leaf_state] = prob
+                backup_queue.append((value, states, actions))
+
+        # perform backup of the searches
+        for value, states, actions in backup_queue:
+            for state_int, action in zip(states, actions):
+                self.visit_count[state_int][action] += 1
+                self.value[state_int][action] += value
+                self.value_avg[state_int][action] = self.value[state_int][action] / self.visit_count[state_int][action]
 
     def get_policy_value(self, state_int, tau=1):
         """
