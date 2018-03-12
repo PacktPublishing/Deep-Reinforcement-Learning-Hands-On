@@ -32,7 +32,7 @@ EVALUATE_EVERY_STEP = 50
 EVALUATION_ROUNDS = 100
 
 
-def play_game(replay_buffer, net1, net2, cuda=False):
+def play_game(mcts_store, replay_buffer, net1, net2, cuda=False):
     """
     Play one single game, memorizing transitions into the replay buffer
     :param replay_buffer: queue with (state, probs, values), if None, nothing is stored
@@ -41,7 +41,6 @@ def play_game(replay_buffer, net1, net2, cuda=False):
     :return: value for the game in respect to player1 (+1 if p1 won, -1 if lost, 0 if draw)
     """
     assert isinstance(replay_buffer, (collections.deque, type(None)))
-    mcts_store = mcts.MCTS()
     state = game.INITIAL_STATE
     nets = [net1, net2]
     cur_player = np.random.choice(2)
@@ -99,13 +98,14 @@ if __name__ == "__main__":
     optimizer = optim.SGD(net.parameters(), lr=LEARNING_RATE, momentum=0.9)
 
     replay_buffer = collections.deque(maxlen=REPLAY_BUFFER)
+    mcts_store = mcts.MCTS()
     step_idx = 0
     best_idx = 0
 
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
         while True:
             t = time.time()
-            game_res, game_steps, game_nodes = play_game(replay_buffer, best_net.target_model,
+            game_res, game_steps, game_nodes = play_game(mcts_store, replay_buffer, best_net.target_model,
                                                          best_net.target_model, cuda=args.cuda)
             dt = time.time() - t
             speed_steps = game_steps / dt
@@ -170,3 +170,4 @@ if __name__ == "__main__":
                     file_name = os.path.join(saves_path, "best_%03d_%05d.dat" % (best_idx, step_idx))
                     torch.save(net.state_dict(), file_name)
                     replay_buffer.clear()
+                    mcts_store.clear()

@@ -24,6 +24,12 @@ class MCTS:
         # prior probability of actions, state_int -> [P(s,a)]
         self.probs = {}
 
+    def clear(self):
+        self.visit_count.clear()
+        self.value.clear()
+        self.value_avg.clear()
+        self.probs.clear()
+
     def __len__(self):
         return len(self.value)
 
