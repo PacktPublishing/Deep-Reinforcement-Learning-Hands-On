@@ -5,31 +5,6 @@ import argparse
 from lib import game, model
 
 import torch
-import torch.nn.functional as F
-
-
-def play_game(net1, net2):
-    cur_player = 0
-    state = game.INITIAL_STATE
-    nets = [net1, net2]
-
-    while True:
-        state_list = game.decode_binary(state)
-        batch_v = model.state_lists_to_batch([state_list], [cur_player])
-        logits_v, _ = nets[cur_player](batch_v)
-        probs_v = F.softmax(logits_v)
-        probs = probs_v[0].data.cpu().numpy()
-        while True:
-            action = np.random.choice(game.GAME_COLS, p=probs)
-            if action in game.possible_moves(state):
-                break
-        state, won = game.move(state, action, cur_player)
-        if won:
-            return 1.0 if cur_player == 0 else -1.0
-        # check for the draw state
-        if len(game.possible_moves(state)) == 0:
-            return 0.0
-        cur_player = 1 - cur_player
 
 
 if __name__ == "__main__":
@@ -52,7 +27,7 @@ if __name__ == "__main__":
                 continue
             score = 0.0
             for _ in range(args.rounds):
-                r = play_game(n1[1], n2[1])
+                r = model.play_game(n1[1], n2[1])
                 print(r)
                 score += r
             print("%s vs %s -> %.1f" % (n1[0], n2[0], score))

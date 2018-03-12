@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+import torch.nn.functional as F
 
 from lib import game
 
@@ -101,9 +102,9 @@ class Net(nn.Module):
 def _encode_list_state(dest_np, state_list, who_move):
     """
     In-place encodes list state into the zero numpy array
-    :param dest_np: dest array, expected to be zero 
-    :param state_list: state of the game in the list form 
-    :param who_move: player index (game.PLAYER_WHITE or game.PLAYER_BLACK) who to move 
+    :param dest_np: dest array, expected to be zero
+    :param state_list: state of the game in the list form
+    :param who_move: player index (game.PLAYER_WHITE or game.PLAYER_BLACK) who to move
     """
     assert dest_np.shape == OBS_SHAPE
 
@@ -132,3 +133,28 @@ def state_lists_to_batch(state_lists, who_moves_lists, cuda=False):
     if cuda:
         batch_v = batch_v.cuda()
     return batch_v
+
+
+def play_game(net1, net2, cuda=False):
+    cur_player = 0
+    state = game.INITIAL_STATE
+    nets = [net1, net2]
+
+    while True:
+        state_list = game.decode_binary(state)
+        batch_v = state_lists_to_batch([state_list], [cur_player], cuda)
+        logits_v, _ = nets[cur_player](batch_v)
+        probs_v = F.softmax(logits_v)
+        probs = probs_v[0].data.cpu().numpy()
+        while True:
+            action = np.random.choice(game.GAME_COLS, p=probs)
+            if action in game.possible_moves(state):
+                break
+        state, won = game.move(state, action, cur_player)
+        if won:
+            return 1.0 if cur_player == 0 else -1.0
+        # check for the draw state
+        if len(game.possible_moves(state)) == 0:
+            return 0.0
+        cur_player = 1 - cur_player
+
