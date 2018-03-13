@@ -17,13 +17,13 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 
-MCTS_SEARCHES = 40
-MCTS_BATCH_SIZE = 20
-REPLAY_BUFFER = 10000
-LEARNING_RATE = 1e-4
-BATCH_SIZE = 128
+MCTS_SEARCHES = 10
+MCTS_BATCH_SIZE = 40
+REPLAY_BUFFER = 30000
+LEARNING_RATE = 0.1
+BATCH_SIZE = 256
 TRAIN_ROUNDS = 10
-MIN_REPLAY_TO_TRAIN = BATCH_SIZE * TRAIN_ROUNDS
+MIN_REPLAY_TO_TRAIN = REPLAY_BUFFER
 
 BEST_SCORES_HIST = 30
 BEST_NET_WIN_RATIO = 0.55
@@ -175,5 +175,5 @@ if __name__ == "__main__":
                     best_idx += 1
                     file_name = os.path.join(saves_path, "best_%03d_%05d.dat" % (best_idx, step_idx))
                     torch.save(net.state_dict(), file_name)
-                    replay_buffer.clear()
+#                    replay_buffer.clear()
                     mcts_store.clear()
