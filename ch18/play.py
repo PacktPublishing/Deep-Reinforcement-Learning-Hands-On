@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import numpy as np
+import sys
 import argparse
 
 from lib import game, model
@@ -41,6 +41,7 @@ if __name__ == "__main__":
                     draws += 1
             name_1, name_2 = n1[0], n2[0]
             print("%s vs %s -> w=%d, l=%d, d=%d" % (name_1, name_2, wins, losses, draws))
+            sys.stdout.flush()
             update_counts(total_agent, name_1, (wins, losses, draws))
             update_counts(total_agent, name_2, (losses, wins, draws))
             update_counts(total_pairs, (name_1, name_2), (wins, losses, draws))

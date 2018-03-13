@@ -3,6 +3,9 @@
 import os
 import sys
 import glob
+import json
+import time
+import datetime
 import random
 import logging
 import numpy as np
@@ -33,13 +36,18 @@ class Session:
     BOT_PLAYER = game.PLAYER_BLACK
     USER_PLAYER = game.PLAYER_WHITE
 
-    def __init__(self, model_file):
+    def __init__(self, model_file, player_moves_first, player_id):
+        self.model_file = model_file
         self.model = model.Net(input_shape=model.OBS_SHAPE, actions_n=game.GAME_COLS)
         self.model.load_state_dict(torch.load(model_file, map_location=lambda storage, loc: storage))
         self.state = game.INITIAL_STATE
         self.value = None
+        self.player_moves_first = player_moves_first
+        self.player_id = player_id
+        self.moves = []
 
     def move_player(self, col):
+        self.moves.append(col)
         self.state, won = game.move(self.state, col, self.USER_PLAYER)
         return won
 
@@ -54,11 +62,15 @@ class Session:
             action = np.random.choice(game.GAME_COLS, p=probs)
             if action in game.possible_moves(self.state):
                 break
+        self.moves.append(action)
         self.state, won = game.move(self.state, action, self.BOT_PLAYER)
         return won
 
     def is_valid_move(self, move_col):
         return move_col in game.possible_moves(self.state)
+
+    def is_draw(self):
+        return len(game.possible_moves(self.state)) == 0
 
     def render(self):
         l = game.render(self.state)
@@ -73,15 +85,34 @@ class Session:
 
 
 class PlayerBot:
-    def __init__(self, models_dir):
+    def __init__(self, models_dir, log_file):
         self.sessions = {}
         self.models = self._read_models(models_dir)
+        self.log_file = log_file
+        self.leaderboard = self._read_leaderboard(log_file)
 
     def _read_models(self, models_dir):
         result = {}
         for idx, name in enumerate(sorted(glob.glob(os.path.join(models_dir, "*.dat")))):
             result[idx] = name
         return result
+
+    def _read_leaderboard(self, log_file):
+        return []
+
+    def _save_log(self, session, bot_score):
+        data = {
+            "ts": time.time(),
+            "time": datetime.datetime.utcnow().isoformat(),
+            "bot_score": bot_score,
+            "model_file": session.model_file,
+            "player_id": session.player_id,
+            "player_moves_first": session.player_moves_first,
+            "moves": session.moves,
+            "state": session.state
+        }
+        with open(self.log_file, "a+t", encoding='utf-8') as f:
+            f.write(json.dumps(data, sort_keys=True) + '\n')
 
     def command_help(self, bot, update):
         bot.send_message(chat_id=update.message.chat_id, parse_mode="HTML", disable_web_page_preview=True,
@@ -110,6 +141,7 @@ During the game, your moves are numbers of columns to drop the disk.
 
     def command_play(self, bot, update, args):
         chat_id = update.message.chat_id
+        player_id = "%s:%s" % (update.message.from_user.username, update.message.from_user.id)
         try:
             model_id = int(args[0])
         except ValueError:
@@ -124,14 +156,15 @@ During the game, your moves are numbers of columns to drop the disk.
             bot.send_message(chat_id=chat_id, text="You already have the game in progress, it will be discarded")
             del self.sessions[chat_id]
 
-        self.sessions[chat_id] = Session(self.models[model_id])
         player_moves = random.choice([False, True])
+        session = Session(self.models[model_id], player_moves, player_id)
+        self.sessions[chat_id] = session
         if player_moves:
-            bot.send_message(chat_id=chat_id, text="Your move is first (you're playing with O), please give the column to put your checker with /move [0-6]")
+            bot.send_message(chat_id=chat_id, text="Your move is first (you're playing with O), please give the column to put your checker - single number from 0 to 6")
         else:
             bot.send_message(chat_id=chat_id, text="The first move is mine (I'm playing with X), moving...")
-            self.sessions[chat_id].move_bot()
-        bot.send_message(chat_id=chat_id, text=self.sessions[chat_id].render(), parse_mode="HTML")
+            session.move_bot()
+        bot.send_message(chat_id=chat_id, text=session.render(), parse_mode="HTML")
 
     def text(self, bot, update):
         chat_id = update.message.chat_id
@@ -141,6 +174,7 @@ During the game, your moves are numbers of columns to drop the disk.
                                                    "(or use <b>/help</b> to see the list of commands)",
                              parse_mode='HTML')
             return
+        session = self.sessions[chat_id]
 
         try:
             move_col = int(update.message.text)
@@ -149,25 +183,32 @@ During the game, your moves are numbers of columns to drop the disk.
                                                    "from 0 to 6 to specify your move.")
             return
 
-        if move_col < 0 or move_col > 6:
+        if move_col < 0 or move_col > game.GAME_COLS:
             bot.send_message(chat_id=chat_id, text="Wrong column specified! It must be in range 0-6")
             return
 
-        if not self.sessions[chat_id].is_valid_move(move_col):
+        if not session.is_valid_move(move_col):
             bot.send_message(chat_id=chat_id, text="Move %d is invalid!" % move_col)
             return
 
-        won = self.sessions[chat_id].move_player(move_col)
+        won = session.move_player(move_col)
         if won:
             bot.send_message(chat_id=chat_id, text="You won! Congratulations!")
+            self._save_log(session, bot_score=-1)
             del self.sessions[chat_id]
             return
 
-        won = self.sessions[chat_id].move_bot()
-        bot.send_message(chat_id=chat_id, text=self.sessions[chat_id].render(), parse_mode="HTML")
+        won = session.move_bot()
+        bot.send_message(chat_id=chat_id, text=session.render(), parse_mode="HTML")
 
         if won:
             bot.send_message(chat_id=chat_id, text="I won! Wheeee!")
+            self._save_log(session, bot_score=1)
+            del self.sessions[chat_id]
+        # checking for a draw
+        if session.is_draw():
+            bot.send_message(chat_id=chat_id, text="Draw position. That's unlikely, but possible. 1:1, see ya!")
+            self._save_log(session, bot_score=0)
             del self.sessions[chat_id]
 
     def error(self, bot, update, error):
@@ -183,6 +224,7 @@ if __name__ == "__main__":
     parser.add_argument("--config", default=CONFIG_DEFAULT,
                         help="Configuration file for the bot, default=" + CONFIG_DEFAULT)
     parser.add_argument("-m", "--models", required=True, help="Directory name with models to serve")
+    parser.add_argument("-l", "--log", required=True, help="Log name to keep the games and leaderboard")
     prog_args = parser.parse_args()
 
     conf = configparser.ConfigParser()
@@ -190,7 +232,7 @@ if __name__ == "__main__":
         log.error("Configuration file %s not found", prog_args.config)
         sys.exit()
 
-    player_bot = PlayerBot(prog_args.models)
+    player_bot = PlayerBot(prog_args.models, prog_args.log)
 
     updater = telegram.ext.Updater(conf['telegram']['api'])
     updater.dispatcher.add_handler(telegram.ext.CommandHandler('help', player_bot.command_help))
