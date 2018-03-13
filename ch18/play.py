@@ -28,7 +28,7 @@ if __name__ == "__main__":
             score = 0.0
             for _ in range(args.rounds):
                 r = model.play_game(n1[1], n2[1])
-                print(r)
+#                print(r)
                 score += r
             print("%s vs %s -> %.1f" % (n1[0], n2[0], score))
             table[idx1][idx2] += score
