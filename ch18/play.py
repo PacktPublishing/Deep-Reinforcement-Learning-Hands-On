@@ -7,6 +7,12 @@ from lib import game, model
 import torch
 
 
+def update_counts(counts_dict, key, counts):
+    v = counts_dict.get(key, (0, 0, 0))
+    res = (v[0] + counts[0], v[1] + counts[1], v[2] + counts[2])
+    counts_dict[key] = res
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("models", nargs='+', help="The list of models (at least 2) to play against each other")
@@ -19,19 +25,32 @@ if __name__ == "__main__":
         net.load_state_dict(torch.load(fname, map_location=lambda storage, loc: storage))
         nets.append((fname, net))
 
-    table = np.zeros((len(nets), len(nets)))
+    total_agent = {}
+    total_pairs = {}
 
     for idx1, n1 in enumerate(nets):
         for idx2, n2 in enumerate(nets):
-            if idx1 == idx2:
-                continue
-            score = 0.0
+            wins, losses, draws = 0, 0, 0
             for _ in range(args.rounds):
                 r = model.play_game(n1[1], n2[1])
-#                print(r)
-                score += r
-            print("%s vs %s -> %.1f" % (n1[0], n2[0], score))
-            table[idx1][idx2] += score
-            table[idx2][idx1] -= score
+                if r > 0.5:
+                    wins += 1
+                elif r < -0.5:
+                    losses += 1
+                else:
+                    draws += 1
+            name_1, name_2 = n1[0], n2[0]
+            print("%s vs %s -> w=%d, l=%d, d=%d" % (name_1, name_2, wins, losses, draws))
+            update_counts(total_agent, name_1, (wins, losses, draws))
+            update_counts(total_agent, name_2, (losses, wins, draws))
+            update_counts(total_pairs, (name_1, name_2), (wins, losses, draws))
+
+    # leaderboard by total wins
+    total_leaders = list(total_agent.items())
+    total_leaders.sort(reverse=True, key=lambda p: p[1][0])
+
+    print("Leaderboard:")
+    for name, (wins, losses, draws) in total_leaders:
+        print("%s: \t w=%d, l=%d, d=%d" % (name, wins, losses, draws))
 
     pass
