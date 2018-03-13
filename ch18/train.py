@@ -19,14 +19,13 @@ from torch.autograd import Variable
 
 MCTS_SEARCHES = 3
 MCTS_BATCH_SIZE = 30
-REPLAY_BUFFER = 30000
+REPLAY_BUFFER = 10000
 LEARNING_RATE = 0.1
 BATCH_SIZE = 256
 TRAIN_ROUNDS = 10
 MIN_REPLAY_TO_TRAIN = REPLAY_BUFFER
 
-BEST_SCORES_HIST = 30
-BEST_NET_WIN_RATIO = 0.55
+BEST_NET_WIN_RATIO = 0.6
 
 EVALUATE_EVERY_STEP = 50
 EVALUATION_ROUNDS = 100
@@ -120,11 +119,11 @@ if __name__ == "__main__":
             tb_tracker.track("speed_nodes", speed_nodes, step_idx)
             print("Game %d, steps %3d, leaves %4d, steps/s %5.2f, leaves/s %6.2f, best_idx %d, replay %d" % (
                 step_idx, game_steps, game_nodes, speed_steps, speed_nodes, best_idx, len(replay_buffer)))
+            step_idx += 1
 
             if len(replay_buffer) < MIN_REPLAY_TO_TRAIN:
                 continue
 
-            step_idx += 1
 
             # train
             sum_loss = 0.0
