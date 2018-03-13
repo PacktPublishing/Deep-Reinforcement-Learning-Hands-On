@@ -30,6 +30,7 @@ BEST_NET_WIN_RATIO = 0.55
 
 EVALUATE_EVERY_STEP = 50
 EVALUATION_ROUNDS = 100
+STEPS_BEFORE_TAU_0 = 10
 
 
 def play_game(mcts_store, replay_buffer, net1, net2, cuda=False):
@@ -46,9 +47,10 @@ def play_game(mcts_store, replay_buffer, net1, net2, cuda=False):
     cur_player = np.random.choice(2)
     step = 0
     result = None
+    tau = 1
     while result is None:
         mcts_store.search_batch(MCTS_SEARCHES, MCTS_BATCH_SIZE, state, cur_player, nets[cur_player], cuda=cuda)
-        probs, values = mcts_store.get_policy_value(state)
+        probs, values = mcts_store.get_policy_value(state, tau=tau)
         if replay_buffer is not None:
             replay_buffer.append((state, cur_player, probs, values))
         action = np.random.choice(game.GAME_COLS, p=probs)
@@ -62,6 +64,8 @@ def play_game(mcts_store, replay_buffer, net1, net2, cuda=False):
         if len(game.possible_moves(state)) == 0:
             result = 0.0
         step += 1
+        if step >= STEPS_BEFORE_TAU_0:
+            tau = 0
     return result, step
 
 
