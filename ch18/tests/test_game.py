@@ -117,3 +117,18 @@ class TestMoveFunctions(unittest.TestCase):
         _, won = game.move(f, 0, 0)
         self.assertFalse(won)
 
+    def test_tricky(self):
+        f = game.encode_lists([
+            [0, 1, 1],
+            [1, 0],
+            [0, 1],
+            [0, 0, 1],
+            [0, 0],
+            [1, 1, 1, 0],
+            []
+        ])
+        s, won = game.move(f, 4, 0)
+        self.assertTrue(won)
+        self.assertEqual(s, 3531389463375529686)
+
+pass
