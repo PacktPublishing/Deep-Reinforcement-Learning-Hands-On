@@ -89,7 +89,8 @@ class PlayerBot:
         self.sessions = {}
         self.models = self._read_models(models_dir)
         self.log_file = log_file
-        self.leaderboard = self._read_leaderboard(log_file)
+        self.leaderboard = {}
+        self._read_leaderboard(log_file)
 
     def _read_models(self, models_dir):
         result = {}
@@ -98,9 +99,28 @@ class PlayerBot:
         return result
 
     def _read_leaderboard(self, log_file):
-        return []
+        with open(log_file, 'rt', encoding='utf-8') as fd:
+            for l in fd:
+                data = json.loads(l)
+                bot_name = os.path.basename(data['model_file'])
+                user_name = data['player_id'].split(':')[0]
+                bot_score = data['bot_score']
+                self._update_leaderboard(bot_score, bot_name, user_name)
+
+    def _update_leaderboard(self, bot_score, bot_name, user_name):
+        if bot_score > 0.5:
+            game.update_counts(self.leaderboard, bot_name, (1, 0, 0))
+            game.update_counts(self.leaderboard, user_name, (0, 1, 0))
+        elif bot_score < -0.5:
+            game.update_counts(self.leaderboard, bot_name, (0, 1, 0))
+            game.update_counts(self.leaderboard, user_name, (1, 0, 0))
+        else:
+            game.update_counts(self.leaderboard, bot_name, (0, 0, 1))
+            game.update_counts(self.leaderboard, user_name, (0, 0, 1))
 
     def _save_log(self, session, bot_score):
+        self._update_leaderboard(bot_score, os.path.basename(session.model_file),
+                                 session.player_id.split(':')[0])
         data = {
             "ts": time.time(),
             "time": datetime.datetime.utcnow().isoformat(),
@@ -124,6 +144,7 @@ This a <a href="https://en.wikipedia.org/wiki/Connect_Four">4-in-a-row</a> game 
 This bot understands the following commands:
 <b>/list</b> to list available pre-trained models (the higher the ID, the stronger the play)
 <b>/play MODEL_ID</b> to start the new game against the specified model
+<b>/top</b> show leaderboard
 
 During the game, your moves are numbers of columns to drop the disk.
 """)
@@ -217,6 +238,15 @@ During the game, your moves are numbers of columns to drop the disk.
         except TimedOut:
             log.info("Timed out error")
 
+    def command_top(self, bot, update):
+        res = ["Leader board"]
+        items = list(self.leaderboard.items())
+        items.sort(reverse=True, key=lambda p: p[1][0])
+        for user, (wins, losses, draws) in items:
+            res.append("%20s: won=%d, lost=%d, draw=%d" % (user[:20], wins, losses, draws))
+        l = "\n".join(res)
+        bot.send_message(chat_id=update.message.chat_id, text="<pre>" + l + "</pre>", parse_mode="HTML")
+
 
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)-15s %(levelname)s %(message)s", level=logging.INFO)
@@ -237,6 +267,7 @@ if __name__ == "__main__":
     updater = telegram.ext.Updater(conf['telegram']['api'])
     updater.dispatcher.add_handler(telegram.ext.CommandHandler('help', player_bot.command_help))
     updater.dispatcher.add_handler(telegram.ext.CommandHandler('list', player_bot.command_list))
+    updater.dispatcher.add_handler(telegram.ext.CommandHandler('top', player_bot.command_top))
     updater.dispatcher.add_handler(telegram.ext.CommandHandler('play', player_bot.command_play, pass_args=True))
     updater.dispatcher.add_handler(telegram.ext.MessageHandler(telegram.ext.Filters.text, player_bot.text))
     updater.dispatcher.add_error_handler(player_bot.error)

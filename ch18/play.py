@@ -7,12 +7,6 @@ from lib import game, model
 import torch
 
 
-def update_counts(counts_dict, key, counts):
-    v = counts_dict.get(key, (0, 0, 0))
-    res = (v[0] + counts[0], v[1] + counts[1], v[2] + counts[2])
-    counts_dict[key] = res
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("models", nargs='+', help="The list of models (at least 2) to play against each other")
@@ -42,9 +36,9 @@ if __name__ == "__main__":
             name_1, name_2 = n1[0], n2[0]
             print("%s vs %s -> w=%d, l=%d, d=%d" % (name_1, name_2, wins, losses, draws))
             sys.stdout.flush()
-            update_counts(total_agent, name_1, (wins, losses, draws))
-            update_counts(total_agent, name_2, (losses, wins, draws))
-            update_counts(total_pairs, (name_1, name_2), (wins, losses, draws))
+            game.update_counts(total_agent, name_1, (wins, losses, draws))
+            game.update_counts(total_agent, name_2, (losses, wins, draws))
+            game.update_counts(total_pairs, (name_1, name_2), (wins, losses, draws))
 
     # leaderboard by total wins
     total_leaders = list(total_agent.items())

@@ -6,7 +6,7 @@ which are encoded by 1 (black) and 0 (white).
 
 There are two representation of the game:
 1. List of 7 lists with elements ordered from the bottom. For example, this field
- 
+
 0     1
 0     1
 10    1
@@ -23,7 +23,7 @@ Will be encoded as [
   [1],
   [1, 1, 1, 1, 1, 1]
 ]
-  
+
 2. integer number consists from:
     a. 7*6 bits (column-wise) encoding the field. Unoccupied bits are zero
     b. 7*3 bits, each 3-bit number encodes amount of free entries on the top.
@@ -45,7 +45,7 @@ In this representation, the field above will be equal to those bits:
     000
 ]
 
-All the code is generic, so, in theory you can try to adjust the field size. 
+All the code is generic, so, in theory you can try to adjust the field size.
 But tests could become broken.
 """
 GAME_ROWS = 6
@@ -102,8 +102,8 @@ INITIAL_STATE = encode_lists([[]] * GAME_COLS)
 def decode_binary(state_int):
     """
     Decode binary representation into the list view
-    :param state_int: integer representing the field 
-    :return: list of GAME_COLS lists 
+    :param state_int: integer representing the field
+    :return: list of GAME_COLS lists
     """
     assert isinstance(state_int, int)
     bits = int_to_bits(state_int, bits=GAME_COLS*GAME_ROWS + GAME_COLS*BITS_IN_LEN)
@@ -170,9 +170,9 @@ def move(state_int, col, player):
     Perform move into given column. Assume the move could be performed, otherwise, assertion will be raised
     :param state_int: current state
     :param col: column to make a move
-    :param player: player index (PLAYER_WHITE or PLAYER_BLACK  
-    :return: tuple of (state_new, won). Value won is bool, True if this move lead 
-    to victory or False otherwise (but it could be a draw) 
+    :param player: player index (PLAYER_WHITE or PLAYER_BLACK
+    :return: tuple of (state_new, won). Value won is bool, True if this move lead
+    to victory or False otherwise (but it could be a draw)
     """
     assert isinstance(state_int, int)
     assert isinstance(col, int)
@@ -198,3 +198,9 @@ def render(state_int):
             row_idx = GAME_ROWS - rev_row_idx - 1
             data[row_idx][col_idx] = str(cell)
     return [''.join(row) for row in data]
+
+
+def update_counts(counts_dict, key, counts):
+    v = counts_dict.get(key, (0, 0, 0))
+    res = (v[0] + counts[0], v[1] + counts[1], v[2] + counts[2])
+    counts_dict[key] = res
