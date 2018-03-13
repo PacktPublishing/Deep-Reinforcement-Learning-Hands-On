@@ -17,8 +17,8 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 
-MCTS_SEARCHES = 10
-MCTS_BATCH_SIZE = 40
+MCTS_SEARCHES = 3
+MCTS_BATCH_SIZE = 30
 REPLAY_BUFFER = 30000
 LEARNING_RATE = 0.1
 BATCH_SIZE = 256
@@ -118,8 +118,8 @@ if __name__ == "__main__":
             speed_nodes = game_nodes / dt
             tb_tracker.track("speed_steps", speed_steps, step_idx)
             tb_tracker.track("speed_nodes", speed_nodes, step_idx)
-            print("Game %d, steps %3d, leaves %4d, steps/s %5.2f, leaves/s %6.2f, best_idx %d" % (
-                step_idx, game_steps, game_nodes, speed_steps, speed_nodes, best_idx))
+            print("Game %d, steps %3d, leaves %4d, steps/s %5.2f, leaves/s %6.2f, best_idx %d, replay %d" % (
+                step_idx, game_steps, game_nodes, speed_steps, speed_nodes, best_idx, len(replay_buffer)))
 
             if len(replay_buffer) < MIN_REPLAY_TO_TRAIN:
                 continue
@@ -162,7 +162,6 @@ if __name__ == "__main__":
             tb_tracker.track("loss_total", sum_loss / TRAIN_ROUNDS, step_idx)
             tb_tracker.track("loss_value", sum_value_loss / TRAIN_ROUNDS, step_idx)
             tb_tracker.track("loss_policy", sum_policy_loss / TRAIN_ROUNDS, step_idx)
-            tb_tracker.track("replay_size", len(replay_buffer), step_idx)
 
             # evaluate net
             if step_idx % EVALUATE_EVERY_STEP == 0:
