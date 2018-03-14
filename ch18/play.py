@@ -7,6 +7,10 @@ from lib import game, model
 import torch
 
 
+MCTS_SEARCHES = 3
+MCTS_BATCH_SIZE = 30
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("models", nargs='+', help="The list of models (at least 2) to play against each other")
@@ -26,7 +30,8 @@ if __name__ == "__main__":
         for idx2, n2 in enumerate(nets):
             wins, losses, draws = 0, 0, 0
             for _ in range(args.rounds):
-                r = model.play_game(n1[1], n2[1])
+                r, _ = model.play_game(mcts_store=None, replay_buffer=None, net1=n1[1], net2=n2[1], steps_before_tau_0=0,
+                                    mcts_searches=MCTS_SEARCHES, mcts_batch_size=MCTS_BATCH_SIZE)
                 if r > 0.5:
                     wins += 1
                 elif r < -0.5:

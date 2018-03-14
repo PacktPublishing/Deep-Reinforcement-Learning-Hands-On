@@ -12,7 +12,10 @@ import numpy as np
 import configparser
 import argparse
 
-from lib import game, model
+from lib import game, model, mcts
+
+MCTS_SEARCHES = 3
+MCTS_BATCH_SIZE = 30
 
 try:
     import telegram.ext
@@ -45,6 +48,7 @@ class Session:
         self.player_moves_first = player_moves_first
         self.player_id = player_id
         self.moves = []
+        self.mcts_store = mcts.MCTS()
 
     def move_player(self, col):
         self.moves.append(col)
@@ -52,16 +56,10 @@ class Session:
         return won
 
     def move_bot(self):
-        state_list = game.decode_binary(self.state)
-        batch_v = model.state_lists_to_batch([state_list], [self.BOT_PLAYER])
-        logits_v, values_v = self.model(batch_v)
-        probs_v = F.softmax(logits_v)
-        probs = probs_v[0].data.cpu().numpy()
-        self.value = values_v.data.cpu().numpy()[0]
-        while True:
-            action = np.random.choice(game.GAME_COLS, p=probs)
-            if action in game.possible_moves(self.state):
-                break
+        self.mcts_store.search_batch(MCTS_SEARCHES, MCTS_BATCH_SIZE, self.state, self.BOT_PLAYER, self.model)
+        probs, values = self.mcts_store.get_policy_value(self.state, tau=0)
+        action = np.random.choice(game.GAME_COLS, p=probs)
+        self.value = values[action]
         self.moves.append(action)
         self.state, won = game.move(self.state, action, self.BOT_PLAYER)
         return won
