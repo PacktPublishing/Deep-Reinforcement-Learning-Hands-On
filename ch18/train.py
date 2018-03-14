@@ -16,17 +16,18 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 
 
-MCTS_SEARCHES = 5
+PLAY_EPISODES = 25
+MCTS_SEARCHES = 10
 MCTS_BATCH_SIZE = 8
-REPLAY_BUFFER = 5000
+REPLAY_BUFFER = 30000
 LEARNING_RATE = 0.1
 BATCH_SIZE = 256
 TRAIN_ROUNDS = 10
-MIN_REPLAY_TO_TRAIN = 1000
+MIN_REPLAY_TO_TRAIN = 10000
 
 BEST_NET_WIN_RATIO = 0.60
 
-EVALUATE_EVERY_STEP = 100
+EVALUATE_EVERY_STEP = 10
 EVALUATION_ROUNDS = 10
 STEPS_BEFORE_TAU_0 = 10
 
@@ -71,16 +72,19 @@ if __name__ == "__main__":
         while True:
             t = time.time()
             prev_nodes = len(mcts_store)
-            game_res, game_steps = model.play_game(mcts_store, replay_buffer, best_net.target_model, best_net.target_model,
-                                                   steps_before_tau_0=STEPS_BEFORE_TAU_0, mcts_searches=MCTS_SEARCHES,
-                                                   mcts_batch_size=MCTS_BATCH_SIZE, cuda=args.cuda)
+            game_steps = 0
+            for _ in range(PLAY_EPISODES):
+                _, steps = model.play_game(mcts_store, replay_buffer, best_net.target_model, best_net.target_model,
+                                           steps_before_tau_0=STEPS_BEFORE_TAU_0, mcts_searches=MCTS_SEARCHES,
+                                           mcts_batch_size=MCTS_BATCH_SIZE, cuda=args.cuda)
+                game_steps += steps
             game_nodes = len(mcts_store) - prev_nodes
             dt = time.time() - t
             speed_steps = game_steps / dt
             speed_nodes = game_nodes / dt
             tb_tracker.track("speed_steps", speed_steps, step_idx)
             tb_tracker.track("speed_nodes", speed_nodes, step_idx)
-            print("Game %d, steps %3d, leaves %4d, steps/s %5.2f, leaves/s %6.2f, best_idx %d, replay %d" % (
+            print("Step %d, steps %3d, leaves %4d, steps/s %5.2f, leaves/s %6.2f, best_idx %d, replay %d" % (
                 step_idx, game_steps, game_nodes, speed_steps, speed_nodes, best_idx, len(replay_buffer)))
             step_idx += 1
 
