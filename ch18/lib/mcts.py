@@ -74,12 +74,10 @@ class MCTS:
             if won:
                 # if somebody won the game, the value of the final state is -1 (as it is on opponent's turn)
                 value = -1.0
-                break
             cur_player = 1-cur_player
             # check for the draw
-            if len(game.possible_moves(cur_state)) == 0:
+            if value is None and len(game.possible_moves(cur_state)) == 0:
                 value = 0.0
-                break
 
         return value, cur_state, cur_player, states, actions
 

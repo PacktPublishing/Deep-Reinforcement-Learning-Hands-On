@@ -14,8 +14,8 @@ import argparse
 
 from lib import game, model, mcts
 
-MCTS_SEARCHES = 3
-MCTS_BATCH_SIZE = 30
+MCTS_SEARCHES = 20
+MCTS_BATCH_SIZE = 4
 
 try:
     import telegram.ext
@@ -25,7 +25,6 @@ except ImportError:
     sys.exit()
 
 import torch
-import torch.nn.functional as F
 
 # Configuration file with the following contents
 # [telegram]

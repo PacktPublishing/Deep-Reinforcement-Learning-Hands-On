@@ -91,7 +91,6 @@ if __name__ == "__main__":
             if len(replay_buffer) < MIN_REPLAY_TO_TRAIN:
                 continue
 
-
             # train
             sum_loss = 0.0
             sum_value_loss = 0.0
@@ -109,9 +108,6 @@ if __name__ == "__main__":
                 if args.cuda:
                     probs_v = probs_v.cuda()
                     values_v = values_v.cuda()
-                # obtain expected value for the state
-#                state_value_v = (probs_v * values_v).sum(dim=1).detach()
-
                 out_logits_v, out_values_v = net(states_v)
 
                 loss_value_v = F.mse_loss(out_values_v, values_v)

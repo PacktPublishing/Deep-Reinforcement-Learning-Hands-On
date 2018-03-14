@@ -7,8 +7,8 @@ from lib import game, model
 import torch
 
 
-MCTS_SEARCHES = 3
-MCTS_BATCH_SIZE = 30
+MCTS_SEARCHES = 10
+MCTS_BATCH_SIZE = 8
 
 
 if __name__ == "__main__":
