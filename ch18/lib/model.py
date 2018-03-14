@@ -188,24 +188,37 @@ def play_game(mcts_store, replay_buffer, net1, net2, steps_before_tau_0, mcts_se
     else:
         cur_player = 0 if net1_plays_first else 1
     step = 0
-    result = None
     tau = 1 if steps_before_tau_0 > 0 else 0
+    game_history = []
+
+    result = None
+    net1_result = None
+
     while result is None:
         mcts_store.search_batch(mcts_searches, mcts_batch_size, state, cur_player, nets[cur_player], cuda=cuda)
-        probs, values = mcts_store.get_policy_value(state, tau=tau)
-        if replay_buffer is not None:
-            replay_buffer.append((state, cur_player, probs, max(values)))
+        probs, _ = mcts_store.get_policy_value(state, tau=tau)
+        game_history.append((state, cur_player, probs))
         action = np.random.choice(game.GAME_COLS, p=probs)
         if action not in game.possible_moves(state):
             print("Impossible action selected")
         state, won = game.move(state, action, cur_player)
         if won:
-            result = 1.0 if cur_player == 0 else -1
+            result = 1
+            net1_result = 1 if cur_player == 0 else -1
+            break
         cur_player = 1-cur_player
         # check the draw case
         if len(game.possible_moves(state)) == 0:
             result = 0
+            net1_result = 0
+            break
         step += 1
         if step >= steps_before_tau_0:
             tau = 0
-    return result, step
+
+    if replay_buffer is not None:
+        for state, cur_player, probs in reversed(game_history):
+            replay_buffer.append((state, cur_player, probs, result))
+            result = -result
+
+    return net1_result, step
