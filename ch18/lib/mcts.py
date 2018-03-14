@@ -39,7 +39,7 @@ class MCTS:
         :param state_int: root node state
         :param player: player to move
         :return: tuple of (value, leaf_state, player, states, actions)
-        1. value: None if leaf node, otherwise equals to the game outcome
+        1. value: None if leaf node, otherwise equals to the game outcome for the player at leaf
         2. leaf_state: state_int of the last state
         3. player: player at the leaf node
         4. states: list of states traversed
@@ -72,7 +72,8 @@ class MCTS:
             actions.append(action)
             cur_state, won = game.move(cur_state, action, cur_player)
             if won:
-                value = 1.0 if cur_player == player else -1
+                # if somebody won the game, the value of the final state is -1 (as it is on opponent's turn)
+                value = -1.0
                 break
             cur_player = 1-cur_player
             # check for the draw
@@ -128,10 +129,13 @@ class MCTS:
 
         # perform backup of the searches
         for value, states, actions in backup_queue:
-            for state_int, action in zip(states, actions):
+            # leaf state is not stored in states and actions, so the value of the leaf will be the value of the opponent
+            cur_value = -value
+            for state_int, action in zip(states[::-1], actions[::-1]):
                 self.visit_count[state_int][action] += 1
-                self.value[state_int][action] += value
+                self.value[state_int][action] += cur_value
                 self.value_avg[state_int][action] = self.value[state_int][action] / self.visit_count[state_int][action]
+                cur_value = -cur_value
 
     def get_policy_value(self, state_int, tau=1):
         """
