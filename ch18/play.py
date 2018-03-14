@@ -32,7 +32,7 @@ if __name__ == "__main__":
                 continue
             wins, losses, draws = 0, 0, 0
             for _ in range(args.rounds):
-                r, _ = model.play_game(mcts_store=None, replay_buffer=None, net1=n1[1], net2=n2[1], steps_before_tau_0=0,
+                r, _ = model.play_game(mcts_stores=None, replay_buffer=None, net1=n1[1], net2=n2[1], steps_before_tau_0=0,
                                     mcts_searches=MCTS_SEARCHES, mcts_batch_size=MCTS_BATCH_SIZE)
                 if r > 0.5:
                     wins += 1

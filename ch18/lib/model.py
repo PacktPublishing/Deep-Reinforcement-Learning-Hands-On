@@ -161,25 +161,28 @@ def state_lists_to_batch(state_lists, who_moves_lists, cuda=False):
 #
 
 
-def play_game(mcts_store, replay_buffer, net1, net2, steps_before_tau_0, mcts_searches, mcts_batch_size,
+def play_game(mcts_stores, replay_buffer, net1, net2, steps_before_tau_0, mcts_searches, mcts_batch_size,
               net1_plays_first=None, cuda=False):
     """
     Play one single game, memorizing transitions into the replay buffer
+    :param mcts_stores: could be None or single MCTS or two MCTSes for individual net
     :param replay_buffer: queue with (state, probs, values), if None, nothing is stored
     :param net1: player1
     :param net2: player2
     :return: value for the game in respect to player1 (+1 if p1 won, -1 if lost, 0 if draw)
     """
     assert isinstance(replay_buffer, (collections.deque, type(None)))
-    assert isinstance(mcts_store, (mcts.MCTS, type(None)))
+    assert isinstance(mcts_stores, (mcts.MCTS, type(None), list))
     assert isinstance(net1, Net)
     assert isinstance(net2, Net)
     assert isinstance(steps_before_tau_0, int) and steps_before_tau_0 >= 0
     assert isinstance(mcts_searches, int) and mcts_searches > 0
     assert isinstance(mcts_batch_size, int) and mcts_batch_size > 0
 
-    if mcts_store is None:
-        mcts_store = mcts.MCTS()
+    if mcts_stores is None:
+        mcts_stores = [mcts.MCTS(), mcts.MCTS()]
+    elif isinstance(mcts_stores, mcts.MCTS):
+        mcts_stores = [mcts_stores, mcts_stores]
 
     state = game.INITIAL_STATE
     nets = [net1, net2]
@@ -195,8 +198,8 @@ def play_game(mcts_store, replay_buffer, net1, net2, steps_before_tau_0, mcts_se
     net1_result = None
 
     while result is None:
-        mcts_store.search_batch(mcts_searches, mcts_batch_size, state, cur_player, nets[cur_player], cuda=cuda)
-        probs, _ = mcts_store.get_policy_value(state, tau=tau)
+        mcts_stores[cur_player].search_batch(mcts_searches, mcts_batch_size, state, cur_player, nets[cur_player], cuda=cuda)
+        probs, _ = mcts_stores[cur_player].get_policy_value(state, tau=tau)
         game_history.append((state, cur_player, probs))
         action = np.random.choice(game.GAME_COLS, p=probs)
         if action not in game.possible_moves(state):

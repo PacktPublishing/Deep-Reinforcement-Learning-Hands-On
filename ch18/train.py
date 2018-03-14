@@ -34,10 +34,12 @@ STEPS_BEFORE_TAU_0 = 10
 
 def evaluate(net1, net2, rounds, cuda=False):
     n1_win, n2_win = 0, 0
+    mcts_stores = [mcts.MCTS(), mcts.MCTS()]
+
     for r_idx in range(rounds):
-        r, _ = model.play_game(mcts_store=None, replay_buffer=None, net1=net1, net2=net2, steps_before_tau_0=0,
-                            mcts_searches=MCTS_SEARCHES, mcts_batch_size=MCTS_BATCH_SIZE,
-                            cuda=cuda)
+        r, _ = model.play_game(mcts_stores=mcts_stores, replay_buffer=None, net1=net1, net2=net2,
+                               steps_before_tau_0=0, mcts_searches=MCTS_SEARCHES, mcts_batch_size=MCTS_BATCH_SIZE,
+                               cuda=cuda)
         if r < -0.5:
             n2_win += 1
         elif r > 0.5:
