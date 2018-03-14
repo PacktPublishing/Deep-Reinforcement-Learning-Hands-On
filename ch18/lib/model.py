@@ -1,3 +1,4 @@
+import collections
 import numpy as np
 
 import torch
@@ -5,7 +6,7 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torch.nn.functional as F
 
-from lib import game
+from lib import game, mcts
 
 
 OBS_SHAPE = (2, game.GAME_ROWS, game.GAME_COLS)
@@ -135,26 +136,72 @@ def state_lists_to_batch(state_lists, who_moves_lists, cuda=False):
     return batch_v
 
 
-def play_game(net1, net2, cuda=False):
-    cur_player = 0
+# def play_game(net1, net2, cuda=False):
+#     cur_player = 0
+#     state = game.INITIAL_STATE
+#     nets = [net1, net2]
+#
+#     while True:
+#         state_list = game.decode_binary(state)
+#         batch_v = state_lists_to_batch([state_list], [cur_player], cuda)
+#         logits_v, _ = nets[cur_player](batch_v)
+#         probs_v = F.softmax(logits_v)
+#         probs = probs_v[0].data.cpu().numpy()
+#         while True:
+#             action = np.random.choice(game.GAME_COLS, p=probs)
+#             if action in game.possible_moves(state):
+#                 break
+#         state, won = game.move(state, action, cur_player)
+#         if won:
+#             return 1.0 if cur_player == 0 else -1.0
+#         # check for the draw state
+#         if len(game.possible_moves(state)) == 0:
+#             return 0.0
+#         cur_player = 1 - cur_player
+#
+
+
+def play_game(mcts_store, replay_buffer, net1, net2, steps_before_tau_0, mcts_searches, mcts_batch_size, cuda=False):
+    """
+    Play one single game, memorizing transitions into the replay buffer
+    :param replay_buffer: queue with (state, probs, values), if None, nothing is stored
+    :param net1: player1
+    :param net2: player2
+    :return: value for the game in respect to player1 (+1 if p1 won, -1 if lost, 0 if draw)
+    """
+    assert isinstance(replay_buffer, (collections.deque, type(None)))
+    assert isinstance(mcts_store, (mcts.MCTS, type(None)))
+    assert isinstance(net1, Net)
+    assert isinstance(net2, Net)
+    assert isinstance(steps_before_tau_0, int) and steps_before_tau_0 >= 0
+    assert isinstance(mcts_searches, int) and mcts_searches > 0
+    assert isinstance(mcts_batch_size, int) and mcts_batch_size > 0
+
+    if mcts_store is None:
+        mcts_store = mcts.MCTS()
+
     state = game.INITIAL_STATE
     nets = [net1, net2]
-
-    while True:
-        state_list = game.decode_binary(state)
-        batch_v = state_lists_to_batch([state_list], [cur_player], cuda)
-        logits_v, _ = nets[cur_player](batch_v)
-        probs_v = F.softmax(logits_v)
-        probs = probs_v[0].data.cpu().numpy()
-        while True:
-            action = np.random.choice(game.GAME_COLS, p=probs)
-            if action in game.possible_moves(state):
-                break
+    cur_player = np.random.choice(2)
+    step = 0
+    result = None
+    tau = 1 if steps_before_tau_0 > 0 else 0
+    while result is None:
+        mcts_store.search_batch(mcts_searches, mcts_batch_size, state, cur_player, nets[cur_player], cuda=cuda)
+        probs, values = mcts_store.get_policy_value(state, tau=tau)
+        if replay_buffer is not None:
+            replay_buffer.append((state, cur_player, probs, values))
+        action = np.random.choice(game.GAME_COLS, p=probs)
+        if action not in game.possible_moves(state):
+            print("Impossible action selected")
         state, won = game.move(state, action, cur_player)
         if won:
-            return 1.0 if cur_player == 0 else -1.0
-        # check for the draw state
+            result = 1.0 if cur_player == 0 else -1
+        cur_player = 1-cur_player
+        # check the draw case
         if len(game.possible_moves(state)) == 0:
-            return 0.0
-        cur_player = 1 - cur_player
-
+            result = 0.0
+        step += 1
+        if step >= steps_before_tau_0:
+            tau = 0
+    return result, step

@@ -5,7 +5,6 @@ import ptan
 import random
 import argparse
 import collections
-import numpy as np
 
 from lib import game, model, mcts
 
@@ -19,62 +18,30 @@ from torch.autograd import Variable
 
 MCTS_SEARCHES = 3
 MCTS_BATCH_SIZE = 30
-REPLAY_BUFFER = 10000
+REPLAY_BUFFER = 5000
 LEARNING_RATE = 0.1
 BATCH_SIZE = 256
 TRAIN_ROUNDS = 10
-MIN_REPLAY_TO_TRAIN = REPLAY_BUFFER
+MIN_REPLAY_TO_TRAIN = 1000
 
-BEST_NET_WIN_RATIO = 0.6
+BEST_NET_WIN_RATIO = 0.55
 
 EVALUATE_EVERY_STEP = 50
 EVALUATION_ROUNDS = 100
 STEPS_BEFORE_TAU_0 = 10
 
 
-def play_game(mcts_store, replay_buffer, net1, net2, cuda=False):
-    """
-    Play one single game, memorizing transitions into the replay buffer
-    :param replay_buffer: queue with (state, probs, values), if None, nothing is stored
-    :param net1: player1
-    :param net2: player2
-    :return: value for the game in respect to player1 (+1 if p1 won, -1 if lost, 0 if draw)
-    """
-    assert isinstance(replay_buffer, (collections.deque, type(None)))
-    state = game.INITIAL_STATE
-    nets = [net1, net2]
-    cur_player = np.random.choice(2)
-    step = 0
-    result = None
-    tau = 1
-    while result is None:
-        mcts_store.search_batch(MCTS_SEARCHES, MCTS_BATCH_SIZE, state, cur_player, nets[cur_player], cuda=cuda)
-        probs, values = mcts_store.get_policy_value(state, tau=tau)
-        if replay_buffer is not None:
-            replay_buffer.append((state, cur_player, probs, values))
-        action = np.random.choice(game.GAME_COLS, p=probs)
-        if action not in game.possible_moves(state):
-            print("Impossible action selected")
-        state, won = game.move(state, action, cur_player)
-        if won:
-            result = 1.0 if cur_player == 0 else -1
-        cur_player = 1-cur_player
-        # check the draw case
-        if len(game.possible_moves(state)) == 0:
-            result = 0.0
-        step += 1
-        if step >= STEPS_BEFORE_TAU_0:
-            tau = 0
-    return result, step
-
-
 def evaluate(net1, net2, rounds, cuda=False):
     n1_win, n2_win = 0, 0
     for r_idx in range(rounds):
         if r_idx % 2 == 0:
-            r = model.play_game(net1, net2, cuda)
+            r = model.play_game(mcts_store=None, replay_buffer=None, net1=net1, net2=net2, steps_before_tau_0=0,
+                                mcts_searches=MCTS_SEARCHES, mcts_batch_size=MCTS_BATCH_SIZE,
+                                cuda=cuda)
         else:
-            r = -model.play_game(net2, net1, cuda)
+            r = -model.play_game(mcts_store=None, replay_buffer=None, net1=net2, net2=net1, steps_before_tau_0=0,
+                                 mcts_searches=MCTS_SEARCHES, mcts_batch_size=MCTS_BATCH_SIZE,
+                                 cuda=cuda)
         if r < -0.5:
             n2_win += 1
         elif r > 0.5:
@@ -109,8 +76,9 @@ if __name__ == "__main__":
         while True:
             t = time.time()
             prev_nodes = len(mcts_store)
-            game_res, game_steps = play_game(mcts_store, replay_buffer, best_net.target_model,
-                                             best_net.target_model, cuda=args.cuda)
+            game_res, game_steps = model.play_game(mcts_store, replay_buffer, best_net.target_model, best_net.target_model,
+                                                   steps_before_tau_0=STEPS_BEFORE_TAU_0, mcts_searches=MCTS_SEARCHES,
+                                                   mcts_batch_size=MCTS_BATCH_SIZE, cuda=args.cuda)
             game_nodes = len(mcts_store) - prev_nodes
             dt = time.time() - t
             speed_steps = game_steps / dt
