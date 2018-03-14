@@ -83,7 +83,6 @@ class Session:
         return extra + "<pre>%s</pre>" % board
 
 
-
 class PlayerBot:
     def __init__(self, models_dir, log_file):
         self.sessions = {}
@@ -99,6 +98,8 @@ class PlayerBot:
         return result
 
     def _read_leaderboard(self, log_file):
+        if not os.path.exists(log_file):
+            return 
         with open(log_file, 'rt', encoding='utf-8') as fd:
             for l in fd:
                 data = json.loads(l)
