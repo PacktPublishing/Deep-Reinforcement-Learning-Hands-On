@@ -161,7 +161,8 @@ def state_lists_to_batch(state_lists, who_moves_lists, cuda=False):
 #
 
 
-def play_game(mcts_store, replay_buffer, net1, net2, steps_before_tau_0, mcts_searches, mcts_batch_size, cuda=False):
+def play_game(mcts_store, replay_buffer, net1, net2, steps_before_tau_0, mcts_searches, mcts_batch_size,
+              net1_plays_first=None, cuda=False):
     """
     Play one single game, memorizing transitions into the replay buffer
     :param replay_buffer: queue with (state, probs, values), if None, nothing is stored
@@ -182,7 +183,10 @@ def play_game(mcts_store, replay_buffer, net1, net2, steps_before_tau_0, mcts_se
 
     state = game.INITIAL_STATE
     nets = [net1, net2]
-    cur_player = np.random.choice(2)
+    if net1_plays_first is None:
+        cur_player = np.random.choice(2)
+    else:
+        cur_player = 0 if net1_plays_first else 1
     step = 0
     result = None
     tau = 1 if steps_before_tau_0 > 0 else 0
@@ -200,7 +204,7 @@ def play_game(mcts_store, replay_buffer, net1, net2, steps_before_tau_0, mcts_se
         cur_player = 1-cur_player
         # check the draw case
         if len(game.possible_moves(state)) == 0:
-            result = 0.0
+            result = 0
         step += 1
         if step >= steps_before_tau_0:
             tau = 0
