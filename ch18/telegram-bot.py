@@ -84,6 +84,7 @@ class Session:
 class PlayerBot:
     def __init__(self, models_dir, log_file):
         self.sessions = {}
+        self.models_dir = models_dir
         self.models = self._read_models(models_dir)
         self.log_file = log_file
         self.leaderboard = {}
@@ -246,6 +247,10 @@ During the game, your moves are numbers of columns to drop the disk.
         l = "\n".join(res)
         bot.send_message(chat_id=update.message.chat_id, text="<pre>" + l + "</pre>", parse_mode="HTML")
 
+    def command_refresh(self, bot, update):
+        self.models = self._read_models(self.models_dir)
+        bot.send_message(chat_id=update.message.chat_id, text="Models reloaded, %d files have found" % len(self.models))
+
 
 if __name__ == "__main__":
     logging.basicConfig(format="%(asctime)-15s %(levelname)s %(message)s", level=logging.INFO)
@@ -268,6 +273,7 @@ if __name__ == "__main__":
     updater.dispatcher.add_handler(telegram.ext.CommandHandler('list', player_bot.command_list))
     updater.dispatcher.add_handler(telegram.ext.CommandHandler('top', player_bot.command_top))
     updater.dispatcher.add_handler(telegram.ext.CommandHandler('play', player_bot.command_play, pass_args=True))
+    updater.dispatcher.add_handler(telegram.ext.CommandHandler('refresh', player_bot.command_refresh))
     updater.dispatcher.add_handler(telegram.ext.MessageHandler(telegram.ext.Filters.text, player_bot.text))
     updater.dispatcher.add_error_handler(player_bot.error)
 
