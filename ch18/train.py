@@ -27,8 +27,8 @@ MIN_REPLAY_TO_TRAIN = 1000 #10000
 
 BEST_NET_WIN_RATIO = 0.60
 
-EVALUATE_EVERY_STEP = 10
-EVALUATION_ROUNDS = 10
+EVALUATE_EVERY_STEP = 50
+EVALUATION_ROUNDS = 20
 STEPS_BEFORE_TAU_0 = 10
 
 
@@ -110,11 +110,11 @@ if __name__ == "__main__":
                     probs_v = probs_v.cuda()
                     values_v = values_v.cuda()
                 # obtain expected value for the state
-                state_value_v = (probs_v * values_v).sum(dim=1).detach()
+#                state_value_v = (probs_v * values_v).sum(dim=1).detach()
 
                 out_logits_v, out_values_v = net(states_v)
 
-                loss_value_v = F.mse_loss(out_values_v, state_value_v)
+                loss_value_v = F.mse_loss(out_values_v, values_v)
                 loss_policy_v = -F.log_softmax(out_logits_v) * probs_v
                 loss_policy_v = loss_policy_v.sum(dim=1).mean()
 

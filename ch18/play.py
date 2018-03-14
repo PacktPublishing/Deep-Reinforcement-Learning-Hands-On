@@ -28,6 +28,8 @@ if __name__ == "__main__":
 
     for idx1, n1 in enumerate(nets):
         for idx2, n2 in enumerate(nets):
+            if idx1 == idx2:
+                continue
             wins, losses, draws = 0, 0, 0
             for _ in range(args.rounds):
                 r, _ = model.play_game(mcts_store=None, replay_buffer=None, net1=n1[1], net2=n2[1], steps_before_tau_0=0,

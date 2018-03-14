@@ -194,7 +194,7 @@ def play_game(mcts_store, replay_buffer, net1, net2, steps_before_tau_0, mcts_se
         mcts_store.search_batch(mcts_searches, mcts_batch_size, state, cur_player, nets[cur_player], cuda=cuda)
         probs, values = mcts_store.get_policy_value(state, tau=tau)
         if replay_buffer is not None:
-            replay_buffer.append((state, cur_player, probs, values))
+            replay_buffer.append((state, cur_player, probs, max(values)))
         action = np.random.choice(game.GAME_COLS, p=probs)
         if action not in game.possible_moves(state):
             print("Impossible action selected")
