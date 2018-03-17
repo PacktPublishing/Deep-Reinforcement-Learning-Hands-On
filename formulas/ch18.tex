@@ -1,0 +1,58 @@
+% C-c C-o to insert the block
+
+% Individual equation: equation* block
+% Inline equation \begin{math}\frac{sin(x)}{x}\end{math}
+\documentclass{article}
+
+\usepackage{amsmath,amssymb}
+
+\ifdefined\ispreview
+\usepackage[active,tightpage]{preview}
+\PreviewEnvironment{math}
+\PreviewEnvironment{equation*}
+\fi
+
+\DeclareMathOperator{\E}{\mathbb{E}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\begin{document}
+
+\subsection{Page 3}
+
+Each search starts from the root state following the most promising actions,
+selected using the utility value U(s, a), proportional to
+\begin{math}Q(s, a) + \frac{P(s, a)}{1+N(s,a)}\end{math}.
+
+\subsection{Page 4}
+Once the self-play game has been finished and the final outcome has become
+known, every step of the game is added to the training dataset, which is a list
+of tuples \begin{math}(s_t, \pi_t, r_t)\end{math},
+where \begin{math}s_t\end{math} is the game state, \begin{math}\pi_t\end{math} is the action
+probabilities calculated from MCTS search sampling and \begin{math}r_t\end{math} is the game’s outcome
+from the perspective of the player at step t.
+
+With this at hand, our training is simple: we sample minibatches from replay
+buffer of training examples and minimizing the MSE between the value head
+prediction and actual position value and cross-entropy loss between predicted
+probabilities and sampled probabilities \begin{math}\pi\end{math}.
+
+\subsection{Page 11}
+The final function in the class returns the probability of actions and the
+action values for game state using the gathered statistics during the MCTS
+searches. There are two modes of probability calculation, specified by the
+parameter \begin{math}\tau\end{math}. If it equals to zero, the selection becomes deterministic, as we
+select the most frequently visited action. In other cases, the distribution
+given by
+\begin{math}\frac{N(s,a)^\frac{1}{\tau}}{\sum_kN(s,k)^\frac{1}{\tau}}\end{math}
+is used, which, again, improves exploration.
+
+\subsection{Page 12}
+The function accepts lots of parameters, including MCTS class instance (one or
+two, as we potentially want to use separate MCTS statistics for different neural
+networks), optional replay buffer, networks to be used during the game, amount
+of game steps need to be taken before the \begin{math}\tau\end{math} parameter used for the action
+probability calculatation will be changed from 1 to 0. Other options are amount
+of MCTS searchers to perform and other flags.
+
+  
+\end{document}
