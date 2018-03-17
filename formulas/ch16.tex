@@ -1,0 +1,76 @@
+% C-c C-o to insert the block
+
+% Individual equation: equation* block
+% Inline equation \begin{math}\frac{sin(x)}{x}\end{math}
+\documentclass{article}
+
+\usepackage{amsmath,amssymb}
+
+\ifdefined\ispreview
+\usepackage[active,tightpage]{preview}
+\PreviewEnvironment{math}
+\PreviewEnvironment{equation*}
+\fi
+
+\DeclareMathOperator{\E}{\mathbb{E}}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\begin{document}
+
+\subsection{Page 1}
+
+One of the simplest example of the method in this family is random search, when
+you randomly sample the thing you’re looking for (in case of RL
+it’s the policy \begin{math}\pi(a|s)\end{math}), then you check
+
+\subsection{Page 2}
+
+More formally, the method above could be expressed as this sequence of steps.
+\begin{enumerate}
+  \item Initialize learning rate \begin{math}\alpha\end{math}, noise standard
+  deviation \begin{math}\sigma\end{math},
+    initial policy parameters \begin{math}\theta_0\end{math}
+  \item For t = 0, 1, 2, ... do
+    \begin{enumerate}
+    \item Sample batch of noise with a shape of the
+      weights \begin{math}\epsilon_1, \ldots, \epsilon_n \sim \mathcal{N}(0, I)\end{math}
+    \item Compute returns \begin{math}F_i=F(\theta_t + \sigma
+      \epsilon_i)\end{math} for \begin{math}i = 1, \ldots, n\end{math}
+    \item Update weights \begin{math}\theta_{t+1} \leftarrow
+      \theta_t+\alpha\frac{1}{n\sigma}\sum_{i=1}^nF_i\epsilon_i
+    \end{math}
+    \end{enumerate}
+\end{enumerate}
+
+\subsection{Page 4}
+
+The last and the central function of the method is train\_step which takes the
+batch with noise and their respective rewards and calculates the update to the
+network parameters by applying the formula
+\begin{math}\theta_{t+1} \leftarrow \theta_t+\alpha\frac{1}{n\sigma}\sum_{i=1}^nF_i\epsilon_i\end{math}
+
+
+\subsection{Page 12}
+
+
+\begin{enumerate}
+\item Initialize mutation power \begin{math}\sigma\end{math}, population size N,
+  number of the selected individuals T, initial
+  population \begin{math}P^0\end{math} with N randomly-initialized
+  policies, their fitness \begin{math}F^0=\{F(P^0_i)|i=1 \ldots N\}\end{math}
+\item For generation \begin{math}g = 1 \ldots G\end{math}
+
+  \begin{enumerate}
+    \item Sort generation \begin{math}P^{g-1}\end{math} by descending of fitness \begin{math}F^{g-1}\end{math}
+    \item Copy elite \begin{math}P^g_1=P^{g-1}_1, F_1^g=F_1^{g-1}\end{math}
+    \item For individual \begin{math}i = 2\ldots N\end{math}     
+      \begin{enumerate}
+      \item k = randomly select parent from \begin{math}1\ldots T\end{math}
+      \item Sample \begin{math}\epsilon \sim \mathcal{N}(0, I)\end{math}
+      \item Mutate parent \begin{math}P_i^g=P_i^{g-1}+\sigma\epsilon\end{math}
+      \item Get its fitness \begin{math}F_i^g=F(P_i^g)\end{math}
+      \end{enumerate}
+  \end{enumerate}
+\end{enumerate}
+
+\end{document}
