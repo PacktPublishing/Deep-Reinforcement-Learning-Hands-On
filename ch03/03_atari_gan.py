@@ -41,9 +41,10 @@ class InputWrapper(gym.ObservationWrapper):
         super(InputWrapper, self).__init__(*args)
         assert isinstance(self.observation_space, gym.spaces.Box)
         old_space = self.observation_space
-        self.observation_space = gym.spaces.Box(self._observation(old_space.low), self._observation(old_space.high))
+        self.observation_space = gym.spaces.Box(self.observation(old_space.low), self.observation(old_space.high),
+                                                dtype=np.float32)
 
-    def _observation(self, observation):
+    def observation(self, observation):
         # resize image
         new_obs = cv2.resize(observation, (IMAGE_SIZE, IMAGE_SIZE))
         # transform (210, 160, 3) -> (3, 210, 160)
