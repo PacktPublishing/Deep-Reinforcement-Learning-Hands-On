@@ -18,3 +18,5 @@ if __name__ == "__main__":
             break
 
     print("Episode done in %d steps, total reward %.2f" % (total_steps, total_reward))
+    env.close()
+    env.env.close()
