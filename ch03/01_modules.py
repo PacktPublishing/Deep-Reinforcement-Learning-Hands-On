@@ -12,7 +12,7 @@ class OurModule(nn.Module):
             nn.ReLU(),
             nn.Linear(20, num_classes),
             nn.Dropout(p=dropout_prob),
-            nn.Softmax()
+            nn.Softmax(dim=1)
         )
 
     def forward(self, x):
