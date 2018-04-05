@@ -80,7 +80,7 @@ def filter_batch(batch, percentile):
     train_act = []
     elite_batch = []
     for example, discounted_reward in zip(batch, disc_rewards):
-        if discounted_reward > reward_bound:
+        if discounted_reward >= reward_bound:
             train_obs.extend(map(lambda step: step.observation, example.steps))
             train_act.extend(map(lambda step: step.action, example.steps))
             elite_batch.append(example)
