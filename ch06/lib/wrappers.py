@@ -12,7 +12,10 @@ class FireResetEnv(gym.Wrapper):
         assert env.unwrapped.get_action_meanings()[1] == 'FIRE'
         assert len(env.unwrapped.get_action_meanings()) >= 3
 
-    def _reset(self):
+    def step(self, action):
+        return self.env.step(action)
+
+    def reset(self):
         self.env.reset()
         obs, _, done, _ = self.env.step(1)
         if done:
@@ -31,7 +34,7 @@ class MaxAndSkipEnv(gym.Wrapper):
         self._obs_buffer = collections.deque(maxlen=2)
         self._skip = skip
 
-    def _step(self, action):
+    def step(self, action):
         total_reward = 0.0
         done = None
         for _ in range(self._skip):
@@ -43,7 +46,7 @@ class MaxAndSkipEnv(gym.Wrapper):
         max_frame = np.max(np.stack(self._obs_buffer), axis=0)
         return max_frame, total_reward, done, info
 
-    def _reset(self):
+    def reset(self):
         """Clear past frame buffer and init. to first obs. from inner env."""
         self._obs_buffer.clear()
         obs = self.env.reset()
@@ -54,9 +57,9 @@ class MaxAndSkipEnv(gym.Wrapper):
 class ProcessFrame84(gym.ObservationWrapper):
     def __init__(self, env=None):
         super(ProcessFrame84, self).__init__(env)
-        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(84, 84, 1))
+        self.observation_space = gym.spaces.Box(low=0, high=255, shape=(84, 84, 1), dtype=np.uint8)
 
-    def _observation(self, obs):
+    def observation(self, obs):
         return ProcessFrame84.process(obs)
 
     @staticmethod
@@ -78,14 +81,15 @@ class ImageToPyTorch(gym.ObservationWrapper):
     def __init__(self, env):
         super(ImageToPyTorch, self).__init__(env)
         old_shape = self.observation_space.shape
-        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(old_shape[-1], old_shape[0], old_shape[1]))
+        self.observation_space = gym.spaces.Box(low=0.0, high=1.0, shape=(old_shape[-1], old_shape[0], old_shape[1]),
+                                                dtype=np.float32)
 
-    def _observation(self, observation):
+    def observation(self, observation):
         return np.moveaxis(observation, 2, 0)
 
 
 class ScaledFloatFrame(gym.ObservationWrapper):
-    def _observation(self, obs):
+    def observation(self, obs):
         return np.array(obs).astype(np.float32) / 255.0
 
 
@@ -95,13 +99,13 @@ class BufferWrapper(gym.ObservationWrapper):
         self.dtype = dtype
         old_space = env.observation_space
         self.observation_space = gym.spaces.Box(old_space.low.repeat(n_steps, axis=0),
-                                                old_space.high.repeat(n_steps, axis=0))
+                                                old_space.high.repeat(n_steps, axis=0), dtype=dtype)
 
-    def _reset(self):
+    def reset(self):
         self.buffer = np.zeros_like(self.observation_space.low, dtype=self.dtype)
-        return self._observation(self.env.reset())
+        return self.observation(self.env.reset())
 
-    def _observation(self, observation):
+    def observation(self, observation):
         self.buffer[:-1] = self.buffer[1:]
         self.buffer[-1] = observation
         return self.buffer
