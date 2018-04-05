@@ -80,14 +80,12 @@ def filter_batch(batch, percentile):
     train_act = []
     elite_batch = []
     for example, discounted_reward in zip(batch, disc_rewards):
-        if discounted_reward >= reward_bound:
+        if discounted_reward > reward_bound:
             train_obs.extend(map(lambda step: step.observation, example.steps))
             train_act.extend(map(lambda step: step.action, example.steps))
             elite_batch.append(example)
 
-    train_obs_v = Variable(torch.from_numpy(np.array(train_obs)))
-    train_act_v = Variable(torch.from_numpy(np.array(train_act)))
-    return elite_batch, train_obs_v, train_act_v, reward_bound
+    return elite_batch, train_obs, train_act, reward_bound
 
 
 if __name__ == "__main__":
@@ -99,15 +97,17 @@ if __name__ == "__main__":
 
     net = Net(obs_size, HIDDEN_SIZE, n_actions)
     objective = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(params=net.parameters(), lr=0.001)
+    optimizer = optim.Adam(params=net.parameters(), lr=0.0005)
     writer = SummaryWriter(comment="-frozenlake-tweaked")
 
     full_batch = []
     for iter_no, batch in enumerate(iterate_batches(env, net, BATCH_SIZE)):
         reward_mean = float(np.mean(list(map(lambda s: s.reward, batch))))
-        full_batch, obs_v, acts_v, reward_bound = filter_batch(full_batch + batch, PERCENTILE)
+        full_batch, obs, acts, reward_bound = filter_batch(full_batch + batch, PERCENTILE)
         if not full_batch:
             continue
+        obs_v = Variable(torch.from_numpy(np.array(obs)))
+        acts_v = Variable(torch.from_numpy(np.array(acts)))
         full_batch = full_batch[-500:]
 
         optimizer.zero_grad()

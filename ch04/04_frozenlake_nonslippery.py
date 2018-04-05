@@ -24,9 +24,9 @@ class DiscreteOneHotWrapper(gym.ObservationWrapper):
     def __init__(self, env):
         super(DiscreteOneHotWrapper, self).__init__(env)
         assert isinstance(env.observation_space, gym.spaces.Discrete)
-        self.observation_space = gym.spaces.Box(0.0, 1.0, (env.observation_space.n, ))
+        self.observation_space = gym.spaces.Box(0.0, 1.0, (env.observation_space.n, ), dtype=np.float32)
 
-    def _observation(self, observation):
+    def observation(self, observation):
         res = np.copy(self.observation_space.low)
         res[observation] = 1.0
         return res
@@ -54,9 +54,9 @@ def iterate_batches(env, net, batch_size):
     episode_reward = 0.0
     episode_steps = []
     obs = env.reset()
-    sm = nn.Softmax()
+    sm = nn.Softmax(dim=1)
     while True:
-        obs_v = Variable(torch.FloatTensor([obs]))
+        obs_v = Variable(torch.from_numpy(np.array([obs])))
         act_probs_v = sm(net(obs_v))
         act_probs = act_probs_v.data.numpy()[0]
         action = np.random.choice(len(act_probs), p=act_probs)
@@ -87,9 +87,7 @@ def filter_batch(batch, percentile):
             train_act.extend(map(lambda step: step.action, example.steps))
             elite_batch.append(example)
 
-    train_obs_v = Variable(torch.FloatTensor(train_obs))
-    train_act_v = Variable(torch.LongTensor(train_act))
-    return elite_batch, train_obs_v, train_act_v, reward_bound
+    return elite_batch, train_obs, train_act, reward_bound
 
 
 if __name__ == "__main__":
@@ -109,9 +107,11 @@ if __name__ == "__main__":
     full_batch = []
     for iter_no, batch in enumerate(iterate_batches(env, net, BATCH_SIZE)):
         reward_mean = float(np.mean(list(map(lambda s: s.reward, batch))))
-        full_batch, obs_v, acts_v, reward_bound = filter_batch(full_batch + batch, PERCENTILE)
+        full_batch, obs, acts, reward_bound = filter_batch(full_batch + batch, PERCENTILE)
         if not full_batch:
             continue
+        obs_v = Variable(torch.from_numpy(np.array(obs)))
+        acts_v = Variable(torch.from_numpy(np.array(acts)))
         full_batch = full_batch[-500:]
 
         optimizer.zero_grad()
