@@ -54,4 +54,6 @@ if __name__ == "__main__":
                 time.sleep(delta)
     print("Total reward: %.2f" % total_reward)
     print("Action counts:", c)
+    if args.record:
+        env.env.close()
 
