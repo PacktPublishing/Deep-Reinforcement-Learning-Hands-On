@@ -14,9 +14,13 @@ from tensorboardX import SummaryWriter
 
 from lib import common
 
-import matplotlib as mpl
-mpl.use("Agg")
-import matplotlib.pylab as plt
+SAVE_STATES_IMG = False
+SAVE_TRANSITIONS_IMG = False
+
+if SAVE_STATES_IMG or SAVE_TRANSITIONS_IMG:
+    import matplotlib as mpl
+    mpl.use("Agg")
+    import matplotlib.pylab as plt
 
 Vmax = 10
 Vmin = -10
@@ -25,9 +29,6 @@ DELTA_Z = (Vmax - Vmin) / (N_ATOMS - 1)
 
 STATES_TO_EVALUATE = 1000
 EVAL_EVERY_FRAME = 100
-
-SAVE_STATES_IMG = False
-SAVE_TRANSITIONS_IMG = False
 
 
 class DistributionalDQN(nn.Module):
