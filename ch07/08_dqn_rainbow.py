@@ -83,7 +83,7 @@ class RainbowDQN(nn.Module):
         return self.both(x)[1]
 
     def apply_softmax(self, t):
-        return self.softmax(t.view(-1, N_ATOMS), dim=1).view(t.size())
+        return self.softmax(t.view(-1, N_ATOMS)).view(t.size())
 
 
 def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
