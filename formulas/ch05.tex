@@ -154,7 +154,7 @@ precise estimation.
     initial value, usually zero.
     % todo: check
   \item For every state s in the MDP perform Bellman update: \begin{math}V_s \leftarrow
-    \max_a \sum_{s'}p_{a,s \rightarrow s'}(r_{s,a} + \gamma V_s')\end{math}
+    \max_a \sum_{s'}p_{a,s \rightarrow s'}(r_{s,a} + \gamma V_{s'})\end{math}
   \item Repeat step 2 for some large amount of steps or until changes become too small.
 \end{enumerate}
 
