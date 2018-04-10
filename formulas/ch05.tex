@@ -109,7 +109,7 @@ reward plus discounted long-term reward of destination state. We also can define
 
 And, finally, we can express Q(s, a) via itself, which will be used in the next chapter’s topic of Q-learning:
 \begin{equation*}
-Q(s,a)=r_{s,a} + \gamma \max_{s' \in A}Q(s',a')
+Q(s,a)=r_{s,a} + \gamma \max_{a' \in A}Q(s',a')
 \end{equation*}
 
 To give you a concrete example, let’s consider a simple environment which is
