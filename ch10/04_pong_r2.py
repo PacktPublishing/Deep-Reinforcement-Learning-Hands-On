@@ -94,7 +94,7 @@ def iterate_batches(envs, net, cuda=False):
             if cuda:
                 obs_v = obs_v.cuda()
             logits_v, values_v = net(obs_v)
-            probs_v = F.softmax(logits_v)
+            probs_v = F.softmax(logits_v, dim=1)
             probs = probs_v.data.cpu().numpy()
             actions = act_selector(probs)
             mb_probs[:, n] = probs
@@ -150,11 +150,11 @@ def train_a2c(net, mb_obs, mb_rewards, mb_actions, mb_values, optimizer, tb_trac
     logits_v, values_v = net(obs_v)
     loss_value_v = F.mse_loss(values_v, rewards_v)
 
-    log_prob_v = F.log_softmax(logits_v)
+    log_prob_v = F.log_softmax(logits_v, dim=1)
     log_prob_actions_v = adv_v * log_prob_v[range(len(mb_actions)), actions_t]
     loss_policy_v = -log_prob_actions_v.mean()
 
-    prob_v = F.softmax(logits_v)
+    prob_v = F.softmax(logits_v, dim=1)
     entropy_loss_v = (prob_v * log_prob_v).sum(dim=1).mean()
     loss_v = ENTROPY_BETA * entropy_loss_v + loss_value_v + loss_policy_v
     loss_v.backward()
