@@ -62,6 +62,7 @@ dependencies:
   - hyperlink==18.0.0
   - idna==2.6
   - incremental==17.5.0
+  - kaitaistruct==0.8
   - kiwisolver==1.0.1
   - markdown==2.6.11
   - matplotlib==2.2.2

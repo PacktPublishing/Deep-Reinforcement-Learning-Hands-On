@@ -63,7 +63,7 @@ if __name__ == "__main__":
                 print(step_idx, reward, done, idle_count, info)
             obs_v = Variable(torch.from_numpy(np.array([obs])))
             logits_v = net(obs_v)[0]
-            policy = F.softmax(logits_v).data.numpy()[0]
+            policy = F.softmax(logits_v, dim=1).data.numpy()[0]
             action = np.random.choice(len(policy), p=policy)
             step_idx += 1
             reward_sum += reward

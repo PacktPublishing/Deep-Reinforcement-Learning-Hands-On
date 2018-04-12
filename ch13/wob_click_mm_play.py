@@ -62,7 +62,7 @@ if __name__ == "__main__":
                 args.name, round_idx, step_idx, reward, idle_count, int(done))
             obs_v = preprocessor([obs])
             logits_v = net(obs_v)[0]
-            policy = F.softmax(logits_v).data.numpy()[0]
+            policy = F.softmax(logits_v, dim=1).data.numpy()[0]
             action = np.random.choice(len(policy), p=policy)
             wob_vnc.save_obs(obs[0], img_name, action=action)
             step_idx += 1
