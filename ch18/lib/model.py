@@ -145,7 +145,7 @@ def state_lists_to_batch(state_lists, who_moves_lists, cuda=False):
 #         state_list = game.decode_binary(state)
 #         batch_v = state_lists_to_batch([state_list], [cur_player], cuda)
 #         logits_v, _ = nets[cur_player](batch_v)
-#         probs_v = F.softmax(logits_v)
+#         probs_v = F.softmax(logits_v, dim=1)
 #         probs = probs_v[0].data.cpu().numpy()
 #         while True:
 #             action = np.random.choice(game.GAME_COLS, p=probs)

@@ -113,7 +113,7 @@ if __name__ == "__main__":
                 out_logits_v, out_values_v = net(states_v)
 
                 loss_value_v = F.mse_loss(out_values_v, values_v)
-                loss_policy_v = -F.log_softmax(out_logits_v) * probs_v
+                loss_policy_v = -F.log_softmax(out_logits_v, dim=1) * probs_v
                 loss_policy_v = loss_policy_v.sum(dim=1).mean()
 
                 loss_v = loss_policy_v + loss_value_v

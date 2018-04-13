@@ -113,7 +113,7 @@ class MCTS:
         if expand_queue:
             batch_v = model.state_lists_to_batch(expand_states, expand_players, cuda)
             logits_v, values_v = net(batch_v)
-            probs_v = F.softmax(logits_v)
+            probs_v = F.softmax(logits_v, dim=1)
             values = values_v.data.cpu().numpy()[:, 0]
             probs = probs_v.data.cpu().numpy()
 
