@@ -181,7 +181,7 @@ class I2A(nn.Module):
             obs_batch_v = torch.cat((cur_plane_v, new_plane_v), dim=1)
             # select actions
             logits_v, _ = self.net_policy(obs_batch_v)
-            probs_v = F.softmax(logits_v)
+            probs_v = F.softmax(logits_v, dim=1)
             probs = probs_v.data.cpu().numpy()
             actions = self.action_selector(probs)
         step_obs_v = torch.stack(step_obs)

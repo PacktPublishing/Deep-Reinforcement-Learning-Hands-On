@@ -45,7 +45,7 @@ def iterate_batches(envs, net, cuda=False):
     while True:
         obs_v = ptan.agent.default_states_preprocessor(obs, cuda=cuda)
         logits_v, values_v = net(obs_v)
-        probs_v = F.softmax(logits_v)
+        probs_v = F.softmax(logits_v, dim=1)
         probs = probs_v.data.cpu().numpy()
         actions = act_selector(probs)
 
