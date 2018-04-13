@@ -95,7 +95,7 @@ if __name__ == "__main__":
                 probs_v = probs_v.cuda()
             policy_opt.zero_grad()
             logits_v, _ = net_policy(obs_v)
-            policy_loss_v = -F.log_softmax(logits_v, dim=1) * probs_v
+            policy_loss_v = -F.log_softmax(logits_v, dim=1) * probs_v.view_as(logits_v)
             policy_loss_v = policy_loss_v.sum(dim=1).mean()
             policy_loss_v.backward()
             policy_opt.step()
