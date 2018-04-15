@@ -86,11 +86,11 @@ if __name__ == "__main__":
 
         optimizer.zero_grad()
         logits_v = net(states_v)
-        log_prob_v = F.log_softmax(logits_v)
+        log_prob_v = F.log_softmax(logits_v, dim=1)
         log_prob_actions_v = batch_scale_v * log_prob_v[range(BATCH_SIZE), batch_actions_t]
         loss_policy_v = -log_prob_actions_v.mean()
 
-        prob_v = F.softmax(logits_v)
+        prob_v = F.softmax(logits_v, dim=1)
         entropy_v = -(prob_v * log_prob_v).sum(dim=1).mean()
         entropy_loss_v = -ENTROPY_BETA * entropy_v
         loss_v = loss_policy_v + entropy_loss_v
@@ -100,7 +100,7 @@ if __name__ == "__main__":
 
         # calc KL-div
         new_logits_v = net(states_v)
-        new_prob_v = F.softmax(new_logits_v)
+        new_prob_v = F.softmax(new_logits_v, dim=1)
         kl_div_v = -((new_prob_v / prob_v).log() * prob_v).sum(dim=1).mean()
         writer.add_scalar("kl", kl_div_v.data.cpu().numpy()[0], step_idx)
 

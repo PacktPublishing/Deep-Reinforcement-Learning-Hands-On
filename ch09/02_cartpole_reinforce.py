@@ -95,7 +95,7 @@ if __name__ == "__main__":
         batch_qvals_v = Variable(torch.FloatTensor(batch_qvals))
 
         logits_v = net(states_v)
-        log_prob_v = F.log_softmax(logits_v)
+        log_prob_v = F.log_softmax(logits_v, dim=1)
         log_prob_actions_v = batch_qvals_v * log_prob_v[range(len(batch_states)), batch_actions_t]
         loss_v = -log_prob_actions_v.mean()
 

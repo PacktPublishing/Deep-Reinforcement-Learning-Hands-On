@@ -57,7 +57,7 @@ class RainbowDQN(nn.Module):
         )
 
         self.register_buffer("supports", torch.arange(Vmin, Vmax, DELTA_Z))
-        self.softmax = nn.Softmax()
+        self.softmax = nn.Softmax(dim=1)
 
     def _get_conv_out(self, shape):
         o = self.conv(Variable(torch.zeros(1, *shape)))
@@ -121,7 +121,7 @@ def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
 
     # calculate net output
     state_action_values = distr_v[range(batch_size), actions_v.data]
-    state_log_sm_v = F.log_softmax(state_action_values)
+    state_log_sm_v = F.log_softmax(state_action_values, dim=1)
     proj_distr_v = Variable(torch.from_numpy(proj_distr))
     if cuda:
         proj_distr_v = proj_distr_v.cuda()

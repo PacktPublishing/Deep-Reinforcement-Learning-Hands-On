@@ -70,7 +70,7 @@ class PhraseModel(nn.Module):
 
     def decode_chain_sampling(self, hid, begin_emb, seq_len, stop_at_token=None):
         """
-        Decode sequence by feeding predicted token to the net again. 
+        Decode sequence by feeding predicted token to the net again.
         Act according to probabilities
         """
         res_logits = []
@@ -79,7 +79,7 @@ class PhraseModel(nn.Module):
 
         for _ in range(seq_len):
             out_logits, hid = self.decode_one(hid, cur_emb)
-            out_probs_v = F.softmax(out_logits)
+            out_probs_v = F.softmax(out_logits, dim=1)
             out_probs = out_probs_v.data.cpu().numpy()[0]
             action = int(np.random.choice(out_probs.shape[0], p=out_probs))
             action_v = Variable(torch.LongTensor([action]))

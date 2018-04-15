@@ -53,7 +53,7 @@ def linesearch(model,
     fval = f().data
 #    print("fval before", fval[0])
     for (_n_backtracks, stepfrac) in enumerate(.5**np.arange(max_backtracks)):
-        xnew = x + stepfrac * fullstep
+        xnew = x + fullstep * stepfrac
         set_flat_params_to(model, xnew)
         newfval = f().data
         actual_improve = fval - newfval

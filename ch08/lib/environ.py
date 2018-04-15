@@ -155,11 +155,11 @@ class StocksEnv(gym.Env):
             self._state = State(bars_count, commission, reset_on_close, reward_on_close=reward_on_close,
                                 volumes=volumes)
         self.action_space = gym.spaces.Discrete(n=len(Actions))
-        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=self._state.shape)
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=self._state.shape, dtype=np.float32)
         self.random_ofs_on_reset = random_ofs_on_reset
-        self._seed()
+        self.seed()
 
-    def _reset(self):
+    def reset(self):
         # make selection of the instrument and it's offset. Then reset the state
         self._instrument = self.np_random.choice(list(self._prices.keys()))
         prices = self._prices[self._instrument]
@@ -171,20 +171,20 @@ class StocksEnv(gym.Env):
         self._state.reset(prices, offset)
         return self._state.encode()
 
-    def _step(self, action_idx):
+    def step(self, action_idx):
         action = Actions(action_idx)
         reward, done = self._state.step(action)
         obs = self._state.encode()
         info = {"instrument": self._instrument, "offset": self._state._offset}
         return obs, reward, done, info
 
-    def _render(self, mode='human', close=False):
+    def render(self, mode='human', close=False):
         pass
 
-    def _close(self):
+    def close(self):
         pass
 
-    def _seed(self, seed=None):
+    def seed(self, seed=None):
         self.np_random, seed1 = seeding.np_random(seed)
         seed2 = seeding.hash_seed(seed1 + 1) % 2 ** 31
         return [seed1, seed2]

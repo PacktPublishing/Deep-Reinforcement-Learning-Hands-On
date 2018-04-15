@@ -156,7 +156,7 @@ if __name__ == "__main__":
                     actions_t = actions_t.cuda()
                     adv_v = adv_v.cuda()
 
-                log_prob_v = F.log_softmax(policies_v)
+                log_prob_v = F.log_softmax(policies_v, dim=1)
                 log_prob_actions_v = adv_v * log_prob_v[range(len(net_actions)), actions_t]
                 loss_policy_v = -log_prob_actions_v.mean()
 

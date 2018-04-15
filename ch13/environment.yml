@@ -1,67 +1,96 @@
-name: rl_book_ch13
+name: rl_book_ch13_new
 channels:
-- soumith
+- pytorch
 - defaults
 dependencies:
-- certifi=2016.2.28=py35_0
-- cffi=1.10.0=py35_0
-- libffi=3.2.1=1
-- libgcc=5.2.0=0
-- mkl=2017.0.3=0
-- numpy=1.13.1=py35_0
-- openssl=1.0.2l=0
-- pip=9.0.1=py35_1
-- pycparser=2.18=py35_0
-- python=3.5.4=0
-- readline=6.2=2
-- setuptools=36.4.0=py35_1
-- sqlite=3.13.0=0
-- tk=8.5.18=0
-- wheel=0.29.0=py35_0
-- xz=5.2.3=0
-- zlib=1.2.11=0
-- cuda80=1.0=0
-- pytorch=0.2.0=py35hb1547bd_4cu80
+- ca-certificates=2018.03.07=0
+- certifi=2018.1.18=py36_0
+- cffi=1.11.5=py36h9745a5d_0
+- cudatoolkit=8.0=3
+- cudnn=7.0.5=cuda8.0_0
+- freetype=2.8=hab7d2ae_1
+- intel-openmp=2018.0.0=8
+- jpeg=9b=h024ee3a_2
+- libedit=3.1=heed3624_0
+- libffi=3.2.1=hd88cf55_4
+- libgcc-ng=7.2.0=hdf63c60_3
+- libgfortran-ng=7.2.0=hdf63c60_3
+- libpng=1.6.34=hb9fc6fc_0
+- libstdcxx-ng=7.2.0=hdf63c60_3
+- libtiff=4.0.9=h28f6b97_0
+- mkl=2018.0.2=1
+- mkl_fft=1.0.1=py36h3010b51_0
+- mkl_random=1.0.1=py36h629b387_0
+- ncurses=6.0=h9df7e31_2
+- numpy=1.14.2=py36hdbf6ddf_1
+- olefile=0.45.1=py36_0
+- openssl=1.0.2o=h20670df_0
+- pillow=5.0.0=py36h3deb7b8_0
+- pip=9.0.3=py36_0
+- pycparser=2.18=py36hf9f622e_1
+- python=3.6.5=hc3d631a_0
+- readline=7.0=ha6073c6_4
+- setuptools=39.0.1=py36_0
+- six=1.11.0=py36h372c433_1
+- sqlite=3.22.0=h1bed415_0
+- tk=8.6.7=hc745277_3
+- wheel=0.31.0=py36_0
+- xz=5.2.3=h55aa19d_2
+- zlib=1.2.11=ha838bed_2
+- pytorch=0.3.1=py36_cuda8.0.61_cudnn7.0.5_2
+- torchvision=0.2.0=py36h17b6947_1
 - pip:
+  - absl-py==0.1.13
+  - astor==0.6.2
+  - atari-py==0.1.1
   - attrs==17.4.0
-  - autobahn==17.10.1
+  - autobahn==18.4.1
   - automat==0.6.0
   - bleach==1.5.0
   - chardet==3.0.4
   - constantly==15.1.0
+  - cycler==0.10.0
   - docker-py==1.10.3
   - docker-pycreds==0.2.1
-  - enum34==1.1.6
   - fastzbarlight==0.0.14
   - future==0.16.0
+  - gast==0.2.0
   - go-vncdriver==0.4.19
+  - grpcio==1.10.0
   - gym==0.9.5
   - html5lib==0.9999999
-  - hyperlink==17.3.1
+  - hyperlink==18.0.0
   - idna==2.6
   - incremental==17.5.0
-  - kaitaistruct==0.7
+  - kaitaistruct==0.8
+  - kiwisolver==1.0.1
   - markdown==2.6.11
+  - matplotlib==2.2.2
+  - mkl-fft==1.0.0
+  - mkl-random==1.0.1
   - nltk==3.2.5
   - opencv-python==3.4.0.12
-  - pillow==5.0.0
-  - protobuf==3.5.1
-  - ptan (/home/shmuma/work/ptan)==0.2
-  - pyglet==1.3.0
+  - protobuf==3.5.2.post1
+  - ptan==0.2
+  - pyglet==1.3.1
+  - pyopengl==3.1.0
+  - pyparsing==2.2.0
+  - python-dateutil==2.7.2
+  - pytz==2018.4
   - pyyaml==3.12
   - requests==2.10.0
-  - six==1.11.0
+  - scipy==1.0.1
+  - tensorboard==1.7.0
   - tensorboard-pytorch==0.7.1
-  - tensorflow==1.4.1
-  - tensorflow-tensorboard==0.4.0
-  - torch==0.2.0.post4
+  - tensorflow==1.7.0
+  - termcolor==1.1.0
+  - torch==0.3.1.post2
   - twisted==17.9.0
-  - txaio==2.8.2
+  - txaio==2.10.0
   - ujson==1.35
-  - universe==0.21.5
   - urllib3==1.22
-  - websocket-client==0.46.0
+  - websocket-client==0.47.0
   - werkzeug==0.14.1
   - zope.interface==4.4.3
-prefix: /home/shmuma/anaconda3/envs/rl_book_ch13
+prefix: /home/shmuma/anaconda3/envs/rl_book_ch13_new
 

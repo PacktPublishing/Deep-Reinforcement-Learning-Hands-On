@@ -14,9 +14,13 @@ from tensorboardX import SummaryWriter
 
 from lib import common
 
-import matplotlib as mpl
-mpl.use("Agg")
-import matplotlib.pylab as plt
+SAVE_STATES_IMG = False
+SAVE_TRANSITIONS_IMG = False
+
+if SAVE_STATES_IMG or SAVE_TRANSITIONS_IMG:
+    import matplotlib as mpl
+    mpl.use("Agg")
+    import matplotlib.pylab as plt
 
 Vmax = 10
 Vmin = -10
@@ -25,9 +29,6 @@ DELTA_Z = (Vmax - Vmin) / (N_ATOMS - 1)
 
 STATES_TO_EVALUATE = 1000
 EVAL_EVERY_FRAME = 100
-
-SAVE_STATES_IMG = False
-SAVE_TRANSITIONS_IMG = False
 
 
 class DistributionalDQN(nn.Module):
@@ -51,7 +52,7 @@ class DistributionalDQN(nn.Module):
         )
 
         self.register_buffer("supports", torch.arange(Vmin, Vmax, DELTA_Z))
-        self.softmax = nn.Softmax()
+        self.softmax = nn.Softmax(dim=1)
 
     def _get_conv_out(self, shape):
         o = self.conv(Variable(torch.zeros(1, *shape)))
@@ -160,13 +161,13 @@ def calc_loss(batch, net, tgt_net, gamma, cuda=False, save_prefix=None):
     # calculate net output
     distr_v = net(states_v)
     state_action_values = distr_v[range(batch_size), actions_v.data]
-    state_log_sm_v = F.log_softmax(state_action_values)
+    state_log_sm_v = F.log_softmax(state_action_values, dim=1)
     proj_distr_v = Variable(torch.from_numpy(proj_distr))
     if cuda:
         proj_distr_v = proj_distr_v.cuda()
 
     if save_prefix is not None:
-        pred = F.softmax(state_action_values).data.cpu().numpy()
+        pred = F.softmax(state_action_values, dim=1).data.cpu().numpy()
         save_transition_images(batch_size, pred, proj_distr, next_best_distr, dones, rewards, save_prefix)
 
     loss_v = -state_log_sm_v * proj_distr_v

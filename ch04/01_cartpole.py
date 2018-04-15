@@ -37,7 +37,7 @@ def iterate_batches(env, net, batch_size):
     episode_reward = 0.0
     episode_steps = []
     obs = env.reset()
-    sm = nn.Softmax()
+    sm = nn.Softmax(dim=1)
     while True:
         obs_v = Variable(torch.FloatTensor([obs]))
         act_probs_v = sm(net(obs_v))

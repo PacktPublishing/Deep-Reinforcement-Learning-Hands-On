@@ -21,7 +21,7 @@ class Net(nn.Module):
             nn.Linear(obs_size, 32),
             nn.ReLU(),
             nn.Linear(32, action_size),
-            nn.Softmax()
+            nn.Softmax(dim=1)
         )
 
     def forward(self, x):

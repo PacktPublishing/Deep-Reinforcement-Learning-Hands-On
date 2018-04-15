@@ -17,6 +17,12 @@
 
 \begin{document}
 
+Page 1, section ``Value, state and optimality''
+
+We defined value as an expected total reward obtainable from the state. In formal way, value of the state is:
+\begin{math}V(s) = \E[\sum_{t=0}^\infty{r_t\gamma^t}]\end{math}, where \begin{math}r_t\end{math} is the local
+reward obtained at the step t of the episode.
+
 Page 2, section ``Bellman equation of optimality''
 
 Let’s start with deterministic case, when all our actions have 100\% guaranteed
@@ -34,8 +40,8 @@ possible outcome. In other words: \begin{math}V_0 = \max_{a \in 1 \ldots N}(r_a 
 factor \begin{math}\gamma\end{math}, we need to multiply value of the next state
   by gamma: \begin{math}V_0 = \max_{a \in 1 \ldots N}(r_a + \gamma V_a)\end{math}.
 
-  
-  
+
+
 Page 3
 
 It’s not very complicated to extend it for a stochastic case, when our
@@ -46,7 +52,7 @@ available from state \begin{math}s_0\end{math} with three possible outcomes.
 
 Here we have one action available from the state \begin{math}s_0\end{math}, which can lead to three
 different states with different probabilities: with probability \begin{math}p_1\end{math} it can end up
-in state \begin{math}s_1\end{math}, \begin{math}p_2\end{math} in state \begin{math}s_2\end{math} and 
+in state \begin{math}s_1\end{math}, \begin{math}p_2\end{math} in state \begin{math}s_2\end{math} and
 \begin{math}p_3\end{math} in state \begin{math}s_3\end{math} (\begin{math}p_1+p_2+p_3=1\end{math}, of course). Every
 target state has its own reward \begin{math}r_1\end{math}, \begin{math}r_2\end{math} or \begin{math}r_3\end{math}. To calculate the expected value
 after issuing action 1, we need to sum all values multiplied by their probabilities:
@@ -101,6 +107,10 @@ reward plus discounted long-term reward of destination state. We also can define
   V_s = \max_{a \in A} Q_{s,a}
 \end{equation*}
 
+And, finally, we can express Q(s, a) via itself, which will be used in the next chapter’s topic of Q-learning:
+\begin{equation*}
+Q(s,a)=r_{s,a} + \gamma \max_{a' \in A}Q(s',a')
+\end{equation*}
 
 To give you a concrete example, let’s consider a simple environment which is
 similar to FrozenLake, but has much simpler structure: we have one initial state
@@ -123,12 +133,12 @@ infinite sum:
 
 
 \begin{equation*}
-V(s_1) = 1 + \gamma (2 + \gamma(1 + \gamma(2 + \ldots))) = \sum_{i=0}^\infty 1\gamma^{2i}+2\gamma^{2i+1}  
+V(s_1) = 1 + \gamma (2 + \gamma(1 + \gamma(2 + \ldots))) = \sum_{i=0}^\infty 1\gamma^{2i}+2\gamma^{2i+1}
 \end{equation*}
 
 
 \begin{equation*}
-V(s_2) = 2 + \gamma (1 + \gamma(2 + \gamma(1 + \ldots))) = \sum_{i=0}^\infty 2\gamma^{2i}+1\gamma^{2i+1}    
+V(s_2) = 2 + \gamma (1 + \gamma(2 + \gamma(1 + \ldots))) = \sum_{i=0}^\infty 2\gamma^{2i}+1\gamma^{2i+1}
 \end{equation*}
 
 Strictly speaking, we cannot calculate the exact values for our states, but with
@@ -144,7 +154,7 @@ precise estimation.
     initial value, usually zero.
     % todo: check
   \item For every state s in the MDP perform Bellman update: \begin{math}V_s \leftarrow
-    \max_a \sum_{s'}p_{a,s \rightarrow s'}(r_{s,a} + \gamma V_s')\end{math}
+    \max_a \sum_{s'}p_{a,s \rightarrow s'}(r_{s,a} + \gamma V_{s'})\end{math}
   \item Repeat step 2 for some large amount of steps or until changes become too small.
 \end{enumerate}
 

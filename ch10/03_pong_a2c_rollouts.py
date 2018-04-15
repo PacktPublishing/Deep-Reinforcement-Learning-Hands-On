@@ -159,11 +159,11 @@ if __name__ == "__main__":
                 logits_v, value_v = net(states_v)
                 loss_value_v = F.mse_loss(value_v, vals_ref_v)
 
-                log_prob_v = F.log_softmax(logits_v)
+                log_prob_v = F.log_softmax(logits_v, dim=1)
                 log_prob_actions_v = adv_v * log_prob_v[range(len(mb_states)), actions_t]
                 loss_policy_v = -log_prob_actions_v.mean()
 
-                prob_v = F.softmax(logits_v)
+                prob_v = F.softmax(logits_v, dim=1)
                 entropy_loss_v = (prob_v * log_prob_v).sum(dim=1).mean()
 
                 # apply entropy and value gradients

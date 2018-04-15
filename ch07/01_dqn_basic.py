@@ -2,10 +2,7 @@
 import gym
 import ptan
 import argparse
-import numpy as np
 
-import torch
-from torch.autograd import Variable
 import torch.optim as optim
 
 from tensorboardX import SummaryWriter

@@ -25,7 +25,7 @@ class Agent:
     def best_value_and_action(self, state):
         best_value, best_action = None, None
         for action in range(self.env.action_space.n):
-            action_value = self.values.get((state, action), 0.0)
+            action_value = self.values[(state, action)]
             if best_value is None or best_value < action_value:
                 best_value = action_value
                 best_action = action
@@ -34,7 +34,7 @@ class Agent:
     def value_update(self, s, a, r, next_s):
         best_v, _ = self.best_value_and_action(next_s)
         new_val = r + GAMMA * best_v
-        old_val = self.values.get((s, a), 0.0)
+        old_val = self.values[(s, a)]
         self.values[(s, a)] = old_val * (1-ALPHA) + new_val * ALPHA
 
     def play_episode(self, env):
