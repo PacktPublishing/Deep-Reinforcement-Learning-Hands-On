@@ -23,3 +23,4 @@ if __name__ == "__main__":
     v = torch.FloatTensor([[2, 3]])
     out = net(v)
     print(out)
+    print("Cuda's availability is %s" % torch.cuda.is_available())
