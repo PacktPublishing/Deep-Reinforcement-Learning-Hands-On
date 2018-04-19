@@ -44,7 +44,7 @@ def unpack_batch_a2c(batch, net, last_val_gamma, cuda=False):
     return states_v, actions_v, ref_vals_v
 
 
-def unpack_batch_ddqn(batch, cuda=False):
+def unpack_batch_ddpg(batch, cuda=False):
     states, actions, rewards, dones, last_states = [], [], [], [], []
     for exp in batch:
         states.append(exp.state)

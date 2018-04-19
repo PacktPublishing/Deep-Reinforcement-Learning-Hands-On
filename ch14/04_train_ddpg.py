@@ -90,7 +90,7 @@ if __name__ == "__main__":
 
                 batch = buffer.sample(BATCH_SIZE)
                 states_v, actions_v, rewards_v, dones_mask, last_states_v = \
-                    common.unpack_batch_ddqn(batch, cuda=args.cuda)
+                    common.unpack_batch_ddpg(batch, cuda=args.cuda)
 
                 # train critic
                 crt_opt.zero_grad()
