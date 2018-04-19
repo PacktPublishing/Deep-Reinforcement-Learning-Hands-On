@@ -1,7 +1,11 @@
 .idea
 runs
+venv
 records
+recording
 *.txt
+!requirements.txt
 *.dat
 __pycache__
 *.png
+*.pyc
