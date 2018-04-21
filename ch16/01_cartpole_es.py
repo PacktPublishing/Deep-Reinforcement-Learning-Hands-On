@@ -69,7 +69,9 @@ def train_step(net, batch_noise, batch_reward, writer, step_idx):
     weighted_noise = None
     norm_reward = np.array(batch_reward)
     norm_reward -= np.mean(norm_reward)
-    norm_reward /= np.std(norm_reward)
+    s = np.std(norm_reward)
+    if abs(s) > 1e-6:
+        norm_reward /= s
 
     for noise, reward in zip(batch_noise, norm_reward):
         if weighted_noise is None:
