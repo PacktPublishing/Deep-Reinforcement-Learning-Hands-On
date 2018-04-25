@@ -5,7 +5,6 @@ import cv2
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 import torch.optim as optim
 from tensorboardX import SummaryWriter
 
@@ -123,7 +122,7 @@ def iterate_batches(envs, batch_size=BATCH_SIZE):
         if np.mean(obs) > 0.01:
             batch.append(obs)
         if len(batch) == batch_size:
-            yield Variable(torch.from_numpy(np.array(batch, dtype=np.float32)))
+            yield torch.tensor(np.array(batch, dtype=np.float32))
             batch.clear()
         if is_done:
             e.reset()
@@ -134,14 +133,12 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true', help="Enable cuda computation")
     args = parser.parse_args()
 
+    device = torch.device("cuda" if args.cuda else "cpu")
     envs = [InputWrapper(gym.make(name)) for name in ('Breakout-v0', 'AirRaid-v0', 'Pong-v0')]
     input_shape = envs[0].observation_space.shape
 
-    net_discr = Discriminator(input_shape=input_shape)
-    net_gener = Generator(output_shape=input_shape)
-    if args.cuda:
-        net_discr.cuda()
-        net_gener.cuda()
+    net_discr = Discriminator(input_shape=input_shape).to(device)
+    net_gener = Generator(output_shape=input_shape).to(device)
 
     objective = nn.BCELoss()
     gen_optimizer = optim.Adam(params=net_gener.parameters(), lr=LEARNING_RATE, betas=(0.5, 0.999))
@@ -152,18 +149,13 @@ if __name__ == "__main__":
     dis_losses = []
     iter_no = 0
 
-    true_labels_v = Variable(torch.FloatTensor([1.0] * BATCH_SIZE))
-    fake_labels_v = Variable(torch.FloatTensor([0.0] * BATCH_SIZE))
-    if args.cuda:
-        true_labels_v = true_labels_v.cuda()
-        fake_labels_v = fake_labels_v.cuda()
+    true_labels_v = torch.ones(BATCH_SIZE, dtype=torch.float32, device=device)
+    fake_labels_v = torch.zeros(BATCH_SIZE, dtype=torch.float32, device=device)
 
     for batch_v in iterate_batches(envs):
         # generate extra fake samples, input is 4D: batch, filters, x, y
-        gen_input_v = Variable(torch.FloatTensor(BATCH_SIZE, LATENT_VECTOR_SIZE, 1, 1).normal_(0, 1))
-        if args.cuda:
-            batch_v = batch_v.cuda()
-            gen_input_v = gen_input_v.cuda()
+        gen_input_v = torch.FloatTensor(BATCH_SIZE, LATENT_VECTOR_SIZE, 1, 1).normal_(0, 1).to(device)
+        batch_v = batch_v.to(device)
         gen_output_v = net_gener(gen_input_v)
 
         # train discriminator
@@ -173,7 +165,7 @@ if __name__ == "__main__":
         dis_loss = objective(dis_output_true_v, true_labels_v) + objective(dis_output_fake_v, fake_labels_v)
         dis_loss.backward()
         dis_optimizer.step()
-        dis_losses.append(dis_loss.data.cpu().numpy())
+        dis_losses.append(dis_loss.item())
 
         # train generator
         gen_optimizer.zero_grad()
@@ -181,7 +173,7 @@ if __name__ == "__main__":
         gen_loss_v = objective(dis_output_v, true_labels_v)
         gen_loss_v.backward()
         gen_optimizer.step()
-        gen_losses.append(gen_loss_v.data.cpu().numpy())
+        gen_losses.append(gen_loss_v.item())
 
         iter_no += 1
         if iter_no % REPORT_EVERY_ITER == 0:
@@ -193,6 +185,3 @@ if __name__ == "__main__":
         if iter_no % SAVE_IMAGE_EVERY_ITER == 0:
             writer.add_image("fake", vutils.make_grid(gen_output_v.data[:64]), iter_no)
             writer.add_image("real", vutils.make_grid(batch_v.data[:64]), iter_no)
-
-    pass
-
