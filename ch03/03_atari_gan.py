@@ -173,7 +173,7 @@ if __name__ == "__main__":
         dis_loss = objective(dis_output_true_v, true_labels_v) + objective(dis_output_fake_v, fake_labels_v)
         dis_loss.backward()
         dis_optimizer.step()
-        dis_losses.append(dis_loss.data.cpu().numpy()[0])
+        dis_losses.append(dis_loss.data.cpu().numpy())
 
         # train generator
         gen_optimizer.zero_grad()
@@ -181,7 +181,7 @@ if __name__ == "__main__":
         gen_loss_v = objective(dis_output_v, true_labels_v)
         gen_loss_v.backward()
         gen_optimizer.step()
-        gen_losses.append(gen_loss_v.data.cpu().numpy()[0])
+        gen_losses.append(gen_loss_v.data.cpu().numpy())
 
         iter_no += 1
         if iter_no % REPORT_EVERY_ITER == 0:
