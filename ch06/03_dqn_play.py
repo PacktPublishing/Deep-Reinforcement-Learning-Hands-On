@@ -5,7 +5,6 @@ import argparse
 import numpy as np
 
 import torch
-from torch.autograd import Variable
 
 from lib import wrappers
 from lib import dqn_model
@@ -40,7 +39,7 @@ if __name__ == "__main__":
         start_ts = time.time()
         if args.visualize:
             env.render()
-        state_v = Variable(torch.from_numpy(np.array([state], copy=False)), volatile=False)
+        state_v = torch.tensor(np.array([state], copy=False))
         q_vals = net(state_v).data.numpy()[0]
         action = np.argmax(q_vals)
         c[action] += 1

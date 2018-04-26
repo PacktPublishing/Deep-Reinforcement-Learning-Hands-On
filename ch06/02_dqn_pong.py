@@ -10,7 +10,6 @@ import collections
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
@@ -60,19 +59,17 @@ class Agent:
         self.state = env.reset()
         self.total_reward = 0.0
 
-    def play_step(self, net, epsilon=0.0, cuda=False):
+    def play_step(self, net, epsilon=0.0, device="cpu"):
         done_reward = None
 
         if np.random.random() < epsilon:
             action = env.action_space.sample()
         else:
             state_a = np.array([self.state], copy=False)
-            state_v = Variable(torch.from_numpy(state_a))
-            if cuda:
-                state_v = state_v.cuda()
+            state_v = torch.tensor(state_a).to(device)
             q_vals_v = net(state_v)
             _, act_v = torch.max(q_vals_v, dim=1)
-            action = int(act_v.data.cpu().numpy()[0])
+            action = int(act_v.item())
 
         # do step in the environment
         new_state, reward, is_done, _ = self.env.step(action)
@@ -88,25 +85,19 @@ class Agent:
         return done_reward
 
 
-def calc_loss(batch, net, tgt_net, cuda=False):
+def calc_loss(batch, net, tgt_net, device="cpu"):
     states, actions, rewards, dones, next_states = batch
 
-    states_v = Variable(torch.from_numpy(states))
-    next_states_v = Variable(torch.from_numpy(next_states), volatile=True)
-    actions_v = Variable(torch.from_numpy(actions))
-    rewards_v = Variable(torch.from_numpy(rewards))
-    done_mask = torch.ByteTensor(dones)
-    if cuda:
-        states_v = states_v.cuda()
-        next_states_v = next_states_v.cuda()
-        actions_v = actions_v.cuda()
-        rewards_v = rewards_v.cuda()
-        done_mask = done_mask.cuda()
+    states_v = torch.tensor(states).to(device)
+    next_states_v = torch.tensor(next_states).to(device)
+    actions_v = torch.tensor(actions).to(device)
+    rewards_v = torch.tensor(rewards).to(device)
+    done_mask = torch.ByteTensor(dones).to(device)
 
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
     next_state_values = tgt_net(next_states_v).max(1)[0]
     next_state_values[done_mask] = 0.0
-    next_state_values.volatile = False
+    next_state_values = next_state_values.detach()
 
     expected_state_action_values = next_state_values * GAMMA + rewards_v
     return nn.MSELoss()(state_action_values, expected_state_action_values)
@@ -120,17 +111,14 @@ if __name__ == "__main__":
     parser.add_argument("--reward", type=float, default=MEAN_REWARD_BOUND,
                         help="Mean reward boundary for stop of training, default=%.2f" % MEAN_REWARD_BOUND)
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     env = wrappers.make_env(args.env)
 
-    net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
-    tgt_net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
+    net = dqn_model.DQN(env.observation_space.shape, env.action_space.n).to(device)
+    tgt_net = dqn_model.DQN(env.observation_space.shape, env.action_space.n).to(device)
     writer = SummaryWriter(comment="-" + args.env)
     print(net)
-
-    if args.cuda:
-        net.cuda()
-        tgt_net.cuda()
 
     buffer = ExperienceBuffer(REPLAY_SIZE)
     agent = Agent(env, buffer)
@@ -147,7 +135,7 @@ if __name__ == "__main__":
         frame_idx += 1
         epsilon = max(EPSILON_FINAL, EPSILON_START - frame_idx / EPSILON_DECAY_LAST_FRAME)
 
-        reward = agent.play_step(net, epsilon, cuda=args.cuda)
+        reward = agent.play_step(net, epsilon, device=device)
         if reward is not None:
             total_rewards.append(reward)
             speed = (frame_idx - ts_frame) / (time.time() - ts)
@@ -179,7 +167,7 @@ if __name__ == "__main__":
 
         optimizer.zero_grad()
         batch = buffer.sample(BATCH_SIZE)
-        loss_t = calc_loss(batch, net, tgt_net, cuda=args.cuda)
+        loss_t = calc_loss(batch, net, tgt_net, device=device)
         loss_t.backward()
         optimizer.step()
     writer.close()
