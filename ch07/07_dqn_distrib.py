@@ -164,7 +164,7 @@ def calc_loss(batch, net, tgt_net, gamma, device="cpu", save_prefix=None):
 
 if __name__ == "__main__":
     params = common.HYPERPARAMS['pong']
-    params['epsilon_frames'] *= 2
+#    params['epsilon_frames'] *= 2
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()

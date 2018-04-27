@@ -7,7 +7,6 @@ from tensorboardX import SummaryWriter
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.autograd import Variable
 
 GAMMA = 0.99
 LEARNING_RATE = 0.01
@@ -37,9 +36,9 @@ class DQN(nn.Module):
 def calc_target(net, local_reward, next_state):
     if next_state is None:
         return local_reward
-    state_v = Variable(torch.from_numpy(np.array([next_state], dtype=np.float32)))
+    state_v = torch.tensor([next_state], dtype=torch.float32)
     next_q_v = net(state_v)
-    best_q = next_q_v.max(dim=1)[0].data.numpy()[0]
+    best_q = next_q_v.max(dim=1)[0].item()
     return local_reward + GAMMA * best_q
 
 
@@ -78,11 +77,11 @@ if __name__ == "__main__":
                          for exp in batch]
         # train
         optimizer.zero_grad()
-        states_v = Variable(torch.from_numpy(np.array(batch_states, dtype=np.float32)))
+        states_v = torch.FloatTensor(batch_states)
         net_q_v = net(states_v)
         target_q = net_q_v.data.numpy().copy()
         target_q[range(BATCH_SIZE), batch_actions] = batch_targets
-        target_q_v = Variable(torch.from_numpy(target_q))
+        target_q_v = torch.tensor(target_q)
         loss_v = mse_loss(net_q_v, target_q_v)
         loss_v.backward()
         optimizer.step()

@@ -8,7 +8,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.autograd import Variable
 
 GAMMA = 0.99
 LEARNING_RATE = 0.01
@@ -95,9 +94,9 @@ if __name__ == "__main__":
         if batch_episodes < EPISODES_TO_TRAIN:
             continue
 
-        states_v = Variable(torch.from_numpy(np.array(batch_states, dtype=np.float32)))
+        states_v = torch.FloatTensor(batch_states)
         batch_actions_t = torch.LongTensor(batch_actions)
-        batch_qvals_v = Variable(torch.FloatTensor(batch_qvals))
+        batch_qvals_v = torch.FloatTensor(batch_qvals)
 
         optimizer.zero_grad()
         logits_v = net(states_v)
