@@ -8,7 +8,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
@@ -51,11 +50,11 @@ class DistributionalDQN(nn.Module):
             nn.Linear(512, n_actions * N_ATOMS)
         )
 
-        self.register_buffer("supports", torch.arange(Vmin, Vmax, DELTA_Z))
+        self.register_buffer("supports", torch.arange(Vmin, Vmax+DELTA_Z, DELTA_Z))
         self.softmax = nn.Softmax(dim=1)
 
     def _get_conv_out(self, shape):
-        o = self.conv(Variable(torch.zeros(1, *shape)))
+        o = self.conv(torch.zeros(1, *shape))
         return int(np.prod(o.size()))
 
     def forward(self, x):
@@ -68,7 +67,7 @@ class DistributionalDQN(nn.Module):
     def both(self, x):
         cat_out = self(x)
         probs = self.apply_softmax(cat_out)
-        weights = probs * Variable(self.supports, volatile=True)
+        weights = probs * self.supports
         res = weights.sum(dim=2)
         return cat_out, res
 
@@ -79,26 +78,21 @@ class DistributionalDQN(nn.Module):
         return self.softmax(t.view(-1, N_ATOMS)).view(t.size())
 
 
-def calc_values_of_states(states, net, cuda=False):
+def calc_values_of_states(states, net, device="cpu"):
     mean_vals = []
     for batch in np.array_split(states, 64):
-        states_v = Variable(torch.from_numpy(batch), volatile=True)
-        if cuda:
-            states_v = states_v.cuda()
+        states_v = torch.tensor(batch).to(device)
         action_values_v = net.qvals(states_v)
         best_action_values_v = action_values_v.max(1)[0]
-        mean_val = best_action_values_v.mean().data.cpu().numpy()[0]
-        mean_vals.append(mean_val)
+        mean_vals.append(best_action_values_v.mean().item())
     return np.mean(mean_vals)
 
 
-def save_state_images(frame_idx, states, net, cuda=False, max_states=200):
+def save_state_images(frame_idx, states, net, device="cpu", max_states=200):
     ofs = 0
     p = np.arange(Vmin, Vmax + DELTA_Z, DELTA_Z)
     for batch in np.array_split(states, 64):
-        states_v = Variable(torch.from_numpy(batch), volatile=True)
-        if cuda:
-            states_v = states_v.cuda()
+        states_v = torch.tensor(batch).to(device)
         action_prob = net.apply_softmax(net(states_v)).data.cpu().numpy()
         batch_size, num_actions, _ = action_prob.shape
         for batch_idx in range(batch_size):
@@ -135,17 +129,13 @@ def save_transition_images(batch_size, predicted, projected, next_distr, dones, 
         plt.savefig("%s_%02d%s.png" % (save_prefix, batch_idx, suffix))
 
 
-def calc_loss(batch, net, tgt_net, gamma, cuda=False, save_prefix=None):
+def calc_loss(batch, net, tgt_net, gamma, device="cpu", save_prefix=None):
     states, actions, rewards, dones, next_states = common.unpack_batch(batch)
     batch_size = len(batch)
 
-    states_v = Variable(torch.from_numpy(states))
-    actions_v = Variable(torch.from_numpy(actions))
-    next_states_v = Variable(torch.from_numpy(next_states), volatile=True)
-    if cuda:
-        states_v = states_v.cuda()
-        actions_v = actions_v.cuda()
-        next_states_v = next_states_v.cuda()
+    states_v = torch.tensor(states).to(device)
+    actions_v = torch.tensor(actions).to(device)
+    next_states_v = torch.tensor(next_states).to(device)
 
     # next state distribution
     next_distr_v, next_qvals_v = tgt_net.both(next_states_v)
@@ -162,9 +152,7 @@ def calc_loss(batch, net, tgt_net, gamma, cuda=False, save_prefix=None):
     distr_v = net(states_v)
     state_action_values = distr_v[range(batch_size), actions_v.data]
     state_log_sm_v = F.log_softmax(state_action_values, dim=1)
-    proj_distr_v = Variable(torch.from_numpy(proj_distr))
-    if cuda:
-        proj_distr_v = proj_distr_v.cuda()
+    proj_distr_v = torch.tensor(proj_distr).to(device)
 
     if save_prefix is not None:
         pred = F.softmax(state_action_values, dim=1).data.cpu().numpy()
@@ -179,19 +167,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     env = gym.make(params['env_name'])
     env = ptan.common.wrappers.wrap_dqn(env)
 
     writer = SummaryWriter(comment="-" + params['run_name'] + "-distrib")
-    net = DistributionalDQN(env.observation_space.shape, env.action_space.n)
-    if args.cuda:
-        net.cuda()
+    net = DistributionalDQN(env.observation_space.shape, env.action_space.n).to(device)
 
     tgt_net = ptan.agent.TargetNet(net)
     selector = ptan.actions.EpsilonGreedyActionSelector(epsilon=params['epsilon_start'])
     epsilon_tracker = common.EpsilonTracker(selector, params)
-    agent = ptan.agent.DQNAgent(lambda x: net.qvals(x), selector, cuda=args.cuda)
+    agent = ptan.agent.DQNAgent(lambda x: net.qvals(x), selector, device=device)
 
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=params['gamma'], steps_count=1)
     buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=params['replay_size'])
@@ -232,7 +219,7 @@ if __name__ == "__main__":
                     prev_save = frame_idx // 30000
 
             loss_v = calc_loss(batch, net, tgt_net.target_model, gamma=params['gamma'],
-                               cuda=args.cuda, save_prefix=save_prefix)
+                               device=device, save_prefix=save_prefix)
             loss_v.backward()
             optimizer.step()
 
@@ -240,8 +227,8 @@ if __name__ == "__main__":
                 tgt_net.sync()
 
             if frame_idx % EVAL_EVERY_FRAME == 0:
-                mean_val = calc_values_of_states(eval_states, net, cuda=args.cuda)
+                mean_val = calc_values_of_states(eval_states, net, device=device)
                 writer.add_scalar("values_mean", mean_val, frame_idx)
 
             if SAVE_STATES_IMG and frame_idx % 10000 == 0:
-                save_state_images(frame_idx, eval_states, net, cuda=args.cuda)
+                save_state_images(frame_idx, eval_states, net, device=device)

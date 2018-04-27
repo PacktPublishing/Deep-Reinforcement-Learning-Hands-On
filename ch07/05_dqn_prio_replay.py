@@ -3,11 +3,9 @@ import gym
 import ptan
 import numpy as np
 import argparse
-import collections
 
 import torch
 import torch.optim as optim
-from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
@@ -61,29 +59,21 @@ class PrioReplayBuffer:
             self.priorities[idx] = prio
 
 
-def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
+def calc_loss(batch, batch_weights, net, tgt_net, gamma, device="cpu"):
     states, actions, rewards, dones, next_states = common.unpack_batch(batch)
 
-    states_v = Variable(torch.from_numpy(states))
-    next_states_v = Variable(torch.from_numpy(next_states), volatile=True)
-    actions_v = Variable(torch.from_numpy(actions))
-    rewards_v = Variable(torch.from_numpy(rewards))
-    done_mask = torch.ByteTensor(dones)
-    batch_weights_v = Variable(torch.from_numpy(batch_weights))
-    if cuda:
-        states_v = states_v.cuda()
-        next_states_v = next_states_v.cuda()
-        actions_v = actions_v.cuda()
-        rewards_v = rewards_v.cuda()
-        done_mask = done_mask.cuda()
-        batch_weights_v = batch_weights_v.cuda()
+    states_v = torch.tensor(states).to(device)
+    next_states_v = torch.tensor(next_states).to(device)
+    actions_v = torch.tensor(actions).to(device)
+    rewards_v = torch.tensor(rewards).to(device)
+    done_mask = torch.ByteTensor(dones).to(device)
+    batch_weights_v = torch.tensor(batch_weights).to(device)
 
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
     next_state_values = tgt_net(next_states_v).max(1)[0]
     next_state_values[done_mask] = 0.0
-    next_state_values.volatile = False
 
-    expected_state_action_values = next_state_values * gamma + rewards_v
+    expected_state_action_values = next_state_values.detach() * gamma + rewards_v
     losses_v = batch_weights_v * (state_action_values - expected_state_action_values) ** 2
     return losses_v.mean(), losses_v + 1e-5
 
@@ -93,19 +83,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     env = gym.make(params['env_name'])
     env = ptan.common.wrappers.wrap_dqn(env)
 
     writer = SummaryWriter(comment="-" + params['run_name'] + "-prio-replay")
-    net = dqn_model.DQN(env.observation_space.shape, env.action_space.n)
-    if args.cuda:
-        net.cuda()
-
+    net = dqn_model.DQN(env.observation_space.shape, env.action_space.n).to(device)
     tgt_net = ptan.agent.TargetNet(net)
     selector = ptan.actions.EpsilonGreedyActionSelector(epsilon=params['epsilon_start'])
     epsilon_tracker = common.EpsilonTracker(selector, params)
-    agent = ptan.agent.DQNAgent(net, selector, cuda=args.cuda)
+    agent = ptan.agent.DQNAgent(net, selector, device=device)
 
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=params['gamma'], steps_count=1)
     buffer = PrioReplayBuffer(exp_source, params['replay_size'], PRIO_REPLAY_ALPHA)
@@ -133,7 +121,7 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             batch, batch_indices, batch_weights = buffer.sample(params['batch_size'], beta)
             loss_v, sample_prios_v = calc_loss(batch, batch_weights, net, tgt_net.target_model,
-                                               params['gamma'], cuda=args.cuda)
+                                               params['gamma'], device=device)
             loss_v.backward()
             optimizer.step()
             buffer.update_priorities(batch_indices, sample_prios_v.data.cpu().numpy())
