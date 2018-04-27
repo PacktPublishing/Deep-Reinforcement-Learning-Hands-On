@@ -5,7 +5,6 @@ import numpy as np
 from lib import environ, data, models
 
 import torch
-from torch.autograd import Variable
 
 import matplotlib as mpl
 mpl.use("Agg")
@@ -33,7 +32,7 @@ if __name__ == "__main__":
     else:
         net = models.SimpleFFDQN(env.observation_space.shape[0], env.action_space.n)
 
-    net.load_state_dict(torch.load(args.model))
+    net.load_state_dict(torch.load(args.model, map_location=lambda storage, loc: storage))
 
     obs = env.reset()
     start_price = env._state._cur_close()
@@ -46,9 +45,9 @@ if __name__ == "__main__":
 
     while True:
         step_idx += 1
-        obs_v = Variable(torch.from_numpy(np.expand_dims(obs, 0)))
+        obs_v = torch.tensor([obs])
         out_v = net(obs_v)
-        action_idx = out_v.max(dim=1)[1].data.cpu().numpy()[0]
+        action_idx = out_v.max(dim=1)[1].item()
         if np.random.random() < EPSILON:
             action_idx = env.action_space.sample()
         action = environ.Actions(action_idx)
