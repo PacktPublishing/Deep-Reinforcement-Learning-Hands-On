@@ -10,7 +10,6 @@ import torch.nn as nn
 import torch.nn.utils as nn_utils
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.autograd import Variable
 
 from lib import common
 
@@ -51,7 +50,7 @@ class AtariA2C(nn.Module):
         )
 
     def _get_conv_out(self, shape):
-        o = self.conv(Variable(torch.zeros(1, *shape)))
+        o = self.conv(torch.zeros(1, *shape))
         return int(np.prod(o.size()))
 
     def forward(self, x):
@@ -60,7 +59,7 @@ class AtariA2C(nn.Module):
         return self.policy(conv_out), self.value(conv_out)
 
 
-def unpack_batch(batch, net, cuda=False):
+def unpack_batch(batch, net, device='cpu'):
     """
     Convert batch into training tensors
     :param batch:
@@ -79,26 +78,17 @@ def unpack_batch(batch, net, cuda=False):
         if exp.last_state is not None:
             not_done_idx.append(idx)
             last_states.append(np.array(exp.last_state, copy=False))
-    states_v = Variable(torch.from_numpy(np.array(states, copy=False)))
-    actions_t = torch.LongTensor(actions)
-    if cuda:
-        states_v = states_v.cuda()
-        actions_t = actions_t.cuda()
-
+    states_v = torch.FloatTensor(states).to(device)
+    actions_t = torch.LongTensor(actions).to(device)
     # handle rewards
     rewards_np = np.array(rewards, dtype=np.float32)
     if not_done_idx:
-        last_states_v = Variable(torch.from_numpy(np.array(last_states, copy=False)), volatile=True)
-        if cuda:
-            last_states_v = last_states_v.cuda()
+        last_states_v = torch.FloatTensor(last_states).to(device)
         last_vals_v = net(last_states_v)[1]
         last_vals_np = last_vals_v.data.cpu().numpy()[:, 0]
         rewards_np[not_done_idx] += GAMMA ** REWARD_STEPS * last_vals_np
 
-    ref_vals_v = Variable(torch.from_numpy(rewards_np))
-    if cuda:
-        ref_vals_v = ref_vals_v.cuda()
-
+    ref_vals_v = torch.FloatTensor(rewards_np).to(device)
     return states_v, actions_t, ref_vals_v
 
 
@@ -107,17 +97,16 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("PongNoFrameskip-v4"))
     envs = [make_env() for _ in range(NUM_ENVS)]
     writer = SummaryWriter(comment="-pong-a2c_" + args.name)
 
-    net = AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
-    if args.cuda:
-        net.cuda()
+    net = AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n).to(device)
     print(net)
 
-    agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], apply_softmax=True, cuda=args.cuda)
+    agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], apply_softmax=True, device=device)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
@@ -138,13 +127,12 @@ if __name__ == "__main__":
                 if len(batch) < BATCH_SIZE:
                     continue
 
-                states_v, actions_t, vals_ref_v = unpack_batch(batch, net, cuda=args.cuda)
+                states_v, actions_t, vals_ref_v = unpack_batch(batch, net, device=device)
                 batch.clear()
 
                 optimizer.zero_grad()
                 logits_v, value_v = net(states_v)
-
-                loss_value_v = F.mse_loss(value_v, vals_ref_v)
+                loss_value_v = F.mse_loss(value_v.squeeze(-1), vals_ref_v)
 
                 log_prob_v = F.log_softmax(logits_v, dim=1)
                 adv_v = vals_ref_v - value_v.detach()
@@ -163,7 +151,7 @@ if __name__ == "__main__":
                 # apply entropy and value gradients
                 loss_v = entropy_loss_v + loss_value_v
                 loss_v.backward()
-                nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
+                nn_utils.clip_grad_norm_(net.parameters(), CLIP_GRAD)
                 optimizer.step()
                 # get full loss
                 loss_v += loss_policy_v
