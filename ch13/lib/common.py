@@ -3,7 +3,6 @@ import time
 
 import numpy as np
 import torch
-from torch.autograd import Variable
 
 import ptan
 
@@ -39,7 +38,7 @@ class RewardTracker:
         return mean_reward if len(self.total_rewards) > 30 else None
 
 
-def unpack_batch(batch, net, last_val_gamma, cuda=False, states_preprocessor=ptan.agent.default_states_preprocessor):
+def unpack_batch(batch, net, last_val_gamma, device="cpu", states_preprocessor=ptan.agent.default_states_preprocessor):
     """
     Convert batch into training tensors
     :param batch:
@@ -58,21 +57,20 @@ def unpack_batch(batch, net, last_val_gamma, cuda=False, states_preprocessor=pta
         if exp.last_state is not None:
             not_done_idx.append(idx)
             last_states.append(exp.last_state)
-    states_v = states_preprocessor(states, cuda=cuda)
-    actions_t = torch.LongTensor(actions)
-    if cuda:
-        actions_t = actions_t.cuda()
+    states_v = states_preprocessor(states)
+    if torch.is_tensor(states_v):
+        states_v = states_v.to(device)
+    actions_t = torch.LongTensor(actions).to(device)
 
     # handle rewards
     rewards_np = np.array(rewards, dtype=np.float32)
     if not_done_idx:
-        last_states_v = states_preprocessor(last_states, cuda=cuda)
+        last_states_v = states_preprocessor(last_states)
+        if torch.is_tensor(last_states_v):
+            last_states_v = last_states_v.to(device)
         last_vals_v = net(last_states_v)[1]
         last_vals_np = last_vals_v.data.cpu().numpy()[:, 0]
         rewards_np[not_done_idx] += last_val_gamma * last_vals_np
 
-    ref_vals_v = Variable(torch.from_numpy(rewards_np))
-    if cuda:
-        ref_vals_v = ref_vals_v.cuda()
-
+    ref_vals_v = torch.FloatTensor(rewards_np).to(device)
     return states_v, actions_t, ref_vals_v

@@ -7,7 +7,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.utils.rnn as rnn_utils
-from torch.autograd import Variable
 
 MM_EMBEDDINGS_DIM = 50
 MM_HIDDEN_SIZE = 128
@@ -38,7 +37,7 @@ class Model(nn.Module):
         )
 
     def _get_conv_out(self, shape):
-        o = self.conv(Variable(torch.zeros(1, *shape)))
+        o = self.conv(torch.zeros(1, *shape))
         return int(np.prod(o.size()))
 
     def forward(self, x):
@@ -72,7 +71,7 @@ class ModelMultimodal(nn.Module):
         )
 
     def _get_conv_out(self, shape):
-        o = self.conv(Variable(torch.zeros(1, *shape)))
+        o = self.conv(torch.zeros(1, *shape))
         return int(np.prod(o.size()))
 
     def _concat_features(self, img_out, rnn_hidden):
@@ -90,7 +89,7 @@ class ModelMultimodal(nn.Module):
 
         # deal with text data
         emb_out = self.emb(x_text.data)
-        emb_out_seq = rnn_utils.PackedSequence(data=emb_out, batch_sizes=x_text.batch_sizes)
+        emb_out_seq = rnn_utils.PackedSequence(emb_out, x_text.batch_sizes)
         rnn_out, rnn_h = self.rnn(emb_out_seq)
 
         # extract image features
@@ -104,16 +103,17 @@ class ModelMultimodal(nn.Module):
 class MultimodalPreprocessor:
     log = logging.getLogger("MulitmodalPreprocessor")
 
-    def __init__(self, max_dict_size=MM_MAX_DICT_SIZE):
+    def __init__(self, max_dict_size=MM_MAX_DICT_SIZE, device="cpu"):
         self.max_dict_size = max_dict_size
         self.token_to_id = {TOKEN_UNK: 0}
         self.next_id = 1
         self.tokenizer = TweetTokenizer(preserve_case=True)
+        self.device = device
 
     def __len__(self):
         return len(self.token_to_id)
 
-    def __call__(self, batch, cuda=False, device_id=None):
+    def __call__(self, batch):
         """
         Convert list of multimodel observations (tuples with image and text string) into the form suitable
         for ModelMultimodal to disgest
@@ -131,7 +131,7 @@ class MultimodalPreprocessor:
 
         # convert data into the target form
         # images
-        img_v = Variable(torch.from_numpy(np.array(img_batch)))
+        img_v = torch.FloatTensor(img_batch).to(self.device)
         # sequences
         seq_arr = np.zeros(shape=(len(seq_batch), max(len(seq_batch[0]), 1)), dtype=np.int64)
         for idx, seq in enumerate(seq_batch):
@@ -139,10 +139,7 @@ class MultimodalPreprocessor:
             # Map empty sequences into single #UNK token
             if len(seq) == 0:
                 lens[idx] = 1
-        seq_v = Variable(torch.from_numpy(seq_arr))
-        if cuda:
-            img_v = img_v.cuda(device_id=device_id)
-            seq_v = seq_v.cuda(device_id=device_id)
+        seq_v = torch.LongTensor(seq_arr).to(self.device)
         seq_p = rnn_utils.pack_padded_sequence(seq_v, lens, batch_first=True)
         return img_v, seq_p
 
@@ -180,19 +177,17 @@ class MultimodalPreprocessor:
             return res
 
 
-def train_demo(net, optimizer, batch, writer, step_idx, preprocessor, cuda=False):
+def train_demo(net, optimizer, batch, writer, step_idx, preprocessor, device="cpu"):
     """
     Train net on demonstration batch
     """
     batch_obs, batch_act = zip(*batch)
-    batch_v = preprocessor(batch_obs, cuda=cuda)
+    batch_v = preprocessor(batch_obs).to(device)
     optimizer.zero_grad()
-    ref_actions_v = Variable(torch.LongTensor(batch_act))
-    if cuda:
-        ref_actions_v = ref_actions_v.cuda()
+    ref_actions_v = torch.LongTensor(batch_act).to(device)
     policy_v = net(batch_v)[0]
     loss_v = F.cross_entropy(policy_v, ref_actions_v)
     loss_v.backward()
     optimizer.step()
-    writer.add_scalar("demo_loss", loss_v.data.cpu().numpy()[0], step_idx)
+    writer.add_scalar("demo_loss", loss_v.item(), step_idx)
 
