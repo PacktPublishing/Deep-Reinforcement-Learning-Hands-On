@@ -4,7 +4,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 HID_SIZE = 128
 
@@ -84,25 +83,26 @@ class D4PGCritic(nn.Module):
             nn.Linear(300, n_atoms)
         )
 
-        self.register_buffer("supports", torch.arange(v_min, v_max, (v_max - v_min) / (n_atoms - 1)))
+        delta = (v_max - v_min) / (n_atoms - 1)
+        self.register_buffer("supports", torch.arange(v_min, v_max + delta, delta))
 
     def forward(self, x, a):
         obs = self.obs_net(x)
         return self.out_net(torch.cat([obs, a], dim=1))
 
     def distr_to_q(self, distr):
-        weights = F.softmax(distr, dim=1) * Variable(self.supports)
+        weights = F.softmax(distr, dim=1) * self.supports
         res = weights.sum(dim=1)
         return res.unsqueeze(dim=-1)
 
 
 class AgentA2C(ptan.agent.BaseAgent):
-    def __init__(self, net, cuda=False):
+    def __init__(self, net, device="cpu"):
         self.net = net
-        self.cuda = cuda
+        self.device = device
 
     def __call__(self, states, agent_states):
-        states_v = ptan.agent.float32_preprocessor(states, cuda=self.cuda)
+        states_v = ptan.agent.float32_preprocessor(states).to(self.device)
 
         mu_v, var_v, _ = self.net(states_v)
         mu = mu_v.data.cpu().numpy()
@@ -116,9 +116,9 @@ class AgentDDPG(ptan.agent.BaseAgent):
     """
     Agent implementing Orstein-Uhlenbeck exploration process
     """
-    def __init__(self, net, cuda=False, ou_enabled=True, ou_mu=0.0, ou_teta=0.15, ou_sigma=0.2, ou_epsilon=1.0):
+    def __init__(self, net, device="cpu", ou_enabled=True, ou_mu=0.0, ou_teta=0.15, ou_sigma=0.2, ou_epsilon=1.0):
         self.net = net
-        self.cuda = cuda
+        self.device = device
         self.ou_enabled = ou_enabled
         self.ou_mu = ou_mu
         self.ou_teta = ou_teta
@@ -129,7 +129,7 @@ class AgentDDPG(ptan.agent.BaseAgent):
         return None
 
     def __call__(self, states, agent_states):
-        states_v = ptan.agent.float32_preprocessor(states, cuda=self.cuda)
+        states_v = ptan.agent.float32_preprocessor(states).to(self.device)
         mu_v = self.net(states_v)
         actions = mu_v.data.cpu().numpy()
 
@@ -154,13 +154,13 @@ class AgentD4PG(ptan.agent.BaseAgent):
     """
     Agent implementing noisy agent
     """
-    def __init__(self, net, cuda=False, epsilon=0.3):
+    def __init__(self, net, device="cpu", epsilon=0.3):
         self.net = net
-        self.cuda = cuda
+        self.device = device
         self.epsilon = epsilon
 
     def __call__(self, states, agent_states):
-        states_v = ptan.agent.float32_preprocessor(states, cuda=self.cuda)
+        states_v = ptan.agent.float32_preprocessor(states).to(self.device)
         mu_v = self.net(states_v)
         actions = mu_v.data.cpu().numpy()
         actions += self.epsilon * np.random.normal(size=actions.shape)
