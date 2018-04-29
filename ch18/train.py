@@ -114,9 +114,9 @@ if __name__ == "__main__":
                 loss_v = loss_policy_v + loss_value_v
                 loss_v.backward()
                 optimizer.step()
-                sum_loss += loss_v.data.cpu().numpy()[0]
-                sum_value_loss += loss_value_v.data.cpu().numpy()[0]
-                sum_policy_loss += loss_policy_v.data.cpu().numpy()[0]
+                sum_loss += loss_v.item()
+                sum_value_loss += loss_value_v.item()
+                sum_policy_loss += loss_policy_v.item()
 
             tb_tracker.track("loss_total", sum_loss / TRAIN_ROUNDS, step_idx)
             tb_tracker.track("loss_value", sum_value_loss / TRAIN_ROUNDS, step_idx)
