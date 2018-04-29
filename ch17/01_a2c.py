@@ -22,6 +22,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=common.DEFAULT_SEED, help="Random seed to use, default=%d" % common.DEFAULT_SEED)
     parser.add_argument("--steps", type=int, default=None, help="Limit of training steps, default=disabled")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     saves_path = os.path.join("saves", "01_a2c_" + args.name)
     os.makedirs(saves_path, exist_ok=True)
@@ -36,9 +37,7 @@ if __name__ == "__main__":
     test_env = common.make_env(test=True)
     writer = SummaryWriter(comment="-01_a2c_" + args.name + suffix)
 
-    net = common.AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
-    if args.cuda:
-        net.cuda()
+    net = common.AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n).to(device)
     print(net)
     optimizer = optim.RMSprop(net.parameters(), lr=LEARNING_RATE, eps=1e-5)
 
@@ -48,7 +47,8 @@ if __name__ == "__main__":
     ts_start = time.time()
     best_test_reward = None
     with ptan.common.utils.TBMeanTracker(writer, batch_size=100) as tb_tracker:
-        for mb_obs, mb_rewards, mb_actions, mb_values, _, done_rewards, done_steps in common.iterate_batches(envs, net, cuda=args.cuda):
+        for mb_obs, mb_rewards, mb_actions, mb_values, _, done_rewards, done_steps in \
+                common.iterate_batches(envs, net, device=device):
             if len(done_rewards) > 0:
                 total_steps += sum(done_steps)
                 speed = total_steps / (time.time() - ts_start)
@@ -63,13 +63,13 @@ if __name__ == "__main__":
                     step_idx, len(done_rewards), done_rewards.mean(), best_reward, speed))
 
             common.train_a2c(net, mb_obs, mb_rewards, mb_actions, mb_values,
-                             optimizer, tb_tracker, step_idx, cuda=args.cuda)
+                             optimizer, tb_tracker, step_idx, device=device)
             step_idx += 1
             if args.steps is not None and args.steps < step_idx:
                 break
 
             if step_idx % TEST_EVERY_BATCH == 0:
-                test_reward, test_steps = common.test_model(test_env, net, cuda=args.cuda)
+                test_reward, test_steps = common.test_model(test_env, net, device=device)
                 writer.add_scalar("test_reward", test_reward, step_idx)
                 writer.add_scalar("test_steps", test_steps, step_idx)
                 if best_test_reward is None or best_test_reward < test_reward:

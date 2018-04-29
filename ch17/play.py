@@ -17,6 +17,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action="store_true")
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -38,7 +39,7 @@ if __name__ == "__main__":
     total_steps = 0
 
     while True:
-        obs_v = ptan.agent.default_states_preprocessor([obs], cuda=args.cuda)
+        obs_v = ptan.agent.default_states_preprocessor([obs]).to(device)
         logits_v, values_v = net(obs_v)
         probs_v = F.softmax(logits_v)
         probs = probs_v.data.cpu().numpy()
@@ -50,5 +51,3 @@ if __name__ == "__main__":
             break
 
     print("Done in %d steps, reward %.2f" % (total_steps, total_reward))
-
-    pass

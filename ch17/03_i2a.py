@@ -10,7 +10,6 @@ from lib import common, i2a
 import torch.optim as optim
 import torch
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
@@ -28,6 +27,7 @@ if __name__ == "__main__":
     parser.add_argument("--em", required=True, help="Environment model file name")
     parser.add_argument("--seed", type=int, default=common.DEFAULT_SEED, help="Random seed to use, default=%d" % common.DEFAULT_SEED)
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     saves_path = os.path.join("saves", "03_i2a_" + args.name)
     os.makedirs(saves_path, exist_ok=True)
@@ -45,22 +45,17 @@ if __name__ == "__main__":
     obs_shape = envs[0].observation_space.shape
     act_n = envs[0].action_space.n
 
-    net_policy = common.AtariA2C(obs_shape, act_n)
+    net_policy = common.AtariA2C(obs_shape, act_n).to(device)
 
     net_em = i2a.EnvironmentModel(obs_shape, act_n)
     net_em.load_state_dict(torch.load(args.em, map_location=lambda storage, loc: storage))
+    net_em = net_em.to(device)
 
-    net_i2a = i2a.I2A(obs_shape, act_n, net_em, net_policy, ROLLOUTS_STEPS)
-
-    if args.cuda:
-        net_policy.cuda()
-        net_em.cuda()
-        net_i2a.cuda()
-
+    net_i2a = i2a.I2A(obs_shape, act_n, net_em, net_policy, ROLLOUTS_STEPS).to(device)
     print(net_i2a)
 
     obs = envs[0].reset()
-    obs_v = ptan.agent.default_states_preprocessor([obs], cuda=args.cuda)
+    obs_v = ptan.agent.default_states_preprocessor([obs]).to(device)
     res = net_i2a(obs_v)
 
     optimizer = optim.RMSprop(net_i2a.parameters(), lr=LEARNING_RATE, eps=1e-5)
@@ -73,7 +68,7 @@ if __name__ == "__main__":
     best_test_reward = None
     with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
         for mb_obs, mb_rewards, mb_actions, mb_values, mb_probs, done_rewards, done_steps in \
-                common.iterate_batches(envs, net_i2a, cuda=args.cuda):
+                common.iterate_batches(envs, net_i2a, device):
             if len(done_rewards) > 0:
                 total_steps += sum(done_steps)
                 speed = total_steps / (time.time() - ts_start)
@@ -88,11 +83,9 @@ if __name__ == "__main__":
                     step_idx, len(done_rewards), done_rewards.mean(), best_reward, speed))
 
             obs_v = common.train_a2c(net_i2a, mb_obs, mb_rewards, mb_actions, mb_values,
-                                     optimizer, tb_tracker, step_idx, cuda=args.cuda)
+                                     optimizer, tb_tracker, step_idx, device=device)
             # policy distillation
-            probs_v = Variable(torch.from_numpy(mb_probs))
-            if args.cuda:
-                probs_v = probs_v.cuda()
+            probs_v = torch.FloatTensor(mb_probs).to(device)
             policy_opt.zero_grad()
             logits_v, _ = net_policy(obs_v)
             policy_loss_v = -F.log_softmax(logits_v, dim=1) * probs_v.view_as(logits_v)
@@ -104,7 +97,7 @@ if __name__ == "__main__":
             step_idx += 1
 
             if step_idx % TEST_EVERY_BATCH == 0:
-                test_reward, test_steps = common.test_model(test_env, net_i2a, cuda=args.cuda)
+                test_reward, test_steps = common.test_model(test_env, net_i2a, device=device)
                 writer.add_scalar("test_reward", test_reward, step_idx)
                 writer.add_scalar("test_steps", test_steps, step_idx)
                 if best_test_reward is None or best_test_reward < test_reward:

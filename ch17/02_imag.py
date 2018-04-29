@@ -9,7 +9,6 @@ from tensorboardX import SummaryWriter
 import torch
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.autograd import Variable
 
 from lib import common, i2a
 
@@ -29,7 +28,7 @@ def get_obs_diff(prev_obs, cur_obs):
     return cur - prev
 
 
-def iterate_batches(envs, net, cuda=False):
+def iterate_batches(envs, net, device="cpu"):
     act_selector = ptan.actions.ProbabilityActionSelector()
     mb_obs = np.zeros((BATCH_SIZE, ) + common.IMG_SHAPE, dtype=np.uint8)
     mb_obs_next = np.zeros((BATCH_SIZE, ) + i2a.EM_OUT_SHAPE, dtype=np.float32)
@@ -43,7 +42,7 @@ def iterate_batches(envs, net, cuda=False):
     done_steps = []
 
     while True:
-        obs_v = ptan.agent.default_states_preprocessor(obs, cuda=cuda)
+        obs_v = ptan.agent.default_states_preprocessor(obs).to(device)
         logits_v, values_v = net(obs_v)
         probs_v = F.softmax(logits_v, dim=1)
         probs = probs_v.data.cpu().numpy()
@@ -72,8 +71,6 @@ def iterate_batches(envs, net, cuda=False):
                 total_steps[e_idx] = 0
             obs[e_idx] = o
 
-    pass
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -81,6 +78,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     parser.add_argument("-m", "--model", required=True, help="File with model to load")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     saves_path = os.path.join("saves", "02_env_" + args.name)
     os.makedirs(saves_path, exist_ok=True)
@@ -89,18 +87,16 @@ if __name__ == "__main__":
     writer = SummaryWriter(comment="-02_env_" + args.name)
 
     net = common.AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
-    net_em = i2a.EnvironmentModel(envs[0].observation_space.shape, envs[0].action_space.n)
+    net_em = i2a.EnvironmentModel(envs[0].observation_space.shape, envs[0].action_space.n).to(device)
     net.load_state_dict(torch.load(args.model, map_location=lambda storage, loc: storage))
-    if args.cuda:
-        net.cuda()
-        net_em.cuda()
+    net = net.to(device)
     print(net_em)
     optimizer = optim.Adam(net_em.parameters(), lr=LEARNING_RATE)
 
     step_idx = 0
     best_loss = np.inf
     with ptan.common.utils.TBMeanTracker(writer, batch_size=100) as tb_tracker:
-        for mb_obs, mb_obs_next, mb_actions, mb_rewards, done_rewards, done_steps in iterate_batches(envs, net, cuda=args.cuda):
+        for mb_obs, mb_obs_next, mb_actions, mb_rewards, done_rewards, done_steps in iterate_batches(envs, net, device):
             if len(done_rewards) > 0:
                 m_reward = np.mean(done_rewards)
                 m_steps = np.mean(done_steps)
@@ -109,20 +105,15 @@ if __name__ == "__main__":
                 tb_tracker.track("total_reward", m_reward, step_idx)
                 tb_tracker.track("total_steps", m_steps, step_idx)
 
-            obs_v = Variable(torch.from_numpy(mb_obs))
-            obs_next_v = Variable(torch.from_numpy(mb_obs_next))
-            actions_t = torch.LongTensor(mb_actions.tolist())
-            rewards_v = Variable(torch.from_numpy(mb_rewards))
-            if args.cuda:
-                obs_v = obs_v.cuda()
-                actions_t = actions_t.cuda()
-                obs_next_v = obs_next_v.cuda()
-                rewards_v = rewards_v.cuda()
+            obs_v = torch.FloatTensor(mb_obs).to(device)
+            obs_next_v = torch.FloatTensor(mb_obs_next).to(device)
+            actions_t = torch.LongTensor(mb_actions.tolist()).to(device)
+            rewards_v = torch.FloatTensor(mb_rewards).to(device)
 
             optimizer.zero_grad()
             out_obs_next_v, out_reward_v = net_em(obs_v.float()/255, actions_t)
-            loss_obs_v = F.mse_loss(out_obs_next_v, obs_next_v)
-            loss_rew_v = F.mse_loss(out_reward_v, rewards_v)
+            loss_obs_v = F.mse_loss(out_obs_next_v.squeeze(-1), obs_next_v)
+            loss_rew_v = F.mse_loss(out_reward_v.squeeze(-1), rewards_v)
             loss_total_v = OBS_WEIGHT * loss_obs_v + REWARD_WEIGHT * loss_rew_v
             loss_total_v.backward()
             optimizer.step()
