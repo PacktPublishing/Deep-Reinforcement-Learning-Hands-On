@@ -54,6 +54,21 @@ In the PPO paper, the authors used more general estimation in the form of
 where \begin{math}\sigma_t=r_t+\gamma V(s_{t+1})-V(s_t)\end{math}. The original
 A3C estimation, is a special case of the proposed method with \begin{math}\lambda=1\end{math}.
 
+Page 8
+
+the advantage estimation (tracked in last\_gae variable) is calculated as the sum of deltas with discount
+factor \begin{math}\gamma\lambda\end{math}.
+
+In the next step, we calculate the logarithm of probability of the actions taken. This value will be used as
+\begin{math}\pi_{\theta_{old}}\end{math} in the surrogate objective of PPO. Additionally, we normalize the advantage’s
+mean and variance to improve the training stability.
+
+In the actor training, we minimize the negated clipped objective,
+\begin{math}\E_t[\min(r_t(\theta)A_t,clip(r_t(\theta), 1-\epsilon, 1+\epsilon)A_t)]\end{math}
+where
+\begin{math}r_t(\theta)=\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{old}}(a_t|s_t)}\end{math}.
+The lines below is straightforward implementation of this formula.
+
 Page 9
 
 As the first step, TRPO method defines the discounted visitation frequencies of
@@ -73,5 +88,5 @@ divergence between the old and the new policies, which could be written as
 .
 
 
-  
+
 \end{document}
