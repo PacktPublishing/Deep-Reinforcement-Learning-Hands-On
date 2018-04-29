@@ -7,7 +7,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 import torch.optim as optim
 
@@ -56,11 +55,11 @@ class RainbowDQN(nn.Module):
             dqn_model.NoisyLinear(512, n_actions * N_ATOMS)
         )
 
-        self.register_buffer("supports", torch.arange(Vmin, Vmax, DELTA_Z))
+        self.register_buffer("supports", torch.arange(Vmin, Vmax+DELTA_Z, DELTA_Z))
         self.softmax = nn.Softmax(dim=1)
 
     def _get_conv_out(self, shape):
-        o = self.conv(Variable(torch.zeros(1, *shape)))
+        o = self.conv(torch.zeros(1, *shape))
         return int(np.prod(o.size()))
 
     def forward(self, x):
@@ -75,7 +74,7 @@ class RainbowDQN(nn.Module):
     def both(self, x):
         cat_out = self(x)
         probs = self.apply_softmax(cat_out)
-        weights = probs * Variable(self.supports, volatile=True)
+        weights = probs * self.supports
         res = weights.sum(dim=2)
         return cat_out, res
 
@@ -86,19 +85,14 @@ class RainbowDQN(nn.Module):
         return self.softmax(t.view(-1, N_ATOMS)).view(t.size())
 
 
-def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
+def calc_loss(batch, batch_weights, net, tgt_net, gamma, device="cpu"):
     states, actions, rewards, dones, next_states = common.unpack_batch(batch)
     batch_size = len(batch)
 
-    states_v = Variable(torch.from_numpy(states))
-    actions_v = Variable(torch.from_numpy(actions))
-    next_states_v = Variable(torch.from_numpy(next_states))
-    batch_weights_v = Variable(torch.from_numpy(batch_weights))
-    if cuda:
-        states_v = states_v.cuda()
-        actions_v = actions_v.cuda()
-        next_states_v = next_states_v.cuda()
-        batch_weights_v = batch_weights_v.cuda()
+    states_v = torch.tensor(states).to(device)
+    actions_v = torch.tensor(actions).to(device)
+    next_states_v = torch.tensor(next_states).to(device)
+    batch_weights_v = torch.tensor(batch_weights).to(device)
 
     # next state distribution
     # dueling arch -- actions from main net, distr from tgt_net
@@ -122,9 +116,7 @@ def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
     # calculate net output
     state_action_values = distr_v[range(batch_size), actions_v.data]
     state_log_sm_v = F.log_softmax(state_action_values, dim=1)
-    proj_distr_v = Variable(torch.from_numpy(proj_distr))
-    if cuda:
-        proj_distr_v = proj_distr_v.cuda()
+    proj_distr_v = torch.tensor(proj_distr).to(device)
 
     loss_v = -state_log_sm_v * proj_distr_v
     loss_v = batch_weights_v * loss_v.sum(dim=1)
@@ -133,20 +125,19 @@ def calc_loss(batch, batch_weights, net, tgt_net, gamma, cuda=False):
 
 if __name__ == "__main__":
     params = common.HYPERPARAMS['pong']
+    params['epsilon_frames'] *= 2
     parser = argparse.ArgumentParser()
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     env = gym.make(params['env_name'])
     env = ptan.common.wrappers.wrap_dqn(env)
 
     writer = SummaryWriter(comment="-" + params['run_name'] + "-rainbow")
-    net = RainbowDQN(env.observation_space.shape, env.action_space.n)
-    if args.cuda:
-        net.cuda()
-
+    net = RainbowDQN(env.observation_space.shape, env.action_space.n).to(device)
     tgt_net = ptan.agent.TargetNet(net)
-    agent = ptan.agent.DQNAgent(lambda x: net.qvals(x), ptan.actions.ArgmaxActionSelector(), cuda=args.cuda)
+    agent = ptan.agent.DQNAgent(lambda x: net.qvals(x), ptan.actions.ArgmaxActionSelector(), device=device)
 
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=params['gamma'], steps_count=REWARD_STEPS)
     buffer = ptan.experience.PrioritizedReplayBuffer(exp_source, params['replay_size'], PRIO_REPLAY_ALPHA)
@@ -172,7 +163,7 @@ if __name__ == "__main__":
             optimizer.zero_grad()
             batch, batch_indices, batch_weights = buffer.sample(params['batch_size'], beta)
             loss_v, sample_prios_v = calc_loss(batch, batch_weights, net, tgt_net.target_model,
-                                               params['gamma'] ** REWARD_STEPS, cuda=args.cuda)
+                                               params['gamma'] ** REWARD_STEPS, device=device)
             loss_v.backward()
             optimizer.step()
             buffer.update_priorities(batch_indices, sample_prios_v.data.cpu().numpy())

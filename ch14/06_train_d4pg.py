@@ -13,7 +13,6 @@ from lib import model, common
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 
 ENV_ID = "MinitaurBulletEnv-v0"
@@ -32,13 +31,13 @@ N_ATOMS = 51
 DELTA_Z = (Vmax - Vmin) / (N_ATOMS - 1)
 
 
-def test_net(net, env, count=10, cuda=False):
+def test_net(net, env, count=10, device="cpu"):
     rewards = 0.0
     steps = 0
     for _ in range(count):
         obs = env.reset()
         while True:
-            obs_v = ptan.agent.float32_preprocessor([obs], cuda)
+            obs_v = ptan.agent.float32_preprocessor([obs]).to(device)
             mu_v = net(obs_v)
             action = mu_v.squeeze(dim=0).data.cpu().numpy()
             action = np.clip(action, -1, 1)
@@ -50,7 +49,7 @@ def test_net(net, env, count=10, cuda=False):
     return rewards / count, steps / count
 
 
-def distr_projection(next_distr_v, rewards_v, dones_mask_t, gamma, cuda=False):
+def distr_projection(next_distr_v, rewards_v, dones_mask_t, gamma, device="cpu"):
     next_distr = next_distr_v.data.cpu().numpy()
     rewards = rewards_v.data.cpu().numpy()
     dones_mask = dones_mask_t.cpu().numpy().astype(np.bool)
@@ -85,10 +84,7 @@ def distr_projection(next_distr_v, rewards_v, dones_mask_t, gamma, cuda=False):
         if ne_dones.any():
             proj_distr[ne_dones, l] = (u - b_j)[ne_mask]
             proj_distr[ne_dones, u] = (b_j - l)[ne_mask]
-    proj_distr_v = Variable(torch.from_numpy(proj_distr))
-    if cuda:
-        proj_distr_v = proj_distr_v.cuda()
-    return proj_distr_v
+    return torch.FloatTensor(proj_distr).to(device)
 
 
 if __name__ == "__main__":
@@ -96,6 +92,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true', help='Enable CUDA')
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     save_path = os.path.join("saves", "d4pg-" + args.name)
     os.makedirs(save_path, exist_ok=True)
@@ -103,18 +100,15 @@ if __name__ == "__main__":
     env = gym.make(ENV_ID)
     test_env = gym.make(ENV_ID)
 
-    act_net = model.DDPGActor(env.observation_space.shape[0], env.action_space.shape[0])
-    crt_net = model.D4PGCritic(env.observation_space.shape[0], env.action_space.shape[0], N_ATOMS, Vmin, Vmax)
-    if args.cuda:
-        act_net.cuda()
-        crt_net.cuda()
+    act_net = model.DDPGActor(env.observation_space.shape[0], env.action_space.shape[0]).to(device)
+    crt_net = model.D4PGCritic(env.observation_space.shape[0], env.action_space.shape[0], N_ATOMS, Vmin, Vmax).to(device)
     print(act_net)
     print(crt_net)
     tgt_act_net = ptan.agent.TargetNet(act_net)
     tgt_crt_net = ptan.agent.TargetNet(crt_net)
 
     writer = SummaryWriter(comment="-d4pg_" + args.name)
-    agent = model.AgentDDPG(act_net, cuda=args.cuda)
+    agent = model.AgentDDPG(act_net, device=device)
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
     buffer = ptan.experience.ExperienceReplayBuffer(exp_source, buffer_size=REPLAY_SIZE)
     act_opt = optim.Adam(act_net.parameters(), lr=LEARNING_RATE)
@@ -137,8 +131,7 @@ if __name__ == "__main__":
                     continue
 
                 batch = buffer.sample(BATCH_SIZE)
-                states_v, actions_v, rewards_v, dones_mask, last_states_v = \
-                    common.unpack_batch_ddpg(batch, cuda=args.cuda)
+                states_v, actions_v, rewards_v, dones_mask, last_states_v = common.unpack_batch_ddqn(batch, device)
 
                 # train critic
                 crt_opt.zero_grad()
@@ -146,7 +139,7 @@ if __name__ == "__main__":
                 last_act_v = tgt_act_net.target_model(last_states_v)
                 last_distr_v = F.softmax(tgt_crt_net.target_model(last_states_v, last_act_v), dim=1)
                 proj_distr_v = distr_projection(last_distr_v, rewards_v, dones_mask,
-                                                gamma=GAMMA**REWARD_STEPS, cuda=args.cuda)
+                                                gamma=GAMMA**REWARD_STEPS, device=device)
                 prob_dist_v = -F.log_softmax(crt_distr_v, dim=1) * proj_distr_v
                 critic_loss_v = prob_dist_v.sum(dim=1).mean()
                 critic_loss_v.backward()
@@ -168,7 +161,7 @@ if __name__ == "__main__":
 
                 if frame_idx % TEST_ITERS == 0:
                     ts = time.time()
-                    rewards, steps = test_net(act_net, test_env, cuda=args.cuda)
+                    rewards, steps = test_net(act_net, test_env, device=device)
                     print("Test done in %.2f sec, reward %.3f, steps %d" % (
                         time.time() - ts, rewards, steps))
                     writer.add_scalar("test_reward", rewards, frame_idx)

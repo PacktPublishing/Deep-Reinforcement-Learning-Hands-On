@@ -1,12 +1,11 @@
 import numpy as np
 
 import torch
-from torch.autograd import Variable
 
 from lib import environ
 
 
-def validation_run(env, net, episodes=100, cuda=False, epsilon=0.02, comission=0.1):
+def validation_run(env, net, episodes=100, device="cpu", epsilon=0.02, comission=0.1):
     stats = {
         'episode_reward': [],
         'episode_steps': [],
@@ -23,12 +22,10 @@ def validation_run(env, net, episodes=100, cuda=False, epsilon=0.02, comission=0
         episode_steps = 0
 
         while True:
-            obs_v = Variable(torch.from_numpy(np.expand_dims(obs, 0)))
-            if cuda:
-                obs_v = obs_v.cuda()
+            obs_v = torch.tensor([obs]).to(device)
             out_v = net(obs_v)
 
-            action_idx = out_v.max(dim=1)[1].data.cpu().numpy()[0]
+            action_idx = out_v.max(dim=1)[1].item()
             if np.random.random() < epsilon:
                 action_idx = env.action_space.sample()
             action = environ.Actions(action_idx)

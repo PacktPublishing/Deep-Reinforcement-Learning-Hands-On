@@ -3,7 +3,6 @@ import time
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 
 
 HYPERPARAMS = {
@@ -82,27 +81,20 @@ def unpack_batch(batch):
            np.array(dones, dtype=np.uint8), np.array(last_states, copy=False)
 
 
-def calc_loss_dqn(batch, net, tgt_net, gamma, cuda=False):
+def calc_loss_dqn(batch, net, tgt_net, gamma, device="cpu"):
     states, actions, rewards, dones, next_states = unpack_batch(batch)
 
-    states_v = Variable(torch.from_numpy(states))
-    next_states_v = Variable(torch.from_numpy(next_states), volatile=True)
-    actions_v = Variable(torch.from_numpy(actions))
-    rewards_v = Variable(torch.from_numpy(rewards))
-    done_mask = torch.ByteTensor(dones)
-    if cuda:
-        states_v = states_v.cuda()
-        next_states_v = next_states_v.cuda()
-        actions_v = actions_v.cuda()
-        rewards_v = rewards_v.cuda()
-        done_mask = done_mask.cuda()
+    states_v = torch.tensor(states).to(device)
+    next_states_v = torch.tensor(next_states).to(device)
+    actions_v = torch.tensor(actions).to(device)
+    rewards_v = torch.tensor(rewards).to(device)
+    done_mask = torch.ByteTensor(dones).to(device)
 
     state_action_values = net(states_v).gather(1, actions_v.unsqueeze(-1)).squeeze(-1)
     next_state_values = tgt_net(next_states_v).max(1)[0]
     next_state_values[done_mask] = 0.0
-    next_state_values.volatile = False
 
-    expected_state_action_values = next_state_values * gamma + rewards_v
+    expected_state_action_values = next_state_values.detach() * gamma + rewards_v
     return nn.MSELoss()(state_action_values, expected_state_action_values)
 
 

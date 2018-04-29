@@ -4,7 +4,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 from . import common
 
@@ -52,15 +51,13 @@ class EnvironmentModel(nn.Module):
         )
 
     def _get_reward_conv_out(self, shape):
-        o = self.conv1(Variable(torch.zeros(1, *shape)))
+        o = self.conv1(torch.zeros(1, *shape))
         o = self.reward_conv(o)
         return int(np.prod(o.size()))
 
     def forward(self, imgs, actions):
         batch_size = actions.size()[0]
-        act_planes_v = Variable(torch.FloatTensor(batch_size, self.n_actions, *self.input_shape[1:]).zero_())
-        if actions.is_cuda:
-            act_planes_v = act_planes_v.cuda()
+        act_planes_v = torch.FloatTensor(batch_size, self.n_actions, *self.input_shape[1:]).zero_().to(actions.device)
         act_planes_v[range(batch_size), actions] = 1.0
         comb_input_v = torch.cat((imgs, act_planes_v), dim=1)
         c1_out = self.conv1(comb_input_v)
@@ -90,7 +87,7 @@ class RolloutEncoder(nn.Module):
         self.rnn = nn.LSTM(input_size=conv_out_size+1, hidden_size=hidden_size, batch_first=False)
 
     def _get_conv_out(self, shape):
-        o = self.conv(Variable(torch.zeros(1, *shape)))
+        o = self.conv(torch.zeros(1, *shape))
         return int(np.prod(o.size()))
 
     def forward(self, obs_v, reward_v):
@@ -142,7 +139,7 @@ class I2A(nn.Module):
         object.__setattr__(self, "net_policy", net_policy)
 
     def _get_conv_out(self, shape):
-        o = self.conv(Variable(torch.zeros(1, *shape)))
+        o = self.conv(torch.zeros(1, *shape))
         return int(np.prod(o.size()))
 
     def forward(self, x):
@@ -166,9 +163,7 @@ class I2A(nn.Module):
         step_obs, step_rewards = [], []
 
         for step_idx in range(self.rollout_steps):
-            actions_t = torch.from_numpy(actions)
-            if batch.is_cuda:
-                actions_t = actions_t.cuda()
+            actions_t = torch.tensor(actions).to(batch.device)
             obs_next_v, reward_v = self.net_em(obs_batch_v, actions_t)
             step_obs.append(obs_next_v.detach())
             step_rewards.append(reward_v.detach())

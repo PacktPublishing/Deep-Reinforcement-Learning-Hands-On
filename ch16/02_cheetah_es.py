@@ -9,7 +9,6 @@ import collections
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 from torch import multiprocessing as mp
 from torch import optim
 
@@ -50,12 +49,12 @@ class Net(nn.Module):
         return self.mu(x)
 
 
-def evaluate(env, net, cuda=False):
+def evaluate(env, net, device="cpu"):
     obs = env.reset()
     reward = 0.0
     steps = 0
     while True:
-        obs_v = ptan.agent.default_states_preprocessor([obs], cuda=cuda)
+        obs_v = ptan.agent.default_states_preprocessor([obs]).to(device)
         action_v = net(obs_v)
         action = action_v.data.cpu().numpy()[0]
         obs, r, done, _ = env.step(action)
@@ -66,22 +65,20 @@ def evaluate(env, net, cuda=False):
     return reward, steps
 
 
-def sample_noise(net, cuda=False):
+def sample_noise(net, device="cpu"):
     res = []
     neg = []
     for p in net.parameters():
-        noise_t = torch.from_numpy(np.random.normal(size=p.data.size()).astype(np.float32))
-        if cuda:
-            noise_t = noise_t.cuda(async=True)
+        noise_t = torch.FloatTensor(np.random.normal(size=p.data.size()).astype(np.float32)).to(device)
         res.append(noise_t)
         neg.append(-noise_t)
     return res, neg
 
 
-def eval_with_noise(env, net, noise, noise_std, cuda=False):
+def eval_with_noise(env, net, noise, noise_std, device="cpu"):
     for p, p_n in zip(net.parameters(), noise):
         p.data += noise_std * p_n
-    r, s = evaluate(env, net, cuda=cuda)
+    r, s = evaluate(env, net, device)
     for p, p_n in zip(net.parameters(), noise):
         p.data -= noise_std * p_n
     return r, s
@@ -119,18 +116,16 @@ def train_step(optimizer, net, batch_noise, batch_reward, writer, step_idx, nois
     optimizer.zero_grad()
     for p, p_update in zip(net.parameters(), weighted_noise):
         update = p_update / (len(batch_reward) * noise_std)
-        p.grad = Variable(-update)
+        p.grad = -update
         m_updates.append(torch.norm(update))
     writer.add_scalar("update_l2", np.mean(m_updates), step_idx)
     optimizer.step()
 
 
-def worker_func(worker_id, params_queue, rewards_queue, cuda, noise_std):
+def worker_func(worker_id, params_queue, rewards_queue, device, noise_std):
     env = make_env()
-    net = Net(env.observation_space.shape[0], env.action_space.shape[0])
+    net = Net(env.observation_space.shape[0], env.action_space.shape[0]).to(device)
     net.eval()
-    if cuda:
-        net.cuda()
 
     while True:
         params = params_queue.get()
@@ -141,9 +136,9 @@ def worker_func(worker_id, params_queue, rewards_queue, cuda, noise_std):
         for _ in range(ITERS_PER_UPDATE):
             seed = np.random.randint(low=0, high=65535)
             np.random.seed(seed)
-            noise, neg_noise = sample_noise(net, cuda=cuda)
-            pos_reward, pos_steps = eval_with_noise(env, net, noise, noise_std, cuda=cuda)
-            neg_reward, neg_steps = eval_with_noise(env, net, neg_noise, noise_std, cuda=cuda)
+            noise, neg_noise = sample_noise(net, device=device)
+            pos_reward, pos_steps = eval_with_noise(env, net, noise, noise_std, device=device)
+            neg_reward, neg_steps = eval_with_noise(env, net, neg_noise, noise_std, device=device)
             rewards_queue.put(RewardsItem(seed=seed, pos_reward=pos_reward,
                                           neg_reward=neg_reward, steps=pos_steps+neg_steps))
     pass
@@ -157,6 +152,7 @@ if __name__ == "__main__":
     parser.add_argument("--noise-std", type=float, default=NOISE_STD)
     parser.add_argument("--iters", type=int, default=MAX_ITERS)
     args = parser.parse_args()
+    device = "cuda" if args.cuda else "cpu"
 
     writer = SummaryWriter(comment="-cheetah-es_lr=%.3e_sigma=%.3e" % (args.lr, args.noise_std))
     env = make_env()
@@ -168,7 +164,7 @@ if __name__ == "__main__":
     workers = []
 
     for idx, params_queue in enumerate(params_queues):
-        proc = mp.Process(target=worker_func, args=(idx, params_queue, rewards_queue, args.cuda, args.noise_std))
+        proc = mp.Process(target=worker_func, args=(idx, params_queue, rewards_queue, device, args.noise_std))
         proc.start()
         workers.append(proc)
 

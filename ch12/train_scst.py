@@ -11,7 +11,6 @@ from libbots import data, model, utils
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 import ptan
 
@@ -24,11 +23,11 @@ MAX_EPOCHES = 10000
 log = logging.getLogger("train")
 
 
-def run_test(test_data, net, end_token, cuda=False):
+def run_test(test_data, net, end_token, device="cpu"):
     bleu_sum = 0.0
     bleu_count = 0
     for p1, p2 in test_data:
-        input_seq = model.pack_input(p1, net.emb, cuda)
+        input_seq = model.pack_input(p1, net.emb, device)
         enc = net.encode(input_seq)
         _, tokens = net.decode_chain_argmax(enc, input_seq.data[0:1], seq_len=data.MAX_TOKENS,
                                             stop_at_token=end_token)
@@ -51,6 +50,7 @@ if __name__ == "__main__":
     parser.add_argument("--samples", type=int, default=4, help="Count of samples in prob mode")
     parser.add_argument("--disable-skip", default=False, action='store_true', help="Disable skipping of samples with high argmax BLEU")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     saves_path = os.path.join(SAVES_DIR, args.name)
     os.makedirs(saves_path, exist_ok=True)
@@ -70,9 +70,8 @@ if __name__ == "__main__":
 
     rev_emb_dict = {idx: word for word, idx in emb_dict.items()}
 
-    net = model.PhraseModel(emb_size=model.EMBEDDING_DIM, dict_size=len(emb_dict), hid_size=model.HIDDEN_STATE_SIZE)
-    if args.cuda:
-        net.cuda()
+    net = model.PhraseModel(emb_size=model.EMBEDDING_DIM, dict_size=len(emb_dict),
+                            hid_size=model.HIDDEN_STATE_SIZE).to(device)
     log.info("Model: %s", net)
 
     writer = SummaryWriter(comment="-" + args.name)
@@ -80,9 +79,7 @@ if __name__ == "__main__":
     log.info("Model loaded from %s, continue training in RL mode...", args.load)
 
     # BEGIN token
-    beg_token = Variable(torch.LongTensor([emb_dict[data.BEGIN_TOKEN]]))
-    if args.cuda:
-        beg_token = beg_token.cuda()
+    beg_token = torch.LongTensor([emb_dict[data.BEGIN_TOKEN]]).to(device)
 
     with ptan.common.utils.TBMeanTracker(writer, batch_size=100) as tb_tracker:
         optimiser = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
@@ -100,7 +97,7 @@ if __name__ == "__main__":
             for batch in data.iterate_batches(train_data, BATCH_SIZE):
                 batch_idx += 1
                 optimiser.zero_grad()
-                input_seq, input_batch, output_batch = model.pack_batch_no_out(batch, net.emb, cuda=args.cuda)
+                input_seq, input_batch, output_batch = model.pack_batch_no_out(batch, net.emb, device)
                 enc = net.encode(input_seq)
 
                 net_policies = []
@@ -150,12 +147,8 @@ if __name__ == "__main__":
                     continue
 
                 policies_v = torch.cat(net_policies)
-                actions_t = torch.LongTensor(net_actions)
-                adv_v = Variable(torch.FloatTensor(net_advantages))
-                if args.cuda:
-                    actions_t = actions_t.cuda()
-                    adv_v = adv_v.cuda()
-
+                actions_t = torch.LongTensor(net_actions).to(device)
+                adv_v = torch.FloatTensor(net_advantages).to(device)
                 log_prob_v = F.log_softmax(policies_v, dim=1)
                 log_prob_actions_v = adv_v * log_prob_v[range(len(net_actions)), actions_t]
                 loss_policy_v = -log_prob_actions_v.mean()
@@ -168,7 +161,7 @@ if __name__ == "__main__":
                 tb_tracker.track("loss_policy", loss_policy_v, batch_idx)
                 tb_tracker.track("loss_total", loss_v, batch_idx)
 
-            bleu_test = run_test(test_data, net, end_token, args.cuda)
+            bleu_test = run_test(test_data, net, end_token, device)
             bleu = np.mean(bleus_argmax)
             writer.add_scalar("bleu_test", bleu_test, batch_idx)
             writer.add_scalar("bleu_argmax", bleu, batch_idx)
@@ -182,6 +175,5 @@ if __name__ == "__main__":
                 torch.save(net.state_dict(), os.path.join(saves_path, "bleu_%.3f_%02d.dat" % (bleu_test, epoch)))
             if epoch % 10 == 0:
                 torch.save(net.state_dict(), os.path.join(saves_path, "epoch_%03d_%.3f_%.3f.dat" % (epoch, bleu, bleu_test)))
-
 
     writer.close()

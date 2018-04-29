@@ -5,7 +5,6 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
@@ -32,7 +31,7 @@ def evaluate(env, net):
     obs = env.reset()
     reward = 0.0
     while True:
-        obs_v = Variable(torch.from_numpy(np.array([obs], dtype=np.float32)), volatile=True)
+        obs_v = torch.FloatTensor([obs])
         act_prob = net(obs_v)
         acts = act_prob.max(dim=1)[1]
         obs, r, done, _ = env.step(acts.data.numpy()[0])
@@ -45,7 +44,7 @@ def evaluate(env, net):
 def mutate_parent(net):
     new_net = copy.deepcopy(net)
     for p in new_net.parameters():
-        noise_t = torch.from_numpy(np.random.normal(size=p.data.size()).astype(np.float32))
+        noise_t = torch.tensor(np.random.normal(size=p.data.size()).astype(np.float32))
         p.data += NOISE_STD * noise_t
     return new_net
 

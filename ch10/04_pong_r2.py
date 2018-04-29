@@ -12,7 +12,6 @@ import torch.nn as nn
 import torch.nn.utils as nn_utils
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.autograd import Variable
 
 from lib import common
 
@@ -53,7 +52,7 @@ class AtariA2C(nn.Module):
         )
 
     def _get_conv_out(self, shape):
-        o = self.conv(Variable(torch.zeros(1, *shape)))
+        o = self.conv(torch.zeros(1, *shape))
         return int(np.prod(o.size()))
 
     def forward(self, x):
@@ -71,7 +70,7 @@ def discount_with_dones(rewards, dones, gamma):
     return discounted[::-1]
 
 
-def iterate_batches(envs, net, cuda=False):
+def iterate_batches(envs, net, device="cpu"):
     n_actions = envs[0].action_space.n
     act_selector = ptan.actions.ProbabilityActionSelector()
     obs = [e.reset() for e in envs]
@@ -89,10 +88,8 @@ def iterate_batches(envs, net, cuda=False):
         done_rewards = []
         done_steps = []
         for n in range(REWARD_STEPS):
-            obs_v = ptan.agent.default_states_preprocessor(obs)
-            mb_obs[:, n] = obs_v.data.numpy()
-            if cuda:
-                obs_v = obs_v.cuda()
+            obs_v = ptan.agent.default_states_preprocessor(obs).to(device)
+            mb_obs[:, n] = obs_v.data.cpu().numpy()
             logits_v, values_v = net(obs_v)
             probs_v = F.softmax(logits_v, dim=1)
             probs = probs_v.data.cpu().numpy()
@@ -114,7 +111,7 @@ def iterate_batches(envs, net, cuda=False):
                 mb_rewards[e_idx, n] = r
                 batch_dones[e_idx].append(done)
         # obtain values for the last observation
-        obs_v = ptan.agent.default_states_preprocessor(obs, cuda)
+        obs_v = ptan.agent.default_states_preprocessor(obs).to(device)
         _, values_v = net(obs_v)
         values_last = values_v.squeeze().data.cpu().numpy()
 
@@ -135,20 +132,15 @@ def iterate_batches(envs, net, cuda=False):
               np.array(done_rewards), np.array(done_steps)
 
 
-def train_a2c(net, mb_obs, mb_rewards, mb_actions, mb_values, optimizer, tb_tracker, step_idx, cuda=False):
+def train_a2c(net, mb_obs, mb_rewards, mb_actions, mb_values, optimizer, tb_tracker, step_idx, device="cpu"):
     optimizer.zero_grad()
     mb_adv = mb_rewards - mb_values
-    adv_v = Variable(torch.from_numpy(mb_adv))
-    obs_v = Variable(torch.from_numpy(mb_obs))
-    rewards_v = Variable(torch.from_numpy(mb_rewards))
-    actions_t = torch.LongTensor(mb_actions.tolist())
-    if cuda:
-        adv_v = adv_v.cuda()
-        obs_v = obs_v.cuda()
-        rewards_v = rewards_v.cuda()
-        actions_t = actions_t.cuda()
+    adv_v = torch.FloatTensor(mb_adv).to(device)
+    obs_v = torch.FloatTensor(mb_obs).to(device)
+    rewards_v = torch.FloatTensor(mb_rewards).to(device)
+    actions_t = torch.LongTensor(mb_actions).to(device)
     logits_v, values_v = net(obs_v)
-    loss_value_v = F.mse_loss(values_v, rewards_v)
+    loss_value_v = F.mse_loss(values_v.squeeze(-1), rewards_v)
 
     log_prob_v = F.log_softmax(logits_v, dim=1)
     log_prob_actions_v = adv_v * log_prob_v[range(len(mb_actions)), actions_t]
@@ -158,7 +150,7 @@ def train_a2c(net, mb_obs, mb_rewards, mb_actions, mb_values, optimizer, tb_trac
     entropy_loss_v = (prob_v * log_prob_v).sum(dim=1).mean()
     loss_v = ENTROPY_BETA * entropy_loss_v + loss_value_v + loss_policy_v
     loss_v.backward()
-    nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
+    nn_utils.clip_grad_norm_(net.parameters(), CLIP_GRAD)
     optimizer.step()
 
     tb_tracker.track("advantage", mb_adv, step_idx)
@@ -188,15 +180,14 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     make_env = lambda: ptan.common.wrappers.wrap_dqn(gym.make("BreakoutNoFrameskip-v4"))
     envs = [make_env() for _ in range(NUM_ENVS)]
     writer = SummaryWriter(comment="-pong-a2c-r2_" + args.name)
     set_seed(20, envs, cuda=args.cuda)
 
-    net = AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n)
-    if args.cuda:
-        net.cuda()
+    net = AtariA2C(envs[0].observation_space.shape, envs[0].action_space.n).to(device)
     print(net)
 
     optimizer = optim.RMSprop(net.parameters(), lr=LEARNING_RATE, eps=1e-5)
@@ -208,7 +199,7 @@ if __name__ == "__main__":
 
     with common.RewardTracker(writer, stop_reward=18) as tracker:
         with ptan.common.utils.TBMeanTracker(writer, batch_size=10) as tb_tracker:
-            for mb_obs, mb_rewards, mb_actions, mb_values, _, done_rewards, done_steps in iterate_batches(envs, net, cuda=args.cuda):
+            for mb_obs, mb_rewards, mb_actions, mb_values, _, done_rewards, done_steps in iterate_batches(envs, net, device=device):
                 if len(done_rewards) > 0:
                     total_steps += sum(done_steps)
                     speed = total_steps / (time.time() - ts_start)
@@ -223,5 +214,5 @@ if __name__ == "__main__":
                         step_idx, len(done_rewards), done_rewards.mean(), best_reward, speed))
 
                 train_a2c(net, mb_obs, mb_rewards, mb_actions, mb_values,
-                          optimizer, tb_tracker, step_idx, cuda=args.cuda)
+                          optimizer, tb_tracker, step_idx, device=device)
                 step_idx += 1

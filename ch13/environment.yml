@@ -37,8 +37,8 @@ dependencies:
 - wheel=0.31.0=py36_0
 - xz=5.2.3=h55aa19d_2
 - zlib=1.2.11=ha838bed_2
-- pytorch=0.3.1=py36_cuda8.0.61_cudnn7.0.5_2
-- torchvision=0.2.0=py36h17b6947_1
+- pytorch=0.4.0=py36_cuda8.0.61_cudnn7.1.2_1
+- torchvision=0.2.1=py36_1
 - pip:
   - absl-py==0.1.13
   - astor==0.6.2
@@ -71,7 +71,7 @@ dependencies:
   - nltk==3.2.5
   - opencv-python==3.4.0.12
   - protobuf==3.5.2.post1
-  - ptan==0.2
+  - ptan==0.3
   - pyglet==1.3.1
   - pyopengl==3.1.0
   - pyparsing==2.2.0
@@ -84,7 +84,7 @@ dependencies:
   - tensorboard-pytorch==0.7.1
   - tensorflow==1.7.0
   - termcolor==1.1.0
-  - torch==0.3.1.post2
+  - torch==0.4.0
   - twisted==17.9.0
   - txaio==2.10.0
   - ujson==1.35

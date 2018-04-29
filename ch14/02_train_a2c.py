@@ -26,13 +26,13 @@ ENTROPY_BETA = 1e-4
 TEST_ITERS = 1000
 
 
-def test_net(net, env, count=10, cuda=False):
+def test_net(net, env, count=10, device="cpu"):
     rewards = 0.0
     steps = 0
     for _ in range(count):
         obs = env.reset()
         while True:
-            obs_v = ptan.agent.float32_preprocessor([obs], cuda)
+            obs_v = ptan.agent.float32_preprocessor([obs]).to(device)
             mu_v = net(obs_v)[0]
             action = mu_v.squeeze(dim=0).data.cpu().numpy()
             action = np.clip(action, -1, 1)
@@ -55,6 +55,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true', help='Enable CUDA')
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     save_path = os.path.join("saves", "a2c-" + args.name)
     os.makedirs(save_path, exist_ok=True)
@@ -62,13 +63,11 @@ if __name__ == "__main__":
     env = gym.make(ENV_ID)
     test_env = gym.make(ENV_ID)
 
-    net = model.ModelA2C(env.observation_space.shape[0], env.action_space.shape[0])
-    if args.cuda:
-        net.cuda()
+    net = model.ModelA2C(env.observation_space.shape[0], env.action_space.shape[0]).to(device)
     print(net)
 
     writer = SummaryWriter(comment="-a2c_" + args.name)
-    agent = model.AgentA2C(net, cuda=args.cuda)
+    agent = model.AgentA2C(net, device=device)
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
@@ -86,7 +85,7 @@ if __name__ == "__main__":
 
                 if step_idx % TEST_ITERS == 0:
                     ts = time.time()
-                    rewards, steps = test_net(net, test_env, cuda=args.cuda)
+                    rewards, steps = test_net(net, test_env, device=device)
                     print("Test done is %.2f sec, reward %.3f, steps %d" % (
                         time.time() - ts, rewards, steps))
                     writer.add_scalar("test_reward", rewards, step_idx)
@@ -104,13 +103,13 @@ if __name__ == "__main__":
                     continue
 
                 states_v, actions_v, vals_ref_v = \
-                    common.unpack_batch_a2c(batch, net, last_val_gamma=GAMMA ** REWARD_STEPS, cuda=args.cuda)
+                    common.unpack_batch_a2c(batch, net, last_val_gamma=GAMMA ** REWARD_STEPS, device=device)
                 batch.clear()
 
                 optimizer.zero_grad()
                 mu_v, var_v, value_v = net(states_v)
 
-                loss_value_v = F.mse_loss(value_v, vals_ref_v)
+                loss_value_v = F.mse_loss(value_v.squeeze(-1), vals_ref_v)
 
                 adv_v = vals_ref_v.unsqueeze(dim=-1) - value_v.detach()
                 log_prob_v = adv_v * calc_logprob(mu_v, var_v, actions_v)

@@ -4,7 +4,6 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 
 
 class AtariA2C(nn.Module):
@@ -34,7 +33,7 @@ class AtariA2C(nn.Module):
         )
 
     def _get_conv_out(self, shape):
-        o = self.conv(Variable(torch.zeros(1, *shape)))
+        o = self.conv(torch.zeros(1, *shape))
         return int(np.prod(o.size()))
 
     def forward(self, x):
@@ -79,7 +78,7 @@ class RewardTracker:
         return False
 
 
-def unpack_batch(batch, net, last_val_gamma, cuda=False):
+def unpack_batch(batch, net, last_val_gamma, device='cpu'):
     """
     Convert batch into training tensors
     :param batch:
@@ -98,24 +97,16 @@ def unpack_batch(batch, net, last_val_gamma, cuda=False):
         if exp.last_state is not None:
             not_done_idx.append(idx)
             last_states.append(np.array(exp.last_state, copy=False))
-    states_v = Variable(torch.from_numpy(np.array(states, copy=False)))
-    actions_t = torch.LongTensor(actions)
-    if cuda:
-        states_v = states_v.cuda()
-        actions_t = actions_t.cuda()
+    states_v = torch.FloatTensor(states).to(device)
+    actions_t = torch.LongTensor(actions).to(device)
 
     # handle rewards
     rewards_np = np.array(rewards, dtype=np.float32)
     if not_done_idx:
-        last_states_v = Variable(torch.from_numpy(np.array(last_states, copy=False)), volatile=True)
-        if cuda:
-            last_states_v = last_states_v.cuda()
+        last_states_v = torch.FloatTensor(last_states).to(device)
         last_vals_v = net(last_states_v)[1]
         last_vals_np = last_vals_v.data.cpu().numpy()[:, 0]
         rewards_np[not_done_idx] += last_val_gamma * last_vals_np
 
-    ref_vals_v = Variable(torch.from_numpy(rewards_np))
-    if cuda:
-        ref_vals_v = ref_vals_v.cuda()
-
+    ref_vals_v = torch.FloatTensor(rewards_np).to(device)
     return states_v, actions_t, ref_vals_v

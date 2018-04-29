@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.utils as nn_utils
-from torch.autograd import Variable
 
 DEFAULT_SEED = 20
 
@@ -67,7 +66,7 @@ class AtariA2C(nn.Module):
         self.value = nn.Linear(512, 1)
 
     def _get_conv_out(self, shape):
-        o = self.conv(Variable(torch.zeros(1, *shape)))
+        o = self.conv(torch.zeros(1, *shape))
         return int(np.prod(o.size()))
 
     def forward(self, x):
@@ -87,7 +86,7 @@ def discount_with_dones(rewards, dones, gamma):
     return discounted[::-1]
 
 
-def iterate_batches(envs, net, cuda=False):
+def iterate_batches(envs, net, device="cpu"):
     n_actions = envs[0].action_space.n
     act_selector = ptan.actions.ProbabilityActionSelector()
     obs = [e.reset() for e in envs]
@@ -105,10 +104,8 @@ def iterate_batches(envs, net, cuda=False):
         done_rewards = []
         done_steps = []
         for n in range(REWARD_STEPS):
-            obs_v = ptan.agent.default_states_preprocessor(obs)
-            mb_obs[:, n] = obs_v.data.numpy()
-            if cuda:
-                obs_v = obs_v.cuda()
+            obs_v = ptan.agent.default_states_preprocessor(obs).to(device)
+            mb_obs[:, n] = obs_v.data.cpu().numpy()
             logits_v, values_v = net(obs_v)
             probs_v = F.softmax(logits_v, dim=1)
             probs = probs_v.data.cpu().numpy()
@@ -130,7 +127,7 @@ def iterate_batches(envs, net, cuda=False):
                 mb_rewards[e_idx, n] = r
                 batch_dones[e_idx].append(done)
         # obtain values for the last observation
-        obs_v = ptan.agent.default_states_preprocessor(obs, cuda)
+        obs_v = ptan.agent.default_states_preprocessor(obs).to(device)
         _, values_v = net(obs_v)
         values_last = values_v.squeeze().data.cpu().numpy()
 
@@ -151,30 +148,25 @@ def iterate_batches(envs, net, cuda=False):
               np.array(done_rewards), np.array(done_steps)
 
 
-def train_a2c(net, mb_obs, mb_rewards, mb_actions, mb_values, optimizer, tb_tracker, step_idx, cuda=False):
+def train_a2c(net, mb_obs, mb_rewards, mb_actions, mb_values, optimizer, tb_tracker, step_idx, device="cpu"):
     optimizer.zero_grad()
     mb_adv = mb_rewards - mb_values
-    adv_v = Variable(torch.from_numpy(mb_adv))
-    obs_v = Variable(torch.from_numpy(mb_obs))
-    rewards_v = Variable(torch.from_numpy(mb_rewards))
-    actions_t = torch.LongTensor(mb_actions.tolist())
-    if cuda:
-        adv_v = adv_v.cuda()
-        obs_v = obs_v.cuda()
-        rewards_v = rewards_v.cuda()
-        actions_t = actions_t.cuda()
+    adv_v = torch.FloatTensor(mb_adv).to(device)
+    obs_v = torch.FloatTensor(mb_obs).to(device)
+    rewards_v = torch.FloatTensor(mb_rewards).to(device)
+    actions_t = torch.LongTensor(mb_actions).to(device)
     logits_v, values_v = net(obs_v)
     log_prob_v = F.log_softmax(logits_v, dim=1)
     log_prob_actions_v = adv_v * log_prob_v[range(len(mb_actions)), actions_t]
 
     loss_policy_v = -log_prob_actions_v.mean()
-    loss_value_v = F.mse_loss(values_v, rewards_v)
+    loss_value_v = F.mse_loss(values_v.squeeze(-1), rewards_v)
 
     prob_v = F.softmax(logits_v, dim=1)
     entropy_loss_v = (prob_v * log_prob_v).sum(dim=1).mean()
     loss_v = ENTROPY_BETA * entropy_loss_v + VALUE_LOSS_COEF * loss_value_v + loss_policy_v
     loss_v.backward()
-    nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
+    nn_utils.clip_grad_norm_(net.parameters(), CLIP_GRAD)
     optimizer.step()
 
     tb_tracker.track("advantage", mb_adv, step_idx)
@@ -187,10 +179,10 @@ def train_a2c(net, mb_obs, mb_rewards, mb_actions, mb_values, optimizer, tb_trac
     return obs_v
 
 
-def test_model(env, net, rounds=3, cuda=False):
+def test_model(env, net, rounds=3, device="cpu"):
     total_reward = 0.0
     total_steps = 0
-    agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=cuda, apply_softmax=True)
+    agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], device=device, apply_softmax=True)
 
     for _ in range(rounds):
         obs = env.reset()

@@ -11,7 +11,6 @@ from tensorboardX import SummaryWriter
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.autograd import Variable
 
 
 HIDDEN_SIZE = 128
@@ -56,7 +55,7 @@ def iterate_batches(env, net, batch_size):
     obs = env.reset()
     sm = nn.Softmax(dim=1)
     while True:
-        obs_v = Variable(torch.from_numpy(np.array([obs])))
+        obs_v = torch.FloatTensor([obs])
         act_probs_v = sm(net(obs_v))
         act_probs = act_probs_v.data.numpy()[0]
         action = np.random.choice(len(act_probs), p=act_probs)
@@ -110,8 +109,8 @@ if __name__ == "__main__":
         full_batch, obs, acts, reward_bound = filter_batch(full_batch + batch, PERCENTILE)
         if not full_batch:
             continue
-        obs_v = Variable(torch.from_numpy(np.array(obs)))
-        acts_v = Variable(torch.from_numpy(np.array(acts)))
+        obs_v = torch.FloatTensor(obs)
+        acts_v = torch.LongTensor(acts)
         full_batch = full_batch[-500:]
 
         optimizer.zero_grad()
@@ -120,8 +119,8 @@ if __name__ == "__main__":
         loss_v.backward()
         optimizer.step()
         print("%d: loss=%.3f, reward_mean=%.3f, reward_bound=%.3f, batch=%d" % (
-            iter_no, loss_v.data[0], reward_mean, reward_bound, len(full_batch)))
-        writer.add_scalar("loss", loss_v.data[0], iter_no)
+            iter_no, loss_v.item(), reward_mean, reward_bound, len(full_batch)))
+        writer.add_scalar("loss", loss_v.item(), iter_no)
         writer.add_scalar("reward_mean", reward_mean, iter_no)
         writer.add_scalar("reward_bound", reward_bound, iter_no)
         if reward_mean > 0.8:

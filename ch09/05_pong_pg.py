@@ -10,7 +10,6 @@ import torch
 import torch.nn.functional as F
 import torch.nn.utils as nn_utils
 import torch.optim as optim
-from torch.autograd import Variable
 
 from lib import common
 
@@ -53,16 +52,15 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     parser.add_argument("-n", '--name', required=True, help="Name of the run")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     envs = [make_env() for _ in range(ENV_COUNT)]
     writer = SummaryWriter(comment="-pong-pg-" + args.name)
 
-    net = common.AtariPGN(envs[0].observation_space.shape, envs[0].action_space.n)
-    if args.cuda:
-        net.cuda()
+    net = common.AtariPGN(envs[0].observation_space.shape, envs[0].action_space.n).to(device)
     print(net)
 
-    agent = ptan.agent.PolicyAgent(net, apply_softmax=True, cuda=args.cuda)
+    agent = ptan.agent.PolicyAgent(net, apply_softmax=True, device=device)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
@@ -96,15 +94,11 @@ if __name__ == "__main__":
                 continue
 
             train_step_idx += 1
-            states_v = Variable(torch.from_numpy(np.array(batch_states, copy=False)))
-            batch_actions_t = torch.LongTensor(batch_actions)
+            states_v = torch.FloatTensor(batch_states).to(device)
+            batch_actions_t = torch.LongTensor(batch_actions).to(device)
 
             scale_std = np.std(batch_scales)
-            batch_scale_v = Variable(torch.FloatTensor(batch_scales))
-            if args.cuda:
-                states_v = states_v.cuda()
-                batch_actions_t = batch_actions_t.cuda()
-                batch_scale_v = batch_scale_v.cuda()
+            batch_scale_v = torch.FloatTensor(batch_scales).to(device)
 
             optimizer.zero_grad()
             logits_v = net(states_v)
@@ -117,30 +111,30 @@ if __name__ == "__main__":
             entropy_loss_v = -ENTROPY_BETA * entropy_v
             loss_v = loss_policy_v + entropy_loss_v
             loss_v.backward()
-            nn_utils.clip_grad_norm(net.parameters(), GRAD_L2_CLIP)
+            nn_utils.clip_grad_norm_(net.parameters(), GRAD_L2_CLIP)
             optimizer.step()
 
             # calc KL-div
             new_logits_v = net(states_v)
             new_prob_v = F.softmax(new_logits_v, dim=1)
             kl_div_v = -((new_prob_v / prob_v).log() * prob_v).sum(dim=1).mean()
-            writer.add_scalar("kl", kl_div_v.data.cpu().numpy()[0], step_idx)
+            writer.add_scalar("kl", kl_div_v.item(), step_idx)
 
             grad_max = 0.0
             grad_means = 0.0
             grad_count = 0
             for p in net.parameters():
-                grad_max = max(grad_max, p.grad.abs().max().data.cpu().numpy()[0])
-                grad_means += (p.grad ** 2).mean().sqrt().data.cpu().numpy()[0]
+                grad_max = max(grad_max, p.grad.abs().max().item())
+                grad_means += (p.grad ** 2).mean().sqrt().item()
                 grad_count += 1
 
             writer.add_scalar("baseline", baseline, step_idx)
-            writer.add_scalar("entropy", entropy_v.data.cpu().numpy()[0], step_idx)
+            writer.add_scalar("entropy", entropy_v.item(), step_idx)
             writer.add_scalar("batch_scales", np.mean(batch_scales), step_idx)
             writer.add_scalar("batch_scales_std", scale_std, step_idx)
-            writer.add_scalar("loss_entropy", entropy_loss_v.data.cpu().numpy()[0], step_idx)
-            writer.add_scalar("loss_policy", loss_policy_v.data.cpu().numpy()[0], step_idx)
-            writer.add_scalar("loss_total", loss_v.data.cpu().numpy()[0], step_idx)
+            writer.add_scalar("loss_entropy", entropy_loss_v.item(), step_idx)
+            writer.add_scalar("loss_policy", loss_policy_v.item(), step_idx)
+            writer.add_scalar("loss_total", loss_v.item(), step_idx)
             writer.add_scalar("grad_l2", grad_means / grad_count, step_idx)
             writer.add_scalar("grad_max", grad_max, step_idx)
 

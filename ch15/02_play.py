@@ -8,7 +8,6 @@ from PIL import Image
 
 import numpy as np
 import torch
-from torch.autograd import Variable
 
 
 ENV_ID = "RoboschoolHalfCheetah-v1"
@@ -35,7 +34,7 @@ if __name__ == "__main__":
     total_reward = 0.0
     total_steps = 0
     while True:
-        obs_v = Variable(torch.from_numpy(np.array([obs], dtype=np.float32)))
+        obs_v = torch.FloatTensor(obs)
         mu_v = net(obs_v)
         action = mu_v.squeeze(dim=0).data.numpy()
         action = np.clip(action, -1, 1)

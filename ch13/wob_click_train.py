@@ -42,6 +42,7 @@ if __name__ == "__main__":
     parser.add_argument("--demo", help="Demo dir to load. Default=No demo")
     parser.add_argument("--host", default='localhost', help="Host with docker containers")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     env_name = args.env
     if not env_name.startswith('wob.mini.'):
@@ -65,14 +66,11 @@ if __name__ == "__main__":
     env = wob_vnc.MiniWoBCropper(env)
     wob_vnc.configure(env, wob_vnc.remotes_url(port_ofs=args.port_ofs, hostname=args.host, count=REMOTES_COUNT))
 
-    net = model_vnc.Model(input_shape=wob_vnc.WOB_SHAPE, n_actions=env.action_space.n)
-    if args.cuda:
-        net.cuda()
+    net = model_vnc.Model(input_shape=wob_vnc.WOB_SHAPE, n_actions=env.action_space.n).to(device)
     print(net)
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
 
-    agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=args.cuda,
-                                   apply_softmax=True)
+    agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], device=device, apply_softmax=True)
     exp_source = ptan.experience.ExperienceSourceFirstLast(
         [env], agent, gamma=GAMMA, steps_count=REWARD_STEPS, vectorized=True)
 
@@ -107,17 +105,16 @@ if __name__ == "__main__":
                     demo_batch = demo_samples[:BATCH_SIZE]
                     model_vnc.train_demo(net, optimizer, demo_batch, writer, step_idx,
                                          preprocessor=ptan.agent.default_states_preprocessor,
-                                         cuda=args.cuda)
+                                         device=device)
 
                 states_v, actions_t, vals_ref_v = \
-                    common.unpack_batch(batch, net, last_val_gamma=GAMMA ** REWARD_STEPS,
-                                        cuda=args.cuda)
+                    common.unpack_batch(batch, net, last_val_gamma=GAMMA ** REWARD_STEPS, device=device)
                 batch.clear()
 
                 optimizer.zero_grad()
                 logits_v, value_v = net(states_v)
 
-                loss_value_v = F.mse_loss(value_v, vals_ref_v)
+                loss_value_v = F.mse_loss(value_v.squeeze(-1), vals_ref_v)
 
                 log_prob_v = F.log_softmax(logits_v, dim=1)
                 adv_v = vals_ref_v - value_v.detach()
@@ -129,7 +126,7 @@ if __name__ == "__main__":
 
                 loss_v = loss_policy_v + entropy_loss_v + loss_value_v
                 loss_v.backward()
-                nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
+                nn_utils.clip_grad_norm_(net.parameters(), CLIP_GRAD)
                 optimizer.step()
 
                 tb_tracker.track("advantage", adv_v, step_idx)

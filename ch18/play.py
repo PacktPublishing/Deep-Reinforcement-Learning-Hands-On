@@ -18,13 +18,13 @@ if __name__ == "__main__":
     parser.add_argument("-r", "--rounds", type=int, default=2, help="Count of rounds to perform for every pair")
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable CUDA")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     nets = []
     for fname in args.models:
         net = model.Net(model.OBS_SHAPE, game.GAME_COLS)
         net.load_state_dict(torch.load(fname, map_location=lambda storage, loc: storage))
-        if args.cuda:
-            net.cuda()
+        net = net.to(device)
         nets.append((fname, net))
 
     total_agent = {}
@@ -38,7 +38,7 @@ if __name__ == "__main__":
             ts = time.time()
             for _ in range(args.rounds):
                 r, _ = model.play_game(mcts_stores=None, replay_buffer=None, net1=n1[1], net2=n2[1], steps_before_tau_0=0,
-                                    mcts_searches=MCTS_SEARCHES, mcts_batch_size=MCTS_BATCH_SIZE, cuda=args.cuda)
+                                    mcts_searches=MCTS_SEARCHES, mcts_batch_size=MCTS_BATCH_SIZE, device=device)
                 if r > 0.5:
                     wins += 1
                 elif r < -0.5:
@@ -61,5 +61,3 @@ if __name__ == "__main__":
     print("Leaderboard:")
     for name, (wins, losses, draws) in total_leaders:
         print("%s: \t w=%d, l=%d, d=%d" % (name, wins, losses, draws))
-
-    pass

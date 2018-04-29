@@ -14,7 +14,6 @@ import numpy as np
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 
 ENV_ID = "RoboschoolHalfCheetah-v1"
@@ -30,13 +29,13 @@ TRPO_DAMPING = 0.1
 TEST_ITERS = 1000
 
 
-def test_net(net, env, count=10, cuda=False):
+def test_net(net, env, count=10, device="cpu"):
     rewards = 0.0
     steps = 0
     for _ in range(count):
         obs = env.reset()
         while True:
-            obs_v = ptan.agent.float32_preprocessor([obs], cuda)
+            obs_v = ptan.agent.float32_preprocessor([obs]).to(device)
             mu_v = net(obs_v)[0]
             action = mu_v.squeeze(dim=0).data.cpu().numpy()
             action = np.clip(action, -1, 1)
@@ -54,12 +53,11 @@ def calc_logprob(mu_v, logstd_v, actions_v):
     return p1 + p2
 
 
-def calc_adv_ref(trajectory, net_crt, states_v, cuda=False):
+def calc_adv_ref(trajectory, net_crt, states_v, device="cpu"):
     """
     By trajectory calculate advantage and 1-step ref value
     :param trajectory: list of Experience objects
     :param net_crt: critic network
-    :param cuda: cuda flag
     :return: tuple with advantage numpy array and reference values
     """
     values_v = net_crt(states_v)
@@ -79,11 +77,8 @@ def calc_adv_ref(trajectory, net_crt, states_v, cuda=False):
         result_adv.append(last_gae)
         result_ref.append(last_gae + val)
 
-    adv_v = Variable(torch.FloatTensor(list(reversed(result_adv))))
-    ref_v = Variable(torch.FloatTensor(list(reversed(result_ref))))
-    if cuda:
-        adv_v = adv_v.cuda()
-        ref_v = ref_v.cuda()
+    adv_v = torch.FloatTensor(list(reversed(result_adv))).to(device)
+    ref_v = torch.FloatTensor(list(reversed(result_ref))).to(device)
     return adv_v, ref_v
 
 
@@ -93,6 +88,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     parser.add_argument("-e", "--env", default=ENV_ID, help="Environment id, default=" + ENV_ID)
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     save_path = os.path.join("saves", "trpo-" + args.name)
     os.makedirs(save_path, exist_ok=True)
@@ -100,16 +96,13 @@ if __name__ == "__main__":
     env = gym.make(args.env)
     test_env = gym.make(args.env)
 
-    net_act = model.ModelActor(env.observation_space.shape[0], env.action_space.shape[0])
-    net_crt = model.ModelCritic(env.observation_space.shape[0])
-    if args.cuda:
-        net_act.cuda()
-        net_crt.cuda()
+    net_act = model.ModelActor(env.observation_space.shape[0], env.action_space.shape[0]).to(device)
+    net_crt = model.ModelCritic(env.observation_space.shape[0]).to(device)
     print(net_act)
     print(net_crt)
 
     writer = SummaryWriter(comment="-trpo_" + args.name)
-    agent = model.AgentA2C(net_act, cuda=args.cuda)
+    agent = model.AgentA2C(net_act, device=device)
     exp_source = ptan.experience.ExperienceSource(env, agent, steps_count=1)
 
     opt_crt = optim.Adam(net_crt.parameters(), lr=LEARNING_RATE_CRITIC)
@@ -126,7 +119,7 @@ if __name__ == "__main__":
 
             if step_idx % TEST_ITERS == 0:
                 ts = time.time()
-                rewards, steps = test_net(net_act, test_env, cuda=args.cuda)
+                rewards, steps = test_net(net_act, test_env, device=device)
                 print("Test done in %.2f sec, reward %.3f, steps %d" % (
                     time.time() - ts, rewards, steps))
                 writer.add_scalar("test_reward", rewards, step_idx)
@@ -145,13 +138,9 @@ if __name__ == "__main__":
 
             traj_states = [t[0].state for t in trajectory]
             traj_actions = [t[0].action for t in trajectory]
-            traj_states_v = Variable(torch.from_numpy(np.array(traj_states, dtype=np.float32)))
-            traj_actions_v = Variable(torch.from_numpy(np.array(traj_actions, dtype=np.float32)))
-            if args.cuda:
-                traj_states_v = traj_states_v.cuda()
-                traj_actions_v = traj_actions_v.cuda()
-
-            traj_adv_v, traj_ref_v = calc_adv_ref(trajectory, net_crt, traj_states_v, cuda=args.cuda)
+            traj_states_v = torch.FloatTensor(traj_states).to(device)
+            traj_actions_v = torch.FloatTensor(traj_actions).to(device)
+            traj_adv_v, traj_ref_v = calc_adv_ref(trajectory, net_crt, traj_states_v, device=device)
             mu_v = net_act(traj_states_v)
             old_logprob_v = calc_logprob(mu_v, net_act.logstd, traj_actions_v)
 
@@ -170,7 +159,7 @@ if __name__ == "__main__":
             # critic step
             opt_crt.zero_grad()
             value_v = net_crt(traj_states_v)
-            loss_value_v = F.mse_loss(value_v, traj_ref_v)
+            loss_value_v = F.mse_loss(value_v.squeeze(-1), traj_ref_v)
             loss_value_v.backward()
             opt_crt.step()
 
@@ -191,10 +180,10 @@ if __name__ == "__main__":
                 kl = logstd_v - logstd0_v + (std0_v ** 2 + ((mu0_v - mu_v) ** 2) / (2.0 * std_v ** 2)) - 0.5
                 return kl.sum(1, keepdim=True)
 
-            trpo.trpo_step(net_act, get_loss, get_kl, TRPO_MAX_KL, TRPO_DAMPING, cuda=args.cuda)
+            trpo.trpo_step(net_act, get_loss, get_kl, TRPO_MAX_KL, TRPO_DAMPING, device=device)
 
             trajectory.clear()
-            writer.add_scalar("advantage", traj_adv_v.mean().data.cpu().numpy()[0], step_idx)
-            writer.add_scalar("values", traj_ref_v.mean().data.cpu().numpy()[0], step_idx)
-            writer.add_scalar("loss_value", loss_value_v.data.cpu().numpy()[0], step_idx)
+            writer.add_scalar("advantage", traj_adv_v.mean().item(), step_idx)
+            writer.add_scalar("values", traj_ref_v.mean().item(), step_idx)
+            writer.add_scalar("loss_value", loss_value_v.item(), step_idx)
 

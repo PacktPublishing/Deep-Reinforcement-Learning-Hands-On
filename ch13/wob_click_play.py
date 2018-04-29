@@ -6,7 +6,6 @@ import numpy as np
 
 import torch
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 from lib import wob_vnc, model_vnc
 
@@ -61,7 +60,7 @@ if __name__ == "__main__":
             obs, reward, done, info, idle_count = step_env(env, action)
             if args.verbose:
                 print(step_idx, reward, done, idle_count, info)
-            obs_v = Variable(torch.from_numpy(np.array([obs])))
+            obs_v = torch.tensor(obs)
             logits_v = net(obs_v)[0]
             policy = F.softmax(logits_v, dim=1).data.numpy()[0]
             action = np.random.choice(len(policy), p=policy)

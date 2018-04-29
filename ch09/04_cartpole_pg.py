@@ -8,7 +8,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.autograd import Variable
 
 GAMMA = 0.99
 LEARNING_RATE = 0.001
@@ -80,9 +79,9 @@ if __name__ == "__main__":
         if len(batch_states) < BATCH_SIZE:
             continue
 
-        states_v = Variable(torch.from_numpy(np.array(batch_states, dtype=np.float32)))
+        states_v = torch.FloatTensor(batch_states)
         batch_actions_t = torch.LongTensor(batch_actions)
-        batch_scale_v = Variable(torch.FloatTensor(batch_scales))
+        batch_scale_v = torch.FloatTensor(batch_scales)
 
         optimizer.zero_grad()
         logits_v = net(states_v)
@@ -102,22 +101,22 @@ if __name__ == "__main__":
         new_logits_v = net(states_v)
         new_prob_v = F.softmax(new_logits_v, dim=1)
         kl_div_v = -((new_prob_v / prob_v).log() * prob_v).sum(dim=1).mean()
-        writer.add_scalar("kl", kl_div_v.data.cpu().numpy()[0], step_idx)
+        writer.add_scalar("kl", kl_div_v.item(), step_idx)
 
         grad_max = 0.0
         grad_means = 0.0
         grad_count = 0
         for p in net.parameters():
-            grad_max = max(grad_max, p.grad.abs().max().data.cpu().numpy()[0])
-            grad_means += (p.grad ** 2).mean().sqrt().data.cpu().numpy()[0]
+            grad_max = max(grad_max, p.grad.abs().max().item())
+            grad_means += (p.grad ** 2).mean().sqrt().item()
             grad_count += 1
 
         writer.add_scalar("baseline", baseline, step_idx)
-        writer.add_scalar("entropy", entropy_v.data.cpu().numpy()[0], step_idx)
+        writer.add_scalar("entropy", entropy_v.item(), step_idx)
         writer.add_scalar("batch_scales", np.mean(batch_scales), step_idx)
-        writer.add_scalar("loss_entropy", entropy_loss_v.data.cpu().numpy()[0], step_idx)
-        writer.add_scalar("loss_policy", loss_policy_v.data.cpu().numpy()[0], step_idx)
-        writer.add_scalar("loss_total", loss_v.data.cpu().numpy()[0], step_idx)
+        writer.add_scalar("loss_entropy", entropy_loss_v.item(), step_idx)
+        writer.add_scalar("loss_policy", loss_policy_v.item(), step_idx)
+        writer.add_scalar("loss_total", loss_v.item(), step_idx)
         writer.add_scalar("grad_l2", grad_means / grad_count, step_idx)
         writer.add_scalar("grad_max", grad_max, step_idx)
 

@@ -46,6 +46,7 @@ if __name__ == "__main__":
     parser.add_argument("--valdata", default=DEFAULT_VAL_STOCKS, help="Stocks data for validation, default=" + DEFAULT_VAL_STOCKS)
     parser.add_argument("-r", "--run", required=True, help="Run name")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     saves_path = os.path.join("saves", args.run)
     os.makedirs(saves_path, exist_ok=True)
@@ -68,12 +69,10 @@ if __name__ == "__main__":
     env_val = environ.StocksEnv(val_data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=False)
 
     writer = SummaryWriter(comment="-simple-" + args.run)
-    net = models.SimpleFFDQN(env.observation_space.shape[0], env.action_space.n)
-    if args.cuda:
-        net.cuda()
+    net = models.SimpleFFDQN(env.observation_space.shape[0], env.action_space.n).to(device)
     tgt_net = ptan.agent.TargetNet(net)
     selector = ptan.actions.EpsilonGreedyActionSelector(EPSILON_START)
-    agent = ptan.agent.DQNAgent(net, selector, cuda=args.cuda)
+    agent = ptan.agent.DQNAgent(net, selector, device=device)
     exp_source = ptan.experience.ExperienceSourceFirstLast(env, agent, GAMMA, steps_count=REWARD_STEPS)
     buffer = ptan.experience.ExperienceReplayBuffer(exp_source, REPLAY_SIZE)
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE)
@@ -103,7 +102,7 @@ if __name__ == "__main__":
                 eval_states = np.array(eval_states, copy=False)
 
             if step_idx % EVAL_EVERY_STEP == 0:
-                mean_val = common.calc_values_of_states(eval_states, net, cuda=args.cuda)
+                mean_val = common.calc_values_of_states(eval_states, net, device=device)
                 writer.add_scalar("values_mean", mean_val, step_idx)
                 if best_mean_val is None or best_mean_val < mean_val:
                     if best_mean_val is not None:
@@ -113,8 +112,7 @@ if __name__ == "__main__":
 
             optimizer.zero_grad()
             batch = buffer.sample(BATCH_SIZE)
-            loss_v = common.calc_loss(batch, net, tgt_net.target_model,
-                                                      GAMMA ** REWARD_STEPS, cuda=args.cuda)
+            loss_v = common.calc_loss(batch, net, tgt_net.target_model, GAMMA ** REWARD_STEPS, device=device)
             loss_v.backward()
             optimizer.step()
 
@@ -126,9 +124,9 @@ if __name__ == "__main__":
                 torch.save(net.state_dict(), os.path.join(saves_path, "checkpoint-%3d.data" % idx))
 
             if step_idx % VALIDATION_EVERY_STEP == 0:
-                res = validation.validation_run(env_tst, net, cuda=args.cuda)
+                res = validation.validation_run(env_tst, net, device=device)
                 for key, val in res.items():
                     writer.add_scalar(key + "_test", val, step_idx)
-                res = validation.validation_run(env_val, net, cuda=args.cuda)
+                res = validation.validation_run(env_val, net, device=device)
                 for key, val in res.items():
                     writer.add_scalar(key + "_val", val, step_idx)

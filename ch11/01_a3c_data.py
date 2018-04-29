@@ -6,6 +6,7 @@ import argparse
 import collections
 from tensorboardX import SummaryWriter
 
+import torch
 import torch.nn.utils as nn_utils
 import torch.nn.functional as F
 import torch.optim as optim
@@ -40,9 +41,9 @@ def make_env():
 TotalReward = collections.namedtuple('TotalReward', field_names='reward')
 
 
-def data_func(net, cuda, train_queue):
+def data_func(net, device, train_queue):
     envs = [make_env() for _ in range(NUM_ENVS)]
-    agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], cuda=cuda, apply_softmax=True)
+    agent = ptan.agent.PolicyAgent(lambda x: net(x)[0], device=device, apply_softmax=True)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, gamma=GAMMA, steps_count=REWARD_STEPS)
 
     for exp in exp_source:
@@ -58,13 +59,12 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
+    device = "cuda" if args.cuda else "cpu"
 
     writer = SummaryWriter(comment="-a3c-data_" + NAME + "_" + args.name)
 
     env = make_env()
-    net = common.AtariA2C(env.observation_space.shape, env.action_space.n)
-    if args.cuda:
-        net.cuda()
+    net = common.AtariA2C(env.observation_space.shape, env.action_space.n).to(device)
     net.share_memory()
 
     optimizer = optim.Adam(net.parameters(), lr=LEARNING_RATE, eps=1e-3)
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     train_queue = mp.Queue(maxsize=PROCESSES_COUNT)
     data_proc_list = []
     for _ in range(PROCESSES_COUNT):
-        data_proc = mp.Process(target=data_func, args=(net, args.cuda, train_queue))
+        data_proc = mp.Process(target=data_func, args=(net, device, train_queue))
         data_proc.start()
         data_proc_list.append(data_proc)
 
@@ -95,13 +95,13 @@ if __name__ == "__main__":
                         continue
 
                     states_v, actions_t, vals_ref_v = \
-                        common.unpack_batch(batch, net, last_val_gamma=GAMMA**REWARD_STEPS, cuda=args.cuda)
+                        common.unpack_batch(batch, net, last_val_gamma=GAMMA**REWARD_STEPS, device=device)
                     batch.clear()
 
                     optimizer.zero_grad()
                     logits_v, value_v = net(states_v)
 
-                    loss_value_v = F.mse_loss(value_v, vals_ref_v)
+                    loss_value_v = F.mse_loss(value_v.squeeze(-1), vals_ref_v)
 
                     log_prob_v = F.log_softmax(logits_v, dim=1)
                     adv_v = vals_ref_v - value_v.detach()
@@ -113,7 +113,7 @@ if __name__ == "__main__":
 
                     loss_v = entropy_loss_v + loss_value_v + loss_policy_v
                     loss_v.backward()
-                    nn_utils.clip_grad_norm(net.parameters(), CLIP_GRAD)
+                    nn_utils.clip_grad_norm_(net.parameters(), CLIP_GRAD)
                     optimizer.step()
 
                     tb_tracker.track("advantage", adv_v, step_idx)

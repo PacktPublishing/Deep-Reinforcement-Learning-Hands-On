@@ -2,8 +2,6 @@ import ptan
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-from torch.autograd import Variable
 
 HID_SIZE = 64
 
@@ -43,12 +41,12 @@ class ModelCritic(nn.Module):
 
 
 class AgentA2C(ptan.agent.BaseAgent):
-    def __init__(self, net, cuda=False):
+    def __init__(self, net, device="cpu"):
         self.net = net
-        self.cuda = cuda
+        self.device = device
 
     def __call__(self, states, agent_states):
-        states_v = ptan.agent.float32_preprocessor(states, cuda=self.cuda)
+        states_v = ptan.agent.float32_preprocessor(states).to(self.device)
 
         mu_v = self.net(states_v)
         mu = mu_v.data.cpu().numpy()

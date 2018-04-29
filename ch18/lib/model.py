@@ -3,8 +3,6 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
-import torch.nn.functional as F
 
 from lib import game, mcts
 
@@ -78,11 +76,11 @@ class Net(nn.Module):
         )
 
     def _get_conv_val_size(self, shape):
-        o = self.conv_val(Variable(torch.zeros(1, *shape)))
+        o = self.conv_val(torch.zeros(1, *shape))
         return int(np.prod(o.size()))
 
     def _get_conv_policy_size(self, shape):
-        o = self.conv_policy(Variable(torch.zeros(1, *shape)))
+        o = self.conv_policy(torch.zeros(1, *shape))
         return int(np.prod(o.size()))
 
     def forward(self, x):
@@ -118,7 +116,7 @@ def _encode_list_state(dest_np, state_list, who_move):
                 dest_np[1, row_idx, col_idx] = 1.0
 
 
-def state_lists_to_batch(state_lists, who_moves_lists, cuda=False):
+def state_lists_to_batch(state_lists, who_moves_lists, device="cpu"):
     """
     Convert list of list states to batch for network
     :param state_lists: list of 'list states'
@@ -130,10 +128,7 @@ def state_lists_to_batch(state_lists, who_moves_lists, cuda=False):
     batch = np.zeros((batch_size,) + OBS_SHAPE, dtype=np.float32)
     for idx, (state, who_move) in enumerate(zip(state_lists, who_moves_lists)):
         _encode_list_state(batch[idx], state, who_move)
-    batch_v = Variable(torch.from_numpy(batch))
-    if cuda:
-        batch_v = batch_v.cuda()
-    return batch_v
+    return torch.tensor(batch).to(device)
 
 
 # def play_game(net1, net2, cuda=False):
@@ -162,7 +157,7 @@ def state_lists_to_batch(state_lists, who_moves_lists, cuda=False):
 
 
 def play_game(mcts_stores, replay_buffer, net1, net2, steps_before_tau_0, mcts_searches, mcts_batch_size,
-              net1_plays_first=None, cuda=False):
+              net1_plays_first=None, device="cpu"):
     """
     Play one single game, memorizing transitions into the replay buffer
     :param mcts_stores: could be None or single MCTS or two MCTSes for individual net
@@ -198,7 +193,8 @@ def play_game(mcts_stores, replay_buffer, net1, net2, steps_before_tau_0, mcts_s
     net1_result = None
 
     while result is None:
-        mcts_stores[cur_player].search_batch(mcts_searches, mcts_batch_size, state, cur_player, nets[cur_player], cuda=cuda)
+        mcts_stores[cur_player].search_batch(mcts_searches, mcts_batch_size, state,
+                                             cur_player, nets[cur_player], device=device)
         probs, _ = mcts_stores[cur_player].get_policy_value(state, tau=tau)
         game_history.append((state, cur_player, probs))
         action = np.random.choice(game.GAME_COLS, p=probs)
