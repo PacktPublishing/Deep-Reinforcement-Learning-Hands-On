@@ -84,11 +84,11 @@ class MCTS:
     def is_leaf(self, state_int):
         return state_int not in self.probs
 
-    def search_batch(self, count, batch_size, state_int, player, net, cuda=False):
+    def search_batch(self, count, batch_size, state_int, player, net, device="cpu"):
         for _ in range(count):
-            self.search_minibatch(batch_size, state_int, player, net, cuda)
+            self.search_minibatch(batch_size, state_int, player, net, device)
 
-    def search_minibatch(self, count, state_int, player, net, cuda=False):
+    def search_minibatch(self, count, state_int, player, net, device="cpu"):
         """
         Perform several MCTS searches.
         """
@@ -111,7 +111,7 @@ class MCTS:
 
         # do expansion of nodes
         if expand_queue:
-            batch_v = model.state_lists_to_batch(expand_states, expand_players, cuda)
+            batch_v = model.state_lists_to_batch(expand_states, expand_players, device)
             logits_v, values_v = net(batch_v)
             probs_v = F.softmax(logits_v, dim=1)
             values = values_v.data.cpu().numpy()[:, 0]
@@ -151,5 +151,3 @@ class MCTS:
             probs = [count / total for count in counts]
         values = self.value_avg[state_int]
         return probs, values
-
-pass

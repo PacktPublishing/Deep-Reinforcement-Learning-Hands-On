@@ -13,7 +13,6 @@ from tensorboardX import SummaryWriter
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 
 PLAY_EPISODES = 1  #25
@@ -32,14 +31,14 @@ EVALUATION_ROUNDS = 20
 STEPS_BEFORE_TAU_0 = 10
 
 
-def evaluate(net1, net2, rounds, cuda=False):
+def evaluate(net1, net2, rounds, device="cpu"):
     n1_win, n2_win = 0, 0
     mcts_stores = [mcts.MCTS(), mcts.MCTS()]
 
     for r_idx in range(rounds):
         r, _ = model.play_game(mcts_stores=mcts_stores, replay_buffer=None, net1=net1, net2=net2,
                                steps_before_tau_0=0, mcts_searches=20, mcts_batch_size=16,
-                               cuda=cuda)
+                               device="cpu")
         if r < -0.5:
             n2_win += 1
         elif r > 0.5:
@@ -52,14 +51,13 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     parser.add_argument("--cuda", default=False, action="store_true", help="Enable CUDA")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     saves_path = os.path.join("saves", args.name)
     os.makedirs(saves_path, exist_ok=True)
     writer = SummaryWriter(comment="-" + args.name)
 
-    net = model.Net(input_shape=model.OBS_SHAPE, actions_n=game.GAME_COLS)
-    if args.cuda:
-        net.cuda()
+    net = model.Net(input_shape=model.OBS_SHAPE, actions_n=game.GAME_COLS).to(device)
     best_net = ptan.agent.TargetNet(net)
     print(net)
 
@@ -78,7 +76,7 @@ if __name__ == "__main__":
             for _ in range(PLAY_EPISODES):
                 _, steps = model.play_game(mcts_store, replay_buffer, best_net.target_model, best_net.target_model,
                                            steps_before_tau_0=STEPS_BEFORE_TAU_0, mcts_searches=MCTS_SEARCHES,
-                                           mcts_batch_size=MCTS_BATCH_SIZE, cuda=args.cuda)
+                                           mcts_batch_size=MCTS_BATCH_SIZE, device=device)
                 game_steps += steps
             game_nodes = len(mcts_store) - prev_nodes
             dt = time.time() - t
@@ -102,14 +100,11 @@ if __name__ == "__main__":
                 batch = random.sample(replay_buffer, BATCH_SIZE)
                 batch_states, batch_who_moves, batch_probs, batch_values = zip(*batch)
                 batch_states_lists = [game.decode_binary(state) for state in batch_states]
-                states_v = model.state_lists_to_batch(batch_states_lists, batch_who_moves, args.cuda)
+                states_v = model.state_lists_to_batch(batch_states_lists, batch_who_moves, device)
 
                 optimizer.zero_grad()
-                probs_v = Variable(torch.FloatTensor(batch_probs))
-                values_v = Variable(torch.FloatTensor(batch_values))
-                if args.cuda:
-                    probs_v = probs_v.cuda()
-                    values_v = values_v.cuda()
+                probs_v = torch.FloatTensor(batch_probs).to(device)
+                values_v = torch.FloatTensor(batch_values).to(device)
                 out_logits_v, out_values_v = net(states_v)
 
                 loss_value_v = F.mse_loss(out_values_v, values_v)
@@ -129,7 +124,7 @@ if __name__ == "__main__":
 
             # evaluate net
             if step_idx % EVALUATE_EVERY_STEP == 0:
-                win_ratio = evaluate(net, best_net.target_model, rounds=EVALUATION_ROUNDS, cuda=args.cuda)
+                win_ratio = evaluate(net, best_net.target_model, rounds=EVALUATION_ROUNDS, device=device)
                 print("Net evaluated, win ratio = %.2f" % win_ratio)
                 writer.add_scalar("eval_win_ratio", win_ratio, step_idx)
                 if win_ratio > BEST_NET_WIN_RATIO:
@@ -138,5 +133,4 @@ if __name__ == "__main__":
                     best_idx += 1
                     file_name = os.path.join(saves_path, "best_%03d_%05d.dat" % (best_idx, step_idx))
                     torch.save(net.state_dict(), file_name)
-#                    replay_buffer.clear()
                     mcts_store.clear()
