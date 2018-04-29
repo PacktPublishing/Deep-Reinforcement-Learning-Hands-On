@@ -28,13 +28,13 @@ ENVS_COUNT = 16
 TEST_ITERS = 1000
 
 
-def test_net(net, env, count=10, cuda=False):
+def test_net(net, env, count=10, device="cpu"):
     rewards = 0.0
     steps = 0
     for _ in range(count):
         obs = env.reset()
         while True:
-            obs_v = ptan.agent.float32_preprocessor([obs], cuda)
+            obs_v = ptan.agent.float32_preprocessor([obs]).to(device)
             mu_v = net(obs_v)[0]
             action = mu_v.squeeze(dim=0).data.cpu().numpy()
             action = np.clip(action, -1, 1)
@@ -58,6 +58,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     parser.add_argument("-e", "--env", default=ENV_ID, help="Environment id, default=" + ENV_ID)
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     save_path = os.path.join("saves", "acktr-" + args.name)
     os.makedirs(save_path, exist_ok=True)
@@ -65,16 +66,13 @@ if __name__ == "__main__":
     envs = [gym.make(args.env) for _ in range(ENVS_COUNT)]
     test_env = gym.make(args.env)
 
-    net_act = model.ModelActor(envs[0].observation_space.shape[0], envs[0].action_space.shape[0])
-    net_crt = model.ModelCritic(envs[0].observation_space.shape[0])
-    if args.cuda:
-        net_act.cuda()
-        net_crt.cuda()
+    net_act = model.ModelActor(envs[0].observation_space.shape[0], envs[0].action_space.shape[0]).to(device)
+    net_crt = model.ModelCritic(envs[0].observation_space.shape[0]).to(device)
     print(net_act)
     print(net_crt)
 
     writer = SummaryWriter(comment="-acktr_" + args.name)
-    agent = model.AgentA2C(net_act, cuda=args.cuda)
+    agent = model.AgentA2C(net_act, device=device)
     exp_source = ptan.experience.ExperienceSourceFirstLast(envs, agent, GAMMA, steps_count=REWARD_STEPS)
 
     opt_act = kfac.KFACOptimizer(net_act, lr=LEARNING_RATE_ACTOR)
@@ -93,7 +91,7 @@ if __name__ == "__main__":
 
                 if step_idx % TEST_ITERS == 0:
                     ts = time.time()
-                    rewards, steps = test_net(net_act, test_env, cuda=args.cuda)
+                    rewards, steps = test_net(net_act, test_env, device=device)
                     print("Test done in %.2f sec, reward %.3f, steps %d" % (
                         time.time() - ts, rewards, steps))
                     writer.add_scalar("test_reward", rewards, step_idx)
@@ -111,12 +109,12 @@ if __name__ == "__main__":
                     continue
 
                 states_v, actions_v, vals_ref_v = \
-                    common.unpack_batch_a2c(batch, net_crt, last_val_gamma=GAMMA ** REWARD_STEPS, cuda=args.cuda)
+                    common.unpack_batch_a2c(batch, net_crt, last_val_gamma=GAMMA ** REWARD_STEPS, device=device)
                 batch.clear()
 
                 opt_crt.zero_grad()
                 value_v = net_crt(states_v)
-                loss_value_v = F.mse_loss(value_v, vals_ref_v)
+                loss_value_v = F.mse_loss(value_v.squeeze(-1), vals_ref_v)
                 loss_value_v.backward()
                 opt_crt.step()
 
@@ -144,4 +142,3 @@ if __name__ == "__main__":
                 tb_tracker.track("loss_policy", loss_policy_v, step_idx)
                 tb_tracker.track("loss_value", loss_value_v, step_idx)
                 tb_tracker.track("loss_total", loss_v, step_idx)
-
