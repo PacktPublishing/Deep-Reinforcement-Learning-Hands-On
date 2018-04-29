@@ -64,7 +64,9 @@ In the next step, we calculate the logarithm of probability of the actions taken
 mean and variance to improve the training stability.
 
 In the actor training, we minimize the negated clipped objective,
-\begin{math}\E_t[\min(r_t(\theta)A_t,clip(r_t(\theta), 1-\epsilon, 1+\epsilon)A_t)]\end{math}
+\begin{equation*}
+\E_t[\min(r_t(\theta)A_t,clip(r_t(\theta), 1-\epsilon, 1+\epsilon)A_t)]
+\end{equation*}
 where
 \begin{math}r_t(\theta)=\frac{\pi_\theta(a_t|s_t)}{\pi_{\theta_{old}}(a_t|s_t)}\end{math}.
 The lines below is straightforward implementation of this formula.
