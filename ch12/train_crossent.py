@@ -11,7 +11,6 @@ from libbots import data, model, utils
 import torch
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.autograd import Variable
 
 SAVES_DIR = "saves"
 
@@ -24,11 +23,11 @@ log = logging.getLogger("train")
 TEACHER_PROB = 0.5
 
 
-def run_test(test_data, net, end_token, cuda=False):
+def run_test(test_data, net, end_token, device="cpu"):
     bleu_sum = 0.0
     bleu_count = 0
     for p1, p2 in test_data:
-        input_seq = model.pack_input(p1, net.emb, cuda)
+        input_seq = model.pack_input(p1, net.emb, device)
         enc = net.encode(input_seq)
         _, tokens = net.decode_chain_argmax(enc, input_seq.data[0:1],
                                             seq_len=data.MAX_TOKENS,
@@ -47,6 +46,7 @@ if __name__ == "__main__":
                         help="Enable cuda")
     parser.add_argument("-n", "--name", required=True, help="Name of the run")
     args = parser.parse_args()
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     saves_path = os.path.join(SAVES_DIR, args.name)
     os.makedirs(saves_path, exist_ok=True)
@@ -64,9 +64,7 @@ if __name__ == "__main__":
     log.info("Train set has %d phrases, test %d", len(train_data), len(test_data))
 
     net = model.PhraseModel(emb_size=model.EMBEDDING_DIM, dict_size=len(emb_dict),
-                            hid_size=model.HIDDEN_STATE_SIZE)
-    if args.cuda:
-        net.cuda()
+                            hid_size=model.HIDDEN_STATE_SIZE).to(device)
     log.info("Model: %s", net)
 
     writer = SummaryWriter(comment="-" + args.name)
@@ -79,8 +77,7 @@ if __name__ == "__main__":
         bleu_count = 0
         for batch in data.iterate_batches(train_data, BATCH_SIZE):
             optimiser.zero_grad()
-            input_seq, out_seq_list, _, out_idx = model.pack_batch(batch, net.emb,
-                                                                   cuda=args.cuda)
+            input_seq, out_seq_list, _, out_idx = model.pack_batch(batch, net.emb, device)
             enc = net.encode(input_seq)
 
             net_results = []
@@ -99,16 +96,14 @@ if __name__ == "__main__":
                 net_targets.extend(ref_indices)
                 bleu_count += 1
             results_v = torch.cat(net_results)
-            targets_v = Variable(torch.LongTensor(net_targets))
-            if args.cuda:
-                targets_v = targets_v.cuda()
+            targets_v = torch.LongTensor(net_targets).to(device)
             loss_v = F.cross_entropy(results_v, targets_v)
             loss_v.backward()
             optimiser.step()
 
-            losses.append(loss_v.data.cpu().numpy()[0])
+            losses.append(loss_v.item())
         bleu = bleu_sum / bleu_count
-        bleu_test = run_test(test_data, net, end_token, args.cuda)
+        bleu_test = run_test(test_data, net, end_token, device)
         log.info("Epoch %d: mean loss %.3f, mean BLEU %.3f, test BLEU %.3f",
                  epoch, np.mean(losses), bleu, bleu_test)
         writer.add_scalar("loss", np.mean(losses), epoch)
