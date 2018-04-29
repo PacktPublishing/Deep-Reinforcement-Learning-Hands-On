@@ -12,7 +12,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.multiprocessing as mp
-from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
@@ -34,8 +33,8 @@ class MultiNoiseLinear(nn.Linear):
 
     def sample_noise_row(self, row):
         # sample noise for our params
-        w_noise = NOISE_STD * torch.from_numpy(np.random.normal(size=self.weight.data.size()).astype(np.float32))
-        b_noise = NOISE_STD * torch.from_numpy(np.random.normal(size=self.bias.data.size()).astype(np.float32))
+        w_noise = NOISE_STD * torch.tensor(np.random.normal(size=self.weight.data.size()).astype(np.float32))
+        b_noise = NOISE_STD * torch.tensor(np.random.normal(size=self.bias.data.size()).astype(np.float32))
         self.noise[row].copy_(w_noise)
         self.noise_bias[row].copy_(b_noise)
 
@@ -86,14 +85,12 @@ class Net(nn.Module):
         self.l3.zero_noise()
 
 
-def evaluate(env, net, cuda=False):
+def evaluate(env, net, device="cpu"):
     obs = env.reset()
     reward = 0.0
     steps = 0
     while True:
-        obs_v = Variable(torch.from_numpy(np.array([obs], dtype=np.float32)), volatile=True)
-        if cuda:
-            obs_v = obs_v.cuda()
+        obs_v = torch.FloatTensor([obs]).to(device)
         action_v = net(obs_v)
         obs, r, done, _ = env.step(action_v.data.cpu().numpy()[0])
         reward += r
@@ -103,7 +100,7 @@ def evaluate(env, net, cuda=False):
     return reward, steps
 
 
-def evaluate_batch(envs, net, cuda=False):
+def evaluate_batch(envs, net, device="cpu"):
     count = len(envs)
     obs = [e.reset() for e in envs]
     rewards = [0.0 for _ in range(count)]
@@ -111,9 +108,7 @@ def evaluate_batch(envs, net, cuda=False):
     done_set = set()
 
     while len(done_set) < count:
-        obs_v = Variable(torch.from_numpy(np.array(obs, dtype=np.float32)))
-        if cuda:
-            obs_v = obs_v.cuda()
+        obs_v = torch.FloatTensor(obs).to(device)
         out_v = net(obs_v)
         out = out_v.data.cpu().numpy()
         for i in range(count):
@@ -148,17 +143,15 @@ def build_net(env, seeds):
 OutputItem = collections.namedtuple('OutputItem', field_names=['seeds', 'reward', 'steps'])
 
 
-def worker_func(input_queue, output_queue, cuda=False):
+def worker_func(input_queue, output_queue, device="cpu"):
     env_pool = [gym.make("RoboschoolHalfCheetah-v1")]
 
     # first generation -- just evaluate given single seeds
     parents = input_queue.get()
     for seed in parents:
-        net = build_net(env_pool[0], seed)
+        net = build_net(env_pool[0], seed).to(device)
         net.zero_noise(batch_size=1)
-        if cuda:
-            net.cuda()
-        reward, steps = evaluate(env_pool[0], net, cuda)
+        reward, steps = evaluate(env_pool[0], net, device)
         output_queue.put((seed, reward, steps))
 
     while True:
@@ -169,14 +162,12 @@ def worker_func(input_queue, output_queue, cuda=False):
         for parent_seeds, children_iter in itertools.groupby(parents, key=lambda s: s[:-1]):
             batch = list(children_iter)
             children_seeds = [b[-1] for b in batch]
-            net = build_net(env_pool[0], parent_seeds)
+            net = build_net(env_pool[0], parent_seeds).to(device)
             net.set_noise_seeds(children_seeds)
-            if cuda:
-                net.cuda()
             batch_size = len(children_seeds)
             while len(env_pool) < batch_size:
                 env_pool.append(gym.make("RoboschoolHalfCheetah-v1"))
-            rewards, steps = evaluate_batch(env_pool[:batch_size], net, cuda)
+            rewards, steps = evaluate_batch(env_pool[:batch_size], net, device)
             for seeds, reward, step in zip(batch, rewards, steps):
                 output_queue.put((seeds, reward, step))
 
@@ -187,6 +178,7 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action='store_true')
     args = parser.parse_args()
     writer = SummaryWriter(comment="-cheetah-ga-batch")
+    device = "cuda" if args.cuda else "cpu"
 
     input_queues = []
     output_queue = mp.Queue(maxsize=WORKERS_COUNT)
@@ -194,7 +186,7 @@ if __name__ == "__main__":
     for _ in range(WORKERS_COUNT):
         input_queue = mp.Queue(maxsize=1)
         input_queues.append(input_queue)
-        w = mp.Process(target=worker_func, args=(input_queue, output_queue, args.cuda))
+        w = mp.Process(target=worker_func, args=(input_queue, output_queue, device))
         w.start()
         seeds = [(np.random.randint(MAX_SEED),) for _ in range(SEEDS_PER_WORKER)]
         input_queue.put(seeds)

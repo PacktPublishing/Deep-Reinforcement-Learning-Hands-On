@@ -5,7 +5,6 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
@@ -35,7 +34,7 @@ def evaluate(env, net):
     reward = 0.0
     steps = 0
     while True:
-        obs_v = Variable(torch.from_numpy(np.array([obs], dtype=np.float32)), volatile=True)
+        obs_v = torch.FloatTensor([obs])
         act_prob = net(obs_v)
         acts = act_prob.max(dim=1)[1]
         obs, r, done, _ = env.step(acts.data.numpy()[0])

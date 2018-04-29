@@ -10,7 +10,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.multiprocessing as mp
-from torch.autograd import Variable
 
 from tensorboardX import SummaryWriter
 
@@ -45,7 +44,7 @@ def evaluate(env, net):
     reward = 0.0
     steps = 0
     while True:
-        obs_v = Variable(torch.from_numpy(np.array([obs], dtype=np.float32)), volatile=True)
+        obs_v = torch.FloatTensor([obs])
         action_v = net(obs_v)
         obs, r, done, _ = env.step(action_v.data.numpy()[0])
         reward += r
@@ -59,7 +58,7 @@ def mutate_net(net, seed, copy_net=True):
     new_net = copy.deepcopy(net) if copy_net else net
     np.random.seed(seed)
     for p in new_net.parameters():
-        noise_t = torch.from_numpy(np.random.normal(size=p.data.size()).astype(np.float32))
+        noise_t = torch.tensor(np.random.normal(size=p.data.size()).astype(np.float32))
         p.data += NOISE_STD * noise_t
     return new_net
 
