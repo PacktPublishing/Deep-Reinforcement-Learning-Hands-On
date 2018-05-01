@@ -21,7 +21,7 @@ log.set_level(gym.logger.INFO)
 LATENT_VECTOR_SIZE = 100
 DISCR_FILTERS = 64
 GENER_FILTERS = 64
-BATCH_SIZE = 256
+BATCH_SIZE = 16
 
 # dimension input image will be rescaled
 IMAGE_SIZE = 64
