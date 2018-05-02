@@ -9,4 +9,4 @@ torchvision==0.2.0
 tensorboardX==1
 tensorflow==1.7.0
 tensorboard==1.7.0
-
+matplotlib==2.2.2
