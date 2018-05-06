@@ -1,4 +1,4 @@
-name: rl_book_ch13_new
+name: rl_book_ch13
 channels:
 - pytorch
 - defaults
@@ -92,5 +92,3 @@ dependencies:
   - websocket-client==0.47.0
   - werkzeug==0.14.1
   - zope.interface==4.4.3
-prefix: /home/shmuma/anaconda3/envs/rl_book_ch13_new
-
