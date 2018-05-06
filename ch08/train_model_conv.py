@@ -62,7 +62,7 @@ if __name__ == "__main__":
         env = environ.StocksEnv.from_dir(args.data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
         env_tst = environ.StocksEnv.from_dir(args.data, bars_count=BARS_COUNT, reset_on_close=True, state_1d=True)
     else:
-        raise RuntimeError("No dato to train on")
+        raise RuntimeError("No data to train on")
     env = gym.wrappers.TimeLimit(env, max_episode_steps=1000)
 
     val_data = {"YNDX": data.load_relative(args.valdata)}

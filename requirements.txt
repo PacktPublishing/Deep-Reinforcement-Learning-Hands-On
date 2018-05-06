@@ -10,3 +10,4 @@ tensorboardX==1
 tensorflow==1.7.0
 tensorboard==1.7.0
 pybullet==1.9.6
+matplotlib==2.2.2
