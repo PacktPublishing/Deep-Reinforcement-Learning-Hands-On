@@ -9,10 +9,10 @@ import numpy as np
 class NoisyLinear(nn.Linear):
     def __init__(self, in_features, out_features, sigma_init=0.017, bias=True):
         super(NoisyLinear, self).__init__(in_features, out_features, bias=bias)
-        self.register_buffer("sigma_weight", torch.full((out_features, in_features), sigma_init))
+        self.sigma_weight = nn.Parameter(torch.full((out_features, in_features), sigma_init))
         self.register_buffer("epsilon_weight", torch.zeros(out_features, in_features))
         if bias:
-            self.register_buffer("sigma_bias", torch.full((out_features,), sigma_init))
+            self.sigma_bias = nn.Parameter(torch.full((out_features,), sigma_init))
             self.register_buffer("epsilon_bias", torch.zeros(out_features))
         self.reset_parameters()
 
@@ -39,11 +39,11 @@ class NoisyFactorizedLinear(nn.Linear):
     def __init__(self, in_features, out_features, sigma_zero=0.4, bias=True):
         super(NoisyFactorizedLinear, self).__init__(in_features, out_features, bias=bias)
         sigma_init = sigma_zero / math.sqrt(in_features)
-        self.register_buffer("sigma_weight", torch.full((out_features, in_features), sigma_init))
+        self.sigma_weight = nn.Parameter(torch.full((out_features, in_features), sigma_init))
         self.register_buffer("epsilon_input", torch.zeros(1, in_features))
         self.register_buffer("epsilon_output", torch.zeros(out_features, 1))
         if bias:
-            self.register_buffer("sigma_bias", torch.full((out_features,), sigma_init))
+            self.sigma_bias = nn.Parameter(torch.full((out_features,), sigma_init))
 
     def forward(self, input):
         self.epsison_input.normal_()
