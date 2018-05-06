@@ -26,8 +26,8 @@ class NoisyLinear(nn.Linear):
         bias = self.bias
         if bias is not None:
             self.epsilon_bias.normal_()
-            bias = bias + self.sigma_bias * self.epsilon_bias.detach()
-        return F.linear(input, self.weight + self.sigma_weight * self.epsilon_weight.detach(), bias)
+            bias = bias + self.sigma_bias * self.epsilon_bias.data
+        return F.linear(input, self.weight + self.sigma_weight * self.epsilon_weight.data, bias)
 
 
 class NoisyFactorizedLinear(nn.Linear):
@@ -50,8 +50,8 @@ class NoisyFactorizedLinear(nn.Linear):
         self.epsilon_output.normal_()
 
         func = lambda x: torch.sign(x) * torch.sqrt(torch.abs(x))
-        eps_in = func(self.epsilon_input.detach())
-        eps_out = func(self.epsilon_output.detach())
+        eps_in = func(self.epsilon_input.data)
+        eps_out = func(self.epsilon_output.data)
 
         bias = self.bias
         if bias is not None:
