@@ -1,3 +1,5 @@
+**UPD**: both patches are applied to the image [shmuma/miniwob:v2](https://hub.docker.com/r/shmuma/miniwob/), so instructions below are left here only if you're curious or want to reproduce those images. In other cases, you can just use patched image from my Docker Hub repo.
+
 # Fixes of WoB docker image
 
 Sometimes WoB docker process crashes with the following stack trace:
