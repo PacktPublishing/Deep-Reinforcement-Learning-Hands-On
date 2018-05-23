@@ -1,6 +1,6 @@
-# Practical Deep Reinforcement Learning
+# Deep Reinforcement Learning Hands-On
 
-Code samples for [Practical Deep Reinforcement Learning](https://www.packtpub.com/big-data-and-business-intelligence/practical-deep-reinforcement-learning)
+Code samples for [Deep Reinforcement Learning Hands-On](https://www.packtpub.com/big-data-and-business-intelligence/practical-deep-reinforcement-learning)
 book
 
 * [Chapter 2: OpenAI Gym](Chapter02)
