@@ -195,4 +195,20 @@ Only minor modifications to the above procedure are required in case of action v
   \item Repeat step 2
 \end{enumerate}
 
+
+The second practical problem arises from the fact that we rarely know the transition
+probability for the actions and rewards matrix. Remember what interface provides
+Gym to the agent’s writer: we observe the state, decide on an action and only
+then do we get the next observation and reward for the transition. We don’t know
+(without peeking into Gym’s environment code) what the probability is to get into
+state \begin{math}s_1\end{math} from state \begin{math}s_0\end{math} by issuing action
+\begin{math}a_0\end{math}. What we do have is just the history from
+the agent’s interaction with the environment. However, in Bellman’s update, we
+need both a reward for every transition and the probability of this transition. So,
+the obvious answer to this issue is to use our agent’s experience as an estimation
+for both unknowns. Rewards could be used as they are. We just need to remember
+what reward we’ve got on transition from \begin{math}s_0\end{math} to \begin{math}s_1\end{math},
+using action a, but to estimate
+probabilities we need to maintain counters for every tuple \begin{math}(s_0, s_1, a)\end{math} and normalize
+them.
 \end{document}
