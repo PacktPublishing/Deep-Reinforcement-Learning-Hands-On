@@ -116,6 +116,22 @@ To give you a concrete example, let’s consider a simple environment which is
 similar to FrozenLake, but has much simpler structure: we have one initial state
 \begin{math}s_0\end{math} surrounded by four target states \begin{math}s_1, s_2, s_3, s_4\end{math} with different rewards.
 
+Let’s calculate the values of actions to begin with. Terminal states \begin{math}s_1 \ldots s_4\end{math} have no
+outbound connections, so Q for those states is zero for all actions. Due to this, the
+values of the Terminal states are equal to their immediate reward (once we get there,
+our episode ends without any subsequent states): \begin{math}V_1 = 1, V_2 = 2, V_3 = 3, V_4 = 4\end{math}.
+The values of actions for state 0 are a bit more complicated. Let’s start with the
+“up” action. Its value, according to the definition, is equal to the expected sum
+of the immediate reward plus long-term value for subsequent steps. We have no
+subsequent steps for any possible transition for the “up” action, so Q(\begin{math}s_0\end{math}, ‘up’) = 0.33
+\begin{math}V_1 + 0.33 \dot V_2 + 0.33 \dot V_4 = 0.33 \dot 1 + 0.33 \dot 2 + 0.33 \dot 4 = 2.31\end{math}.
+
+Repeating this for the rest of s0 actions results in the following:
+\begin{math}Q(s_0, ‘left’) = 0.33 \dot V_1 + 0.33 \dot V_2 + 0.33 \dot V_3 = 1.98\end{math}
+\begin{math}Q(s_0, ‘right’) = 0.33 \dot V_4 + 0.33 \dot V_1 + 0.33 \dot V_3 = 2.64\end{math}
+\begin{math}Q(s_0, ‘down’) = 0.33 \dot V_3 + 0.33 \dot V_2 + 0.33 \dot V_4 = 2.97\end{math}
+The final value for state s0 is the maximum of those actions’ values, which is 2.97.
+
 Page 6, Value iteration method
 
 We start from state \begin{math}s_1\end{math} and the only action we can do leads us to state \begin{math}s_2\end{math}. We
