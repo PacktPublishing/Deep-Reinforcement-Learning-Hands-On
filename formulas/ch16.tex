@@ -63,7 +63,7 @@ network parameters by applying the formula
   \begin{enumerate}
     \item Sort generation \begin{math}P^{g-1}\end{math} by descending of fitness \begin{math}F^{g-1}\end{math}
     \item Copy elite \begin{math}P^g_1=P^{g-1}_1, F_1^g=F_1^{g-1}\end{math}
-    \item For individual \begin{math}i = 2\ldots N\end{math}     
+    \item For individual \begin{math}i = 2\ldots N\end{math}
       \begin{enumerate}
       \item k = randomly select parent from \begin{math}1\ldots T\end{math}
       \item Sample \begin{math}\epsilon \sim \mathcal{N}(0, I)\end{math}
@@ -72,5 +72,9 @@ network parameters by applying the formula
       \end{enumerate}
   \end{enumerate}
 \end{enumerate}
+
+\subsection{Page 16}
+To implement the Novelty Search, we define so called Behaviour Characteristic BC(\begin{math}\pi\end{math}),
+which describes the behaviour of the policy and a distance between two BCs.
 
 \end{document}
