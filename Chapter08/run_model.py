@@ -41,8 +41,6 @@ if __name__ == "__main__":
     step_idx = 0
     rewards = []
 
-    position_steps = None
-
     while True:
         step_idx += 1
         obs_v = torch.tensor([obs])
@@ -53,12 +51,10 @@ if __name__ == "__main__":
         action = environ.Actions(action_idx)
 
         obs, reward, done, _ = env.step(action_idx)
-        if position_steps is not None:
-            position_steps += 1
         total_reward += reward
         rewards.append(total_reward)
         if step_idx % 100 == 0:
-            print("%d: position=%s, reward=%.3f" % (step_idx, position_steps, total_reward))
+            print("%d: reward=%.3f" % (step_idx, total_reward))
         if done:
             break
 
@@ -67,5 +63,3 @@ if __name__ == "__main__":
     plt.title("Total reward, data=%s" % args.name)
     plt.ylabel("Reward, %")
     plt.savefig("rewards-%s.png" % args.name)
-
-    pass
