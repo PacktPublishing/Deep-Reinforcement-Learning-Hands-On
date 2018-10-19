@@ -53,7 +53,7 @@ class SimpleFFDQN(nn.Module):
     def forward(self, x):
         val = self.fc_val(x)
         adv = self.fc_adv(x)
-        return val + adv - adv.mean()
+        return val + adv - adv.mean(dim=1, keepdim=True)
 
 
 class DQNConv1D(nn.Module):
@@ -89,7 +89,7 @@ class DQNConv1D(nn.Module):
         conv_out = self.conv(x).view(x.size()[0], -1)
         val = self.fc_val(conv_out)
         adv = self.fc_adv(conv_out)
-        return val + adv - adv.mean()
+        return val + adv - adv.mean(dim=1, keepdim=True)
 
 
 class DQNConv1DLarge(nn.Module):
@@ -137,4 +137,4 @@ class DQNConv1DLarge(nn.Module):
         conv_out = self.conv(x).view(x.size()[0], -1)
         val = self.fc_val(conv_out)
         adv = self.fc_adv(conv_out)
-        return val + adv - adv.mean()
+        return val + adv - adv.mean(dim=1, keepdim=True)
