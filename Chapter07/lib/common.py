@@ -175,11 +175,11 @@ def distr_projection(next_distr, rewards, dones, Vmin, Vmax, n_atoms, gamma):
         eq_dones = dones.copy()
         eq_dones[dones] = eq_mask
         if eq_dones.any():
-            proj_distr[eq_dones, l] = 1.0
+            proj_distr[eq_dones, l[eq_mask]] = 1.0
         ne_mask = u != l
         ne_dones = dones.copy()
         ne_dones[dones] = ne_mask
         if ne_dones.any():
-            proj_distr[ne_dones, l] = (u - b_j)[ne_mask]
-            proj_distr[ne_dones, u] = (b_j - l)[ne_mask]
+            proj_distr[ne_dones, l[ne_mask]] = (u - b_j)[ne_mask]
+            proj_distr[ne_dones, u[ne_mask]] = (b_j - l)[ne_mask]
     return proj_distr
