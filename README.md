@@ -3,6 +3,25 @@
 Code samples for [Deep Reinforcement Learning Hands-On](https://www.packtpub.com/big-data-and-business-intelligence/practical-deep-reinforcement-learning)
 book
 
+## Versions and compatibility
+
+This repository is being maintained by book author [Max Lapan](https://github.com/Shmuma).
+I'm trying to keep all the examples working under the latest versions of [PyTorch](https://pytorch.org/) 
+and [gym](https://gym.openai.com/), which is not always simple, as software evolves. For example, OpenAI Universe, 
+extensively being used in chapter 13, was discontinued by OpenAI. List of current requirements is present in 
+[requirements.txt](requirements.txt) file.
+
+And, of course, bugs in examples are inevitable, so, exact code might differ from code present in the book text.
+
+Too keep track of major code change, I'm using tags and branches, for example:
+* [tag 01_release](https://github.com/PacktPublishing/Deep-Reinforcement-Learning-Hands-On/tree/01_release) marks code 
+state right after book publication in June 2018
+* [branch master](https://github.com/PacktPublishing/Deep-Reinforcement-Learning-Hands-On) has the latest 
+version of code updated for the latest stable PyTorch 0.4.1
+* [branch torch_1.0](not_created_yet) keeps the activity of porting examples to PyTorch 1.0 (not yet released)
+
+## Chapters' examples
+
 * [Chapter 2: OpenAI Gym](Chapter02)
 * [Chapter 3: Deep Learning with PyTorch](Chapter03)
 * [Chapter 4: Cross Entropy method](Chapter04)
