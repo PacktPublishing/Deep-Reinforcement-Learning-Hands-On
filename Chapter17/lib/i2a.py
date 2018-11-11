@@ -163,7 +163,7 @@ class I2A(nn.Module):
         step_obs, step_rewards = [], []
 
         for step_idx in range(self.rollout_steps):
-            actions_t = torch.tensor(actions).to(batch.device)
+            actions_t = torch.tensor(actions, dtype=torch.int64).to(batch.device)
             obs_next_v, reward_v = self.net_em(obs_batch_v, actions_t)
             step_obs.append(obs_next_v.detach())
             step_rewards.append(reward_v.detach())
