@@ -49,7 +49,7 @@ class InputWrapper(gym.ObservationWrapper):
         new_obs = cv2.resize(observation, (IMAGE_SIZE, IMAGE_SIZE))
         # transform (210, 160, 3) -> (3, 210, 160)
         new_obs = np.moveaxis(new_obs, 2, 0)
-        return new_obs.astype(np.float32) / 255.0
+        return new_obs.astype(np.float32)
 
 
 class Discriminator(nn.Module):
@@ -122,7 +122,9 @@ def iterate_batches(envs, batch_size=BATCH_SIZE):
         if np.mean(obs) > 0.01:
             batch.append(obs)
         if len(batch) == batch_size:
-            yield torch.tensor(np.array(batch, dtype=np.float32))
+            # Normalising input between -1 to 1
+            batch_np = np.array(batch, dtype=np.float32) * 2.0 / 255.0 - 1.0
+            yield torch.tensor(batch_np)
             batch.clear()
         if is_done:
             e.reset()
