@@ -185,5 +185,5 @@ if __name__ == "__main__":
             gen_losses = []
             dis_losses = []
         if iter_no % SAVE_IMAGE_EVERY_ITER == 0:
-            writer.add_image("fake", vutils.make_grid(gen_output_v.data[:64]), iter_no)
-            writer.add_image("real", vutils.make_grid(batch_v.data[:64]), iter_no)
+            writer.add_image("fake", vutils.make_grid(gen_output_v.data[:64], normalize=True), iter_no)
+            writer.add_image("real", vutils.make_grid(batch_v.data[:64], normalize=True), iter_no)
