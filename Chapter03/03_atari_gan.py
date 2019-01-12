@@ -123,7 +123,7 @@ def iterate_batches(envs, batch_size=BATCH_SIZE):
             batch.append(obs)
         if len(batch) == batch_size:
             # Normalising input between -1 to 1
-            batch_np = (np.array(batch, dtype=np.float32) - 127.5) / 127.5
+            batch_np = np.array(batch, dtype=np.float32) * 2.0 / 255.0 - 1.0
             yield torch.tensor(batch_np)
             batch.clear()
         if is_done:
