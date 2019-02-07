@@ -135,7 +135,7 @@ if __name__ == "__main__":
                 loss_value_v = F.mse_loss(value_v.squeeze(-1), vals_ref_v)
 
                 log_prob_v = F.log_softmax(logits_v, dim=1)
-                adv_v = vals_ref_v - value_v.detach()
+                adv_v = vals_ref_v - value_v.squeeze(-1).detach()
                 log_prob_actions_v = adv_v * log_prob_v[range(BATCH_SIZE), actions_t]
                 loss_policy_v = -log_prob_actions_v.mean()
 
