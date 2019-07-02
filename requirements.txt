@@ -1,3 +1,4 @@
+tensorboardX
 numpy==1.15.4
 atari-py==0.1.6
 gym==0.10.9
