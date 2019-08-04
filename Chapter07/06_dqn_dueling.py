@@ -28,14 +28,14 @@ class DuelingDQN(nn.Module):
 
         conv_out_size = self._get_conv_out(input_shape)
         self.fc_adv = nn.Sequential(
-            nn.Linear(conv_out_size, 512),
+            nn.Linear(conv_out_size, 256),
             nn.ReLU(),
-            nn.Linear(512, n_actions)
+            nn.Linear(256, n_actions)
         )
         self.fc_val = nn.Sequential(
-            nn.Linear(conv_out_size, 512),
+            nn.Linear(conv_out_size, 256),
             nn.ReLU(),
-            nn.Linear(512, 1)
+            nn.Linear(256, 1)
         )
 
     def _get_conv_out(self, shape):
@@ -47,7 +47,7 @@ class DuelingDQN(nn.Module):
         conv_out = self.conv(fx).view(fx.size()[0], -1)
         val = self.fc_val(conv_out)
         adv = self.fc_adv(conv_out)
-        return val + adv - adv.mean()
+        return val + (adv - adv.mean(dim=1, keepdim=True))
 
 
 if __name__ == "__main__":

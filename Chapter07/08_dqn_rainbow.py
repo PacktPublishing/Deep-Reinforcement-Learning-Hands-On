@@ -44,15 +44,15 @@ class RainbowDQN(nn.Module):
 
         conv_out_size = self._get_conv_out(input_shape)
         self.fc_val = nn.Sequential(
-            dqn_model.NoisyLinear(conv_out_size, 512),
+            dqn_model.NoisyLinear(conv_out_size, 256),
             nn.ReLU(),
-            dqn_model.NoisyLinear(512, N_ATOMS)
+            dqn_model.NoisyLinear(256, N_ATOMS)
         )
 
         self.fc_adv = nn.Sequential(
-            dqn_model.NoisyLinear(conv_out_size, 512),
+            dqn_model.NoisyLinear(conv_out_size, 256),
             nn.ReLU(),
-            dqn_model.NoisyLinear(512, n_actions * N_ATOMS)
+            dqn_model.NoisyLinear(256, n_actions * N_ATOMS)
         )
 
         self.register_buffer("supports", torch.arange(Vmin, Vmax+DELTA_Z, DELTA_Z))
@@ -69,7 +69,7 @@ class RainbowDQN(nn.Module):
         val_out = self.fc_val(conv_out).view(batch_size, 1, N_ATOMS)
         adv_out = self.fc_adv(conv_out).view(batch_size, -1, N_ATOMS)
         adv_mean = adv_out.mean(dim=1, keepdim=True)
-        return val_out + adv_out - adv_mean
+        return val_out + (adv_out - adv_mean)
 
     def both(self, x):
         cat_out = self(x)
