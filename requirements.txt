@@ -6,7 +6,7 @@ opencv-python==3.4.3.18
 scipy==1.1.0
 torch==0.4.1
 torchvision==0.2.1
-tensorboard-pytorch==0.7.1
+tensorboardX==1.6
 tensorflow==1.12.0
 tensorboard==1.12.0
 pybullet==2.3.6
