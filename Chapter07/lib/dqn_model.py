@@ -46,7 +46,7 @@ class NoisyFactorizedLinear(nn.Linear):
             self.sigma_bias = nn.Parameter(torch.full((out_features,), sigma_init))
 
     def forward(self, input):
-        self.epsison_input.normal_()
+        self.epsilon_input.normal_()
         self.epsilon_output.normal_()
 
         func = lambda x: torch.sign(x) * torch.sqrt(torch.abs(x))
