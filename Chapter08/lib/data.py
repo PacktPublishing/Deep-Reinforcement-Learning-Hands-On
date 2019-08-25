@@ -31,7 +31,7 @@ def read_csv(file_name, sep=',', filter_data=True, fix_open_price=False):
 
             # fix open price for current bar to match close price for the previous bar
             if fix_open_price and prev_vals is not None:
-                ppo, pph, ppl, ppc, ppv = vals
+                ppo, pph, ppl, ppc, ppv = prev_vals
                 if abs(po - ppc) > 1e-8:
                     count_fixed += 1
                     po = ppc
