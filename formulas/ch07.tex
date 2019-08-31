@@ -27,7 +27,7 @@ Page 3, Agent's experience
 To support this situations in a generic way, in PTAN we have class
 ptan.experience.ExperienceSourceFirstLast, which takes the environment and the
 agent and provides us the stream of experience tuples: ($s_t$, $a_t$, $R_t$, $s_{t+k}$), where
-\begin{math}R_t = r_tt + \gamma r_{t+1} + \gamma^2 r_{t+2} + \ldots + \gamma^{k-1}r_{t+k-1}\end{math}. When k=1, $R_t$ is just the $r_t$.
+\begin{math}R_t = r_t + \gamma r_{t+1} + \gamma^2 r_{t+2} + \ldots + \gamma^{k-1}r_{t+k-1}\end{math}. When k=1, $R_t$ is just the $r_t$.
 
 Page 10, N-steps DQN
 
