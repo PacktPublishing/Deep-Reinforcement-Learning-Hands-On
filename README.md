@@ -11,6 +11,8 @@ and [gym](https://gym.openai.com/), which is not always simple, as software evol
 extensively being used in chapter 13, was discontinued by OpenAI. List of current requirements is present in 
 [requirements.txt](requirements.txt) file.
 
+Examples require python 3.6.
+
 And, of course, bugs in examples are inevitable, so, exact code might differ from code present in the book text.
 
 Too keep track of major code change, I'm using tags and branches, for example:
