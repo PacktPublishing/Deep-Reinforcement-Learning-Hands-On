@@ -28,7 +28,7 @@ PPO_EPS = 0.2
 PPO_EPOCHES = 10
 PPO_BATCH_SIZE = 64
 
-TEST_ITERS = 1000
+TEST_ITERS = 100000
 
 
 def test_net(net, env, count=10, device="cpu"):

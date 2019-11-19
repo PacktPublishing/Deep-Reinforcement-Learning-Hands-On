@@ -26,7 +26,7 @@ LEARNING_RATE_CRITIC = 1e-3
 TRPO_MAX_KL = 0.01
 TRPO_DAMPING = 0.1
 
-TEST_ITERS = 1000
+TEST_ITERS = 100000
 
 
 def test_net(net, env, count=10, device="cpu"):

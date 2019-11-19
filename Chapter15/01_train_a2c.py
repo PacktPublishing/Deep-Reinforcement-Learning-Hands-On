@@ -25,7 +25,7 @@ LEARNING_RATE_CRITIC = 1e-3
 ENTROPY_BETA = 1e-3
 ENVS_COUNT = 16
 
-TEST_ITERS = 1000
+TEST_ITERS = 100000
 
 
 def test_net(net, env, count=10, device="cpu"):
