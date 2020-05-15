@@ -131,7 +131,6 @@ if __name__ == "__main__":
                 batch.clear()
 
                 optimizer.zero_grad()
-                import ipdb; ipdb.set_trace()
                 logits_v, value_v = net(states_v)
                 loss_value_v = F.mse_loss(value_v.squeeze(-1), vals_ref_v)
 
