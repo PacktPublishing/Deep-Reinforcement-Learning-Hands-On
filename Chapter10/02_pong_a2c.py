@@ -78,12 +78,12 @@ def unpack_batch(batch, net, device='cpu'):
         if exp.last_state is not None:
             not_done_idx.append(idx)
             last_states.append(np.array(exp.last_state, copy=False))
-    states_v = torch.FloatTensor(states).to(device)
+    states_v = torch.FloatTensor(np.array(states, copy=False)).to(device)
     actions_t = torch.LongTensor(actions).to(device)
     # handle rewards
     rewards_np = np.array(rewards, dtype=np.float32)
     if not_done_idx:
-        last_states_v = torch.FloatTensor(last_states).to(device)
+        last_states_v = torch.FloatTensor(np.array(last_states, copy)).to(device)
         last_vals_v = net(last_states_v)[1]
         last_vals_np = last_vals_v.data.cpu().numpy()[:, 0]
         rewards_np[not_done_idx] += GAMMA ** REWARD_STEPS * last_vals_np
@@ -135,7 +135,7 @@ if __name__ == "__main__":
                 loss_value_v = F.mse_loss(value_v.squeeze(-1), vals_ref_v)
 
                 log_prob_v = F.log_softmax(logits_v, dim=1)
-                adv_v = vals_ref_v - value_v.detach()
+                adv_v = vals_ref_v - value_v.squeeze(-1).detach()
                 log_prob_actions_v = adv_v * log_prob_v[range(BATCH_SIZE), actions_t]
                 loss_policy_v = -log_prob_actions_v.mean()
 
