@@ -59,12 +59,13 @@ class PhraseModel(nn.Module):
             out_token_v = torch.max(out_logits, dim=1)[1]
             out_token = out_token_v.data.cpu().numpy()[0]
 
+            if stop_at_token is not None and out_token == stop_at_token:
+                break
+
             cur_emb = self.emb(out_token_v)
 
             res_logits.append(out_logits)
             res_tokens.append(out_token)
-            if stop_at_token is not None and out_token == stop_at_token:
-                break
         return torch.cat(res_logits), res_tokens
 
     def decode_chain_sampling(self, hid, begin_emb, seq_len, stop_at_token=None):
@@ -82,12 +83,14 @@ class PhraseModel(nn.Module):
             out_probs = out_probs_v.data.cpu().numpy()[0]
             action = int(np.random.choice(out_probs.shape[0], p=out_probs))
             action_v = torch.LongTensor([action]).to(begin_emb.device)
+
+            if stop_at_token is not None and action == stop_at_token:
+                break
+
             cur_emb = self.emb(action_v)
 
             res_logits.append(out_logits)
             res_actions.append(action)
-            if stop_at_token is not None and action == stop_at_token:
-                break
         return torch.cat(res_logits), res_actions
 
 
