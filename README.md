@@ -50,3 +50,7 @@ Recent developments in reinforcement learning (RL), combined with deep learning 
 
 Deep Reinforcement Learning Hands-On is a comprehensive guide to the very latest DL tools and their limitations. You will evaluate methods including Cross-entropy and policy gradients, before applying them to real-world environments. Take on both the Atari set of virtual games and family favorites such as Connect4. The book provides an introduction to the basics of RL, giving you the know-how to code intelligent learning agents to take on a formidable array of practical tasks. Discover how to implement Q-learning on ‘grid world’ environments, teach your agent to buy and trade stocks, and find out how natural language models are driving the boom in chatbots.
 
+### Download a free PDF
+
+ <i>If you have already purchased a print or Kindle version of this book, you can get a DRM-free PDF version at no cost.<br>Simply click on the link to claim your free PDF.</i>
+<p align="center"> <a href="https://packt.link/free-ebook/9781838826994">https://packt.link/free-ebook/9781838826994 </a> </p>
