@@ -41,7 +41,7 @@ Get practical tips on **dashboarding**, **data visualization**, and **analytics 
 
 # Deep Reinforcement Learning Hands-On
 
-Code samples for [Deep Reinforcement Learning Hands-On](https://www.packtpub.com/big-data-and-business-intelligence/practical-deep-reinforcement-learning)
+Code samples for [Deep Reinforcement Learning Hands-On](https://www.packtpub.com/big-data-and-business-intelligence/deep-reinforcement-learning-hands?utm_source=github&utm_medium=repository&utm_campaign=9781788834247)
 book
 
 ## Versions and compatibility
