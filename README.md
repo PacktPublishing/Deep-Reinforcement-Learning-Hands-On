@@ -1,14 +1,4 @@
-<p align="center"><a href="https://packt.link/mlsumgh"><img src="https://static.packt-cdn.com/assets/images/ML Summit Banner v3 1200x627.png" alt="Machine Learning Summit 2025"/></a></p>
 
-## Machine Learning Summit 2025
-**Bridging Theory and Practice: ML Solutions for Today’s Challenges**
-
-3 days, 20+ experts, and 25+ tech sessions and talks covering critical aspects of:
-- **Agentic and Generative AI**
-- **Applied Machine Learning in the Real World**
-- **ML Engineering and Optimization**
-
-👉 [Book your ticket now >>](https://packt.link/mlsumgh)
 
 ---
 
